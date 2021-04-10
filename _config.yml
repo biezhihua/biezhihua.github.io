@@ -3,17 +3,17 @@
 ## Source: https://github.com/hexojs/hexo/
 
 # Site
-title: Hexo
-subtitle: ''
+title: 别志华的博客
+subtitle: '不积跬步，无以至千里；不积小流，无以成江海'
 description: ''
-keywords:
-author: John Doe
-language: en
+keywords: biezhihua Android iOS Rust Java
+author: biezhihua
+language: zh-CN
 timezone: ''
 
 # URL
 ## Set your site url here. For example, if you use GitHub Page, set url as 'https://username.github.io/project'
-url: http://example.com
+url: http://biezhihua.wicp.io/
 permalink: :year/:month/:day/:title/
 permalink_defaults:
 pretty_urls:
