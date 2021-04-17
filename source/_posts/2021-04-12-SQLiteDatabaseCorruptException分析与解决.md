@@ -140,28 +140,7 @@ SQLITE_PRIVATE const char *sqlite3ErrStr(int rc){
     /* SQLITE_NOTADB      */ "file is not a database",
     ......
   };
-  const char *zErr = "unknown error";
-  switch( rc ){
-    case SQLITE_ABORT_ROLLBACK: {
-      zErr = "abort due to ROLLBACK";
-      break;
-    }
-    case SQLITE_ROW: {
-      zErr = "another row available";
-      break;
-    }
-    case SQLITE_DONE: {
-      zErr = "no more rows available";
-      break;
-    }
-    default: {
-      rc &= 0xff;
-      if( ALWAYS(rc>=0) && rc<ArraySize(aMsg) && aMsg[rc]!=0 ){
-        zErr = aMsg[rc];
-      }
-      break;
-    }
-  }
+  ......
   return zErr;
 }
 ```
