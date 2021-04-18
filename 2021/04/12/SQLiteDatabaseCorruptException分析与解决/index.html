@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.4.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"biezhihua.wicp.io","root":"/","scheme":"Muse","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="先说解决方案与结论方案如果使用的Room库，那么需要按照如下方法设置JournalMode： 123Room.databaseBuilder(context, XXX::class.java, DATABASE_NAME)                .setJournalMode(JournalMode.TRUNCATE)                .build()  如果直接使用SQLi">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Crash: &#39;SQLiteDatabaseCorruptException: file is encrypted or is not a database&#39;的分析与解决">
+<meta property="og:url" content="http://biezhihua.wicp.io/2021/04/12/SQLiteDatabaseCorruptException%E5%88%86%E6%9E%90%E4%B8%8E%E8%A7%A3%E5%86%B3/index.html">
+<meta property="og:site_name" content="别志华的博客">
+<meta property="og:description" content="先说解决方案与结论方案如果使用的Room库，那么需要按照如下方法设置JournalMode： 123Room.databaseBuilder(context, XXX::class.java, DATABASE_NAME)                .setJournalMode(JournalMode.TRUNCATE)                .build()  如果直接使用SQLi">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://biezhihua.wicp.io/2021/04/12/SQLiteDatabaseCorruptException%E5%88%86%E6%9E%90%E4%B8%8E%E8%A7%A3%E5%86%B3/20210412234950.jpg">
+<meta property="og:image" content="http://biezhihua.wicp.io/2021/04/12/SQLiteDatabaseCorruptException%E5%88%86%E6%9E%90%E4%B8%8E%E8%A7%A3%E5%86%B3/20210413000002.jpg">
+<meta property="og:image" content="http://biezhihua.wicp.io/2021/04/12/SQLiteDatabaseCorruptException%E5%88%86%E6%9E%90%E4%B8%8E%E8%A7%A3%E5%86%B3/20210417172839.jpg">
+<meta property="og:image" content="http://biezhihua.wicp.io/2021/04/12/SQLiteDatabaseCorruptException%E5%88%86%E6%9E%90%E4%B8%8E%E8%A7%A3%E5%86%B3/20210417172726.jpg">
+<meta property="og:image" content="http://biezhihua.wicp.io/2021/04/12/SQLiteDatabaseCorruptException%E5%88%86%E6%9E%90%E4%B8%8E%E8%A7%A3%E5%86%B3/20210417172520.jpg">
+<meta property="og:image" content="http://biezhihua.wicp.io/2021/04/12/SQLiteDatabaseCorruptException%E5%88%86%E6%9E%90%E4%B8%8E%E8%A7%A3%E5%86%B3/20210417173116.jpg">
+<meta property="og:image" content="http://biezhihua.wicp.io/2021/04/12/SQLiteDatabaseCorruptException%E5%88%86%E6%9E%90%E4%B8%8E%E8%A7%A3%E5%86%B3/20210417173228.jpg">
+<meta property="og:image" content="http://biezhihua.wicp.io/2021/04/12/SQLiteDatabaseCorruptException%E5%88%86%E6%9E%90%E4%B8%8E%E8%A7%A3%E5%86%B3/20210417185532.jpg">
+<meta property="article:published_time" content="2021-04-12T00:00:00.000Z">
+<meta property="article:modified_time" content="2021-04-18T04:57:11.409Z">
+<meta property="article:author" content="biezhihua">
+<meta property="article:tag" content="biezhihua Android iOS Rust Java">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://biezhihua.wicp.io/2021/04/12/SQLiteDatabaseCorruptException%E5%88%86%E6%9E%90%E4%B8%8E%E8%A7%A3%E5%86%B3/20210412234950.jpg">
+
+<link rel="canonical" href="http://biezhihua.wicp.io/2021/04/12/SQLiteDatabaseCorruptException%E5%88%86%E6%9E%90%E4%B8%8E%E8%A7%A3%E5%86%B3/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>Crash: 'SQLiteDatabaseCorruptException: file is encrypted or is not a database'的分析与解决 | 别志华的博客</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">别志华的博客</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">不积跬步，无以至千里；不积小流，无以成江海</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://biezhihua.wicp.io/2021/04/12/SQLiteDatabaseCorruptException%E5%88%86%E6%9E%90%E4%B8%8E%E8%A7%A3%E5%86%B3/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="biezhihua">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="别志华的博客">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Crash: 'SQLiteDatabaseCorruptException: file is encrypted or is not a database'的分析与解决
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2021-04-12 00:00:00" itemprop="dateCreated datePublished" datetime="2021-04-12T00:00:00+00:00">2021-04-12</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2021-04-18 04:57:11" itemprop="dateModified" datetime="2021-04-18T04:57:11+00:00">2021-04-18</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h1 id="先说解决方案与结论"><a href="#先说解决方案与结论" class="headerlink" title="先说解决方案与结论"></a>先说解决方案与结论</h1><h2 id="方案"><a href="#方案" class="headerlink" title="方案"></a>方案</h2><p>如果使用的Room库，那么需要按照如下方法设置<code>JournalMode</code>：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">Room.databaseBuilder(context, XXX::class.java, DATABASE_NAME)</span><br><span class="line">                .setJournalMode(JournalMode.TRUNCATE)</span><br><span class="line">                .build()</span><br></pre></td></tr></table></figure>
+
+<p>如果直接使用SQLite，那么需要按照如下的方法设置<code>JournalMode</code>：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">SQLiteDatabase.disableWriteAheadLogging</span><br><span class="line"></span><br><span class="line">SQLiteDatabase.OpenParams.setJournalMode(String mode)</span><br></pre></td></tr></table></figure>
+
+<p>什么是<code>JournalMode</code>请参看这里：</p>
+<blockquote>
+<p><a target="_blank" rel="noopener" href="https://source.android.com/devices/tech/perf/compatibility-wal">https://source.android.com/devices/tech/perf/compatibility-wal</a></p>
+</blockquote>
+<h2 id="结论"><a href="#结论" class="headerlink" title="结论"></a>结论</h2><p>Android 9 引入了 SQLiteDatabase 的一种特殊模式，称为“兼容性 WAL（预写日志记录）(Write-Ahead-Logging)”，它允许数据库使用 journal_mode=WAL，同时保留每个数据库最多创建一个连接的行为。</p>
+<p>WAL使数据库的工作方式发生了变化，在一些状态下会抛出此异常。需要按照上文解决方案中的方法，手动关闭WAL模式，即可修复此问题。</p>
+<h1 id="排查方向和路径"><a href="#排查方向和路径" class="headerlink" title="排查方向和路径"></a>排查方向和路径</h1><h2 id="明确Crash堆栈信息"><a href="#明确Crash堆栈信息" class="headerlink" title="明确Crash堆栈信息"></a>明确Crash堆栈信息</h2><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line">android.database.sqlite.SQLiteDatabaseCorruptException: file is encrypted or is not a database (Sqlite code 26): , while compiling: PRAGMA journal_mode, (OS error - 2:No such file or directory)</span><br><span class="line">	at android.database.sqlite.SQLiteConnection.nativePrepareStatement(Native Method)</span><br><span class="line">	at android.database.sqlite.SQLiteConnection.acquirePreparedStatement(SQLiteConnection.java:925)</span><br><span class="line">	at android.database.sqlite.SQLiteConnection.executeForString(SQLiteConnection.java:670)</span><br><span class="line">	at android.database.sqlite.SQLiteConnection.setJournalMode(SQLiteConnection.java:356)</span><br><span class="line">	at android.database.sqlite.SQLiteConnection.setWalModeFromConfiguration(SQLiteConnection.java:319)</span><br><span class="line">	at android.database.sqlite.SQLiteConnection.open(SQLiteConnection.java:229)</span><br><span class="line">	at android.database.sqlite.SQLiteConnection.open(SQLiteConnection.java:207)</span><br><span class="line">	at android.database.sqlite.SQLiteConnectionPool.openConnectionLocked(SQLiteConnectionPool.java:511)</span><br><span class="line">	at android.database.sqlite.SQLiteConnectionPool.open(SQLiteConnectionPool.java:194)</span><br><span class="line">	at android.database.sqlite.SQLiteConnectionPool.open(SQLiteConnectionPool.java:183)</span><br><span class="line">	at android.database.sqlite.SQLiteDatabase.openInner(SQLiteDatabase.java:880)</span><br><span class="line">	at android.database.sqlite.SQLiteDatabase.open(SQLiteDatabase.java:867)</span><br><span class="line">	at android.database.sqlite.SQLiteDatabase.openDatabase(SQLiteDatabase.java:767)</span><br><span class="line">	at android.app.ContextImpl.openOrCreateDatabase(ContextImpl.java:739)</span><br><span class="line">	at android.content.ContextWrapper.openOrCreateDatabase(ContextWrapper.java:289)</span><br><span class="line">	at android.database.sqlite.SQLiteOpenHelper.getDatabaseLocked(SQLiteOpenHelper.java:235)</span><br><span class="line">	at android.database.sqlite.SQLiteOpenHelper.getWritableDatabase(SQLiteOpenHelper.java:175)</span><br><span class="line">	at android.arch.persistence.a.a.b$a.a(SourceFile:96)</span><br><span class="line">	at android.arch.persistence.a.a.b.a(SourceFile:54)</span><br><span class="line">	at android.arch.persistence.room.RoomDatabase.query(SourceFile:233)</span><br></pre></td></tr></table></figure>
+
+<h2 id="明确问题影响范围"><a href="#明确问题影响范围" class="headerlink" title="明确问题影响范围"></a>明确问题影响范围</h2><p>问题在一开始只有零星的一些，并未引起我太多的注意，但是在正式版本放量后，Crash数量便猛增起来，到了不得不修复的状态。</p>
+<p><img src="20210412234950.jpg"></p>
+<p>而且该问题出现的系统版本遍布了5.1.1到11。</p>
+<p><img src="20210413000002.jpg"></p>
+<h2 id="尝试修复无果"><a href="#尝试修复无果" class="headerlink" title="尝试修复无果"></a>尝试修复无果</h2><p>开始着手修复后，只是拿着关键词在Google和百度上进行搜索，但是惊奇的发现，有同类型错误的出现，但都没有相关的解决方案。</p>
+<p>虽说<code>try catch</code>能够捕获该异常，但是这种粗暴的方法，再加上不明所以，总是会让人不爽，于是开始查询源码来排查问题出在那里。</p>
+<h2 id="源码寻因"><a href="#源码寻因" class="headerlink" title="源码寻因"></a>源码寻因</h2><p>根据堆栈信息可以明确知道，异常是在<code>nativePrepareStatement</code>的方法中抛出的，由于此方法是JNI代码，并无法快捷的直接在AS中索引，所以此处用到了Andoid Code Search网站进行源码搜索。</p>
+<p><code>nativePrepareStatement</code>是<code>android_database_SQLiteConnection.cpp</code>文件中的方法，方法如下：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line">static jlong nativePrepareStatement(JNIEnv* env, jclass clazz, jlong connectionPtr, jstring sqlString) &#123;</span><br><span class="line">    SQLiteConnection* connection &#x3D; reinterpret_cast&lt;SQLiteConnection*&gt;(connectionPtr);</span><br><span class="line"></span><br><span class="line">    jsize sqlLength &#x3D; env-&gt;GetStringLength(sqlString);</span><br><span class="line">    const jchar* sql &#x3D; env-&gt;GetStringCritical(sqlString, NULL);</span><br><span class="line">    sqlite3_stmt* statement;</span><br><span class="line">    int err &#x3D; sqlite3_prepare16_v2(connection-&gt;db, sql, sqlLength * sizeof(jchar), &amp;statement, NULL);</span><br><span class="line">    env-&gt;ReleaseStringCritical(sqlString, sql);</span><br><span class="line"></span><br><span class="line">    if (err !&#x3D; SQLITE_OK) &#123;</span><br><span class="line">        &#x2F;&#x2F; Error messages like &#39;near &quot;)&quot;: syntax error&#39; are not</span><br><span class="line">        &#x2F;&#x2F; always helpful enough, so construct an error string that</span><br><span class="line">        &#x2F;&#x2F; includes the query itself.</span><br><span class="line">        const char *query &#x3D; env-&gt;GetStringUTFChars(sqlString, NULL);</span><br><span class="line">        char *message &#x3D; (char*) malloc(strlen(query) + 50);</span><br><span class="line">        if (message) &#123;</span><br><span class="line">            strcpy(message, &quot;, while compiling: &quot;); &#x2F;&#x2F; less than 50 chars</span><br><span class="line">            strcat(message, query);</span><br><span class="line">        &#125;</span><br><span class="line">        env-&gt;ReleaseStringUTFChars(sqlString, query);</span><br><span class="line">        throw_sqlite3_exception(env, connection-&gt;db, message);</span><br><span class="line">        free(message);</span><br><span class="line">        return 0;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    ALOGV(&quot;Prepared statement %p on connection %p&quot;, statement, connection-&gt;db);</span><br><span class="line">    return reinterpret_cast&lt;jlong&gt;(statement);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<blockquote>
+<p><a target="_blank" rel="noopener" href="https://cs.android.com/android/platform/superproject/+/android-10.0.0_r30:frameworks/base/core/jni/android_database_SQLiteConnection.cpp;l=303;drc=android-10.0.0_r30">https://cs.android.com/android/platform/superproject/+/android-10.0.0_r30:frameworks/base/core/jni/android_database_SQLiteConnection.cpp;l=303;drc=android-10.0.0_r30</a></p>
+</blockquote>
+<p>在<code>nativePrepareStatement</code>方法中，可以看到一个关键字”, while compiling:”与Crash日志中的”file is encrypted or is not a database (Sqlite code 26): , while compiling: PRAGMA journal_mode, (OS error - 2:No such file or directory)”相匹配，可以确定真正发生Crash的地点是在拼接错误日志之前。</p>
+<p>那么可以进一步将发生Crash的方法锁定到<code>sqlite3_prepare16_v2</code>方法中。</p>
+<p>由于sqilte3的代码文件过大，建议将库克隆到本地。</p>
+<blockquote>
+<p><a target="_blank" rel="noopener" href="https://android.googlesource.com/platform/external/sqlite.git">https://android.googlesource.com/platform/external/sqlite.git</a></p>
+</blockquote>
+<p>这里推荐一下Sourcetrail软件，阅读C代码的神器，以<code>sqlite3_prepare16_v2()</code>为起点，通过层层调用可以排查到在<code>lockBtree()</code>方法中有可能返回<code>SQLITE_NOTADB</code>错误码。</p>
+<p><img src="20210417172839.jpg"></p>
+<p><img src="20210417172726.jpg"></p>
+<p><img src="20210417172520.jpg"></p>
+<p><img src="20210417173116.jpg"></p>
+<p><img src="20210417173228.jpg"></p>
+<p>同时可以搜索sqlite3.c文件，可以知道在<code>sqlite3ErrStr()</code>方法中，将<code>SQLITE_NOTADB</code>错误码与错误文案（”file is not a database”）进行了关联。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">SQLITE_PRIVATE const char *sqlite3ErrStr(int rc)&#123;</span><br><span class="line">  static const char* const aMsg[] &#x3D; &#123;</span><br><span class="line">    ......</span><br><span class="line">    &#x2F;* SQLITE_NOTADB      *&#x2F; &quot;file is not a database&quot;,</span><br><span class="line">    ......</span><br><span class="line">  &#125;;</span><br><span class="line">  ......</span><br><span class="line">  return zErr;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>可以分析得知<code>lockBtree()</code>方法就是产生这个Crash的地方，那么着重对该方法进行一个分析。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br></pre></td><td class="code"><pre><span class="line">&#x2F;*</span><br><span class="line">** Get a reference to pPage1 of the database file.  This will</span><br><span class="line">** also acquire a readlock on that file.</span><br><span class="line">**</span><br><span class="line">** SQLITE_OK is returned on success.  If the file is not a</span><br><span class="line">** well-formed database file, then SQLITE_CORRUPT is returned.</span><br><span class="line">** SQLITE_BUSY is returned if the database is locked.  SQLITE_NOMEM</span><br><span class="line">** is returned if we run out of memory. </span><br><span class="line">*&#x2F;</span><br><span class="line">static int lockBtree(BtShared *pBt)&#123;</span><br><span class="line">  int rc;              &#x2F;* Result code from subfunctions *&#x2F;</span><br><span class="line">  MemPage *pPage1;     &#x2F;* Page 1 of the database file *&#x2F;</span><br><span class="line">  u32 nPage;           &#x2F;* Number of pages in the database *&#x2F;</span><br><span class="line">  u32 nPageFile &#x3D; 0;   &#x2F;* Number of pages in the database file *&#x2F;</span><br><span class="line">  u32 nPageHeader;     &#x2F;* Number of pages in the database according to hdr *&#x2F;</span><br><span class="line"></span><br><span class="line">  &#x2F;* Do some checking to help insure the file we opened really is</span><br><span class="line">  ** a valid database file. </span><br><span class="line">  *&#x2F;</span><br><span class="line">  nPage &#x3D; nPageHeader &#x3D; get4byte(28+(u8*)pPage1-&gt;aData);</span><br><span class="line">  sqlite3PagerPagecount(pBt-&gt;pPager, (int*)&amp;nPageFile);</span><br><span class="line">  if( nPage&#x3D;&#x3D;0 || memcmp(24+(u8*)pPage1-&gt;aData, 92+(u8*)pPage1-&gt;aData,4)!&#x3D;0 )&#123;</span><br><span class="line">    nPage &#x3D; nPageFile;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  if( nPage&gt;0 )&#123;</span><br><span class="line">    u32 pageSize;</span><br><span class="line">    u32 usableSize;</span><br><span class="line">    u8 *page1 &#x3D; pPage1-&gt;aData;</span><br><span class="line">    rc &#x3D; SQLITE_NOTADB;</span><br><span class="line"></span><br><span class="line">    ......</span><br><span class="line"></span><br><span class="line">#ifdef SQLITE_OMIT_WAL</span><br><span class="line">    ......</span><br><span class="line">#else</span><br><span class="line">    if( page1[18]&gt;2 )&#123;</span><br><span class="line">      pBt-&gt;btsFlags |&#x3D; BTS_READ_ONLY;</span><br><span class="line">    &#125;</span><br><span class="line">    if( page1[19]&gt;2 )&#123;</span><br><span class="line">      goto page1_init_failed;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    &#x2F;* If the write version is set to 2, this database should be accessed</span><br><span class="line">    ** in WAL mode. If the log is not already open, open it now. Then </span><br><span class="line">    ** return SQLITE_OK and return without populating BtShared.pPage1.</span><br><span class="line">    ** The caller detects this and calls this function again. This is</span><br><span class="line">    ** required as the version of page 1 currently in the page1 buffer</span><br><span class="line">    ** may not be the latest version - there may be a newer one in the log</span><br><span class="line">    ** file.</span><br><span class="line">    *&#x2F;</span><br><span class="line">    if( page1[19]&#x3D;&#x3D;2 &amp;&amp; (pBt-&gt;btsFlags &amp; BTS_NO_WAL)&#x3D;&#x3D;0 )&#123;</span><br><span class="line">      int isOpen &#x3D; 0;</span><br><span class="line">      rc &#x3D; sqlite3PagerOpenWal(pBt-&gt;pPager, &amp;isOpen);</span><br><span class="line">      if( rc!&#x3D;SQLITE_OK )&#123;</span><br><span class="line">        goto page1_init_failed;</span><br><span class="line">      &#125;else&#123;</span><br><span class="line">        setDefaultSyncFlag(pBt, SQLITE_DEFAULT_WAL_SYNCHRONOUS+1);</span><br><span class="line">        if( isOpen&#x3D;&#x3D;0 )&#123;</span><br><span class="line">          releasePageOne(pPage1);</span><br><span class="line">          return SQLITE_OK;</span><br><span class="line">        &#125;</span><br><span class="line">      &#125;</span><br><span class="line">      rc &#x3D; SQLITE_NOTADB;</span><br><span class="line">    &#125;else&#123;</span><br><span class="line">      setDefaultSyncFlag(pBt, SQLITE_DEFAULT_SYNCHRONOUS+1);</span><br><span class="line">    &#125;</span><br><span class="line">#endif</span><br><span class="line"></span><br><span class="line">    ......</span><br><span class="line"></span><br><span class="line">page1_init_failed:</span><br><span class="line">  releasePageOne(pPage1);</span><br><span class="line">  pBt-&gt;pPage1 &#x3D; 0;</span><br><span class="line">  return rc;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>我将<code>lockBTree()</code>中和Crash不相关的逻辑进行了去除，通过分析可以知道，<code>rc</code>的默认值就是<code>SQLITE_NOTADB</code>，在随后的逻辑中<br>通过<code>sqlite3PagerOpenWal()</code>方法尝试通过WAL的方式打开数据库，但是其结果不为<code>SQLITE_OK</code>，导致逻辑直接跳向了<code>page1_init_failed</code>中。</p>
+<p><img src="20210417185532.jpg"></p>
+<p>在<code>sqlite3PagerOpenWal()</code>方法中又后续调用了<code>pagerOpenWal()</code>等方法，都是WAL的逻辑。</p>
+<p>WAL预写式日志（Write-ahead logging，缩写 WAL）是关系数据库系统中用于提供原子性和持久性（ACID属性中的两个）的一系列技术。在使用WAL的系统中，所有的修改在提交之前都要先写入log文件中。</p>
+<p>至此，想要解决这个Crash，只需要禁止数据库的WAL模式即可。</p>
+<h1 id="引用"><a href="#引用" class="headerlink" title="引用"></a>引用</h1><ul>
+<li>JOURNAL_MODE:<a target="_blank" rel="noopener" href="https://sqlite.org/pragma.html#pragma_journal_mode">https://sqlite.org/pragma.html#pragma_journal_mode</a></li>
+<li>WAL:<a target="_blank" rel="noopener" href="https://zh.wikipedia.org/zh-hans/%E9%A2%84%E5%86%99%E5%BC%8F%E6%97%A5%E5%BF%97">https://zh.wikipedia.org/zh-hans/%E9%A2%84%E5%86%99%E5%BC%8F%E6%97%A5%E5%BF%97</a></li>
+<li>AndroidWAL:<a target="_blank" rel="noopener" href="https://source.android.com/devices/tech/perf/compatibility-wal">https://source.android.com/devices/tech/perf/compatibility-wal</a></li>
+<li>nativePrepareStatement: <a target="_blank" rel="noopener" href="https://cs.android.com/android/platform/superproject/+/android-10.0.0_r30:frameworks/base/core/jni/android_database_SQLiteConnection.cpp;l=303;drc=android-10.0.0_r30">https://cs.android.com/android/platform/superproject/+/android-10.0.0_r30:frameworks/base/core/jni/android_database_SQLiteConnection.cpp;l=303;drc=android-10.0.0_r30</a></li>
+<li>sqlite:<a target="_blank" rel="noopener" href="https://android.googlesource.com/platform/external/sqlite.git">https://android.googlesource.com/platform/external/sqlite.git</a></li>
+<li><a target="_blank" rel="noopener" href="https://blog.csdn.net/aasmfox/article/details/8026333">https://blog.csdn.net/aasmfox/article/details/8026333</a></li>
+<li><a target="_blank" rel="noopener" href="https://stackoverflow.com/questions/11901460/is-it-possible-to-disable-wal-on-android-sqlite-database">https://stackoverflow.com/questions/11901460/is-it-possible-to-disable-wal-on-android-sqlite-database</a></li>
+<li><a target="_blank" rel="noopener" href="https://stackoverflow.com/questions/53659206/disabling-sqlite-write-ahead-logging-in-android-pie/53689702">https://stackoverflow.com/questions/53659206/disabling-sqlite-write-ahead-logging-in-android-pie/53689702</a></li>
+<li><a target="_blank" rel="noopener" href="https://github.com/CoatiSoftware/Sourcetrail">https://github.com/CoatiSoftware/Sourcetrail</a></li>
+<li><a target="_blank" rel="noopener" href="https://blog.csdn.net/zearot/article/details/51039593">https://blog.csdn.net/zearot/article/details/51039593</a></li>
+<li><a target="_blank" rel="noopener" href="https://cs.android.com/android/platform/superproject/+/master:external/rust/crates/">https://cs.android.com/android/platform/superproject/+/master:external/rust/crates/</a></li>
+<li><a target="_blank" rel="noopener" href="http://sqlite.1065341.n5.nabble.com/sqlite-3-7-2-doesn-t-compile-if-SQLITE-OMIT-WAL-is-defined-td45921.html">http://sqlite.1065341.n5.nabble.com/sqlite-3-7-2-doesn-t-compile-if-SQLITE-OMIT-WAL-is-defined-td45921.html</a></li>
+<li><a target="_blank" rel="noopener" href="https://www.sqlite.org/src/info/d1ed743b6e">https://www.sqlite.org/src/info/d1ed743b6e</a></li>
+<li><a target="_blank" rel="noopener" href="https://www.sqlite.org/compile.html">https://www.sqlite.org/compile.html</a></li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2021/04/11/%E5%A6%82%E4%BD%95%E8%AE%A9HEXO%E5%9C%A8%E5%90%8E%E5%8F%B0%E9%95%BF%E6%9C%9F%E8%BF%90%E8%A1%8C/" rel="prev" title="如何让HEXO在后台长期运行?">
+      <i class="fa fa-chevron-left"></i> 如何让HEXO在后台长期运行?
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%85%88%E8%AF%B4%E8%A7%A3%E5%86%B3%E6%96%B9%E6%A1%88%E4%B8%8E%E7%BB%93%E8%AE%BA"><span class="nav-number">1.</span> <span class="nav-text">先说解决方案与结论</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%96%B9%E6%A1%88"><span class="nav-number">1.1.</span> <span class="nav-text">方案</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E7%BB%93%E8%AE%BA"><span class="nav-number">1.2.</span> <span class="nav-text">结论</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E6%8E%92%E6%9F%A5%E6%96%B9%E5%90%91%E5%92%8C%E8%B7%AF%E5%BE%84"><span class="nav-number">2.</span> <span class="nav-text">排查方向和路径</span></a><ol class="nav-child"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%98%8E%E7%A1%AECrash%E5%A0%86%E6%A0%88%E4%BF%A1%E6%81%AF"><span class="nav-number">2.1.</span> <span class="nav-text">明确Crash堆栈信息</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%98%8E%E7%A1%AE%E9%97%AE%E9%A2%98%E5%BD%B1%E5%93%8D%E8%8C%83%E5%9B%B4"><span class="nav-number">2.2.</span> <span class="nav-text">明确问题影响范围</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%B0%9D%E8%AF%95%E4%BF%AE%E5%A4%8D%E6%97%A0%E6%9E%9C"><span class="nav-number">2.3.</span> <span class="nav-text">尝试修复无果</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E6%BA%90%E7%A0%81%E5%AF%BB%E5%9B%A0"><span class="nav-number">2.4.</span> <span class="nav-text">源码寻因</span></a></li></ol></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%BC%95%E7%94%A8"><span class="nav-number">3.</span> <span class="nav-text">引用</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">biezhihua</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">2</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2021</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">biezhihua</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://muse.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>
