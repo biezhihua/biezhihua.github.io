@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.4.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"biezhihua.wicp.io","root":"/","scheme":"Muse","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="Rust语言最强大的一个特点就是可以创建和利用宏&#x2F;Macro。不过创建Rust宏看起来挺复杂，常常令刚接触Rust的开发者心生畏惧。这片文章的目的就是帮助你理解Rust Macro的基本运作原理，学习如何创建自己的Rust宏。 1、什么是Rust的宏&#x2F;Macro？ 如果你尝试过Rust，应该已经用过Rust的宏了：println!。这个宏 可以在终端输出一行文本，并且支持变量的插值。 简单地说，R">
+<meta property="og:type" content="article">
+<meta property="og:title" content="【转载】Rust宏编程新手指南">
+<meta property="og:url" content="http://biezhihua.wicp.io/2021/05/11/Rust%E5%AE%8F%E7%BC%96%E7%A8%8B%E6%96%B0%E6%89%8B%E6%8C%87%E5%8D%97/index.html">
+<meta property="og:site_name" content="别志华的博客">
+<meta property="og:description" content="Rust语言最强大的一个特点就是可以创建和利用宏&#x2F;Macro。不过创建Rust宏看起来挺复杂，常常令刚接触Rust的开发者心生畏惧。这片文章的目的就是帮助你理解Rust Macro的基本运作原理，学习如何创建自己的Rust宏。 1、什么是Rust的宏&#x2F;Macro？ 如果你尝试过Rust，应该已经用过Rust的宏了：println!。这个宏 可以在终端输出一行文本，并且支持变量的插值。 简单地说，R">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://biezhihua.wicp.io/2021/05/11/Rust%E5%AE%8F%E7%BC%96%E7%A8%8B%E6%96%B0%E6%89%8B%E6%8C%87%E5%8D%97/1.png">
+<meta property="og:image" content="http://biezhihua.wicp.io/2021/05/11/Rust%E5%AE%8F%E7%BC%96%E7%A8%8B%E6%96%B0%E6%89%8B%E6%8C%87%E5%8D%97/2.png">
+<meta property="og:image" content="http://biezhihua.wicp.io/2021/05/11/Rust%E5%AE%8F%E7%BC%96%E7%A8%8B%E6%96%B0%E6%89%8B%E6%8C%87%E5%8D%97/matcher-transcriber.png">
+<meta property="og:image" content="http://biezhihua.wicp.io/2021/05/11/Rust%E5%AE%8F%E7%BC%96%E7%A8%8B%E6%96%B0%E6%89%8B%E6%8C%87%E5%8D%97/matcher.png">
+<meta property="og:image" content="http://biezhihua.wicp.io/2021/05/11/Rust%E5%AE%8F%E7%BC%96%E7%A8%8B%E6%96%B0%E6%89%8B%E6%8C%87%E5%8D%97/transcriber.png">
+<meta property="og:image" content="http://biezhihua.wicp.io/2021/05/11/Rust%E5%AE%8F%E7%BC%96%E7%A8%8B%E6%96%B0%E6%89%8B%E6%8C%87%E5%8D%97/yo.png">
+<meta property="og:image" content="http://biezhihua.wicp.io/2021/05/11/Rust%E5%AE%8F%E7%BC%96%E7%A8%8B%E6%96%B0%E6%89%8B%E6%8C%87%E5%8D%97/repeat.png">
+<meta property="og:image" content="http://biezhihua.wicp.io/2021/05/11/Rust%E5%AE%8F%E7%BC%96%E7%A8%8B%E6%96%B0%E6%89%8B%E6%8C%87%E5%8D%97/repeat-sample.png">
+<meta property="og:image" content="http://biezhihua.wicp.io/2021/05/11/Rust%E5%AE%8F%E7%BC%96%E7%A8%8B%E6%96%B0%E6%89%8B%E6%8C%87%E5%8D%97/hash-pattern.png">
+<meta property="og:image" content="http://biezhihua.wicp.io/2021/05/11/Rust%E5%AE%8F%E7%BC%96%E7%A8%8B%E6%96%B0%E6%89%8B%E6%8C%87%E5%8D%97/hash-repeat.png">
+<meta property="og:image" content="http://biezhihua.wicp.io/2021/05/11/Rust%E5%AE%8F%E7%BC%96%E7%A8%8B%E6%96%B0%E6%89%8B%E6%8C%87%E5%8D%97/hash-repeat-2.png">
+<meta property="og:image" content="http://biezhihua.wicp.io/2021/05/11/Rust%E5%AE%8F%E7%BC%96%E7%A8%8B%E6%96%B0%E6%89%8B%E6%8C%87%E5%8D%97/hash-transcriber.png">
+<meta property="og:image" content="http://biezhihua.wicp.io/2021/05/11/Rust%E5%AE%8F%E7%BC%96%E7%A8%8B%E6%96%B0%E6%89%8B%E6%8C%87%E5%8D%97/hash-expand.png">
+<meta property="og:image" content="http://biezhihua.wicp.io/2021/05/11/Rust%E5%AE%8F%E7%BC%96%E7%A8%8B%E6%96%B0%E6%89%8B%E6%8C%87%E5%8D%97/map.png">
+<meta property="og:image" content="http://biezhihua.wicp.io/2021/05/11/Rust%E5%AE%8F%E7%BC%96%E7%A8%8B%E6%96%B0%E6%89%8B%E6%8C%87%E5%8D%97/map-test.png">
+<meta property="article:published_time" content="2021-05-11T00:00:00.000Z">
+<meta property="article:modified_time" content="2021-05-11T12:51:42.637Z">
+<meta property="article:author" content="biezhihua">
+<meta property="article:tag" content="biezhihua Android iOS Rust Java">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://biezhihua.wicp.io/2021/05/11/Rust%E5%AE%8F%E7%BC%96%E7%A8%8B%E6%96%B0%E6%89%8B%E6%8C%87%E5%8D%97/1.png">
+
+<link rel="canonical" href="http://biezhihua.wicp.io/2021/05/11/Rust%E5%AE%8F%E7%BC%96%E7%A8%8B%E6%96%B0%E6%89%8B%E6%8C%87%E5%8D%97/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>【转载】Rust宏编程新手指南 | 别志华的博客</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">别志华的博客</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">不积跬步，无以至千里；不积小流，无以成江海</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://biezhihua.wicp.io/2021/05/11/Rust%E5%AE%8F%E7%BC%96%E7%A8%8B%E6%96%B0%E6%89%8B%E6%8C%87%E5%8D%97/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="biezhihua">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="别志华的博客">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          【转载】Rust宏编程新手指南
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2021-05-11 00:00:00 / 修改时间：12:51:42" itemprop="dateCreated datePublished" datetime="2021-05-11T00:00:00+00:00">2021-05-11</time>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>Rust语言最强大的一个特点就是可以创建和利用宏/Macro。不过创建Rust宏看起来挺复杂，常常令刚接触Rust的开发者心生畏惧。这片文章的目的就是帮助你理解Rust Macro的基本运作原理，学习如何创建自己的Rust宏。</p>
+<h1 id="1、什么是Rust的宏-Macro？"><a href="#1、什么是Rust的宏-Macro？" class="headerlink" title="1、什么是Rust的宏/Macro？"></a>1、什么是Rust的宏/Macro？</h1><p><img src="1.png"></p>
+<p>如果你尝试过Rust，应该已经用过Rust的宏了：println!。这个宏 可以在终端输出一行文本，并且支持变量的插值。</p>
+<p>简单地说，Rust宏让你可以发明自己的语法，编写出可以自行展开的代码， 也就是我们通常所说的元编程，你甚至可以用Rust宏来创作自己的DSL。</p>
+<p>Rust宏的基本运作机制就是：首先匹配宏规则中定义的模式，然后将匹配 结果绑定到变量，最后展开变量替换后的代码。</p>
+<p>不理解也没有关系，让我们继续看。</p>
+<h1 id="2、如果创建Rust宏-Macro？"><a href="#2、如果创建Rust宏-Macro？" class="headerlink" title="2、如果创建Rust宏/Macro？"></a>2、如果创建Rust宏/Macro？</h1><p>可以使用Rust预置的<code>macro_rules!</code>宏来创建一个新的Rust宏。</p>
+<p>下图展示了如何创建一个空白的Rust宏：<code>hey!</code>，这个宏什么功能 也没有，我们现在只关注它的结构：</p>
+<p><img src="2.png"></p>
+<p><code>() =&gt; &#123;&#125;</code>看起来很神秘，因为它不是标准的Rust语法，是<code>macro_rules!</code>这个宏自己发明的，用来表示一条宏规则，<code>=&gt;</code>左边是匹配模式，右边是 等待展开的代码：</p>
+<p><img src="matcher-transcriber.png"></p>
+<p>左边的小括号部分是Rust宏的匹配器/Matcher，用来匹配模式并捕捉变量，这是我们 发明自定义语法和DSL的关键所在。</p>
+<p>右边的大括号部分是Rust宏的转码器/Transcriber，也就是我们要应用匹配器捕捉到 的变量的部分，Rust编译器将利用变量和这部分的代码来生成实际的Rust代码。</p>
+<p>类似于Rust中的match语句，在<code>macro_rules!</code>中可以定义多条宏规则，例如：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">macro_rules! hey&#123;</span><br><span class="line">  () &#x3D;&gt; &#123;&#125;,</span><br><span class="line">  () &#x3D;&gt; &#123;&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h1 id="3、模式匹配与变量捕捉"><a href="#3、模式匹配与变量捕捉" class="headerlink" title="3、模式匹配与变量捕捉"></a>3、模式匹配与变量捕捉</h1><p>现在我们看看Rust宏的模式是如何匹配的。</p>
+<p><img src="matcher.png"></p>
+<p>在匹配器/Matcher中，<code>$name</code>部分定义了变量名，匹配结果将绑定到该变量以便 应用到转码器/Transcriber中。在这个示例中，表示我们将Rust宏的匹配结果存入变量<code>$name</code>。</p>
+<p>冒号后面的部分被称为选择器/Designator，用于声明我们要匹配的类型。 例如在这个示例中，我们使用的是表达式选择器，也就是<code>expr</code>， 这告诉Rust：匹配一个表达式，然后存入<code>$name</code>变量。</p>
+<p>表达式选择器只是Rust中众多可用选择器中的一个，下面是一些常见的 Rust宏选择器：</p>
+<ul>
+<li>item：条目，例如函数、结构、模块等</li>
+<li>block：代码块</li>
+<li>stmt：语句</li>
+<li>pat：模式</li>
+<li>expr：表达式</li>
+<li>ty：类型</li>
+<li>ident：标识符</li>
+<li>path：路径，例如 foo、 ::std::mem::replace, transmute::&lt;_, int&gt;, …</li>
+<li>meta：元信息条目，例如 #[…]和 #![rust macro…] 属性</li>
+<li>tt：词条树</li>
+</ul>
+<p>那么，现在如何在转码器/Transcriber中应用我们捕捉到的变量？</p>
+<p><img src="transcriber.png"></p>
+<p>很简单，在Rust宏转码器部分我们只需要在常规的Rust代码中，嵌入匹配器 捕捉到的变量就行了，没什么特别之处！</p>
+<h1 id="4、编写第一个Rust宏"><a href="#4、编写第一个Rust宏" class="headerlink" title="4、编写第一个Rust宏"></a>4、编写第一个Rust宏</h1><p>我们已经了解了如何编写一个Rust宏，现在让我们动手写一个：</p>
+<p><img src="yo.png"></p>
+<p>很简单，对吧？</p>
+<h1 id="5、重复模式的提取与利用"><a href="#5、重复模式的提取与利用" class="headerlink" title="5、重复模式的提取与利用"></a>5、重复模式的提取与利用</h1><p>我们用的许多Rust宏都可以支持非常多的输入。以vec!宏为例，我们 可以这样调用它：<code>vec![rust macro1,2,3,4,5]</code>，或者这样：<code>vec![rust macro1,2,3,,4,5,6,7,8]</code>。</p>
+<p>那么<code>vec!</code>宏是如何实现这一点的？很显然它不会去定义成千上万个变量来 逐个保存匹配结果，秘密在于重复模式的匹配：</p>
+<p><img src="repeat.png"></p>
+<p>我们只需要把希望重复的模式写在<code>$(...)</code>这部分，然后插入分隔符， 在这里也就是逗号，最后添加一个<code>*</code>符号，表示重复匹配<code>$()</code>中的模式。</p>
+<p>还有点晕？让我们看个具体的例子：</p>
+<p><img src="repeat-sample.png"></p>
+<p>在这个示例中，对于<code>hey!</code>宏，我们重复捕捉输入表达式并存入变量<code>$name</code>， 也就是说，所有捕捉到的表达式都绑定到变量<code>$name</code>了 —— 不妨把 <code>$name</code> 想象成数组变量。</p>
+<h1 id="6、用重复模式在Rust中实现Ruby的哈希表语法"><a href="#6、用重复模式在Rust中实现Ruby的哈希表语法" class="headerlink" title="6、用重复模式在Rust中实现Ruby的哈希表语法"></a>6、用重复模式在Rust中实现Ruby的哈希表语法</h1><p>如果你之前写过Ruby程序，可能还记得在Ruby中定义哈希表的语法：<code>key =&gt; value</code>。 现在我们可以用Rust宏来在Rust中实现哈希表的这种定义方法！</p>
+<p><img src="hash-pattern.png"></p>
+<p>在Rust宏的匹配器部分，我们使用模式<code>$key:expr =&gt; $value:expr </code>来分别捕捉<code>$key</code>和<code>$value</code>表达式，分隔符为<code>=&gt;</code>。 不过现在只能匹配一个键/值对，但是哈希表通常都是多个键值对的。应该 如何实现？</p>
+<p>答案是使用重复匹配：</p>
+<p><img src="hash-repeat.png"></p>
+<p>将我们要匹配的键/值对模式放到<code>$(),*</code>，就可以进行重复匹配了。COOL!!</p>
+<p><img src="hash-repeat-2.png"></p>
+<p>那么，如何应用捕捉到的键/值对？显然，我们应该在Rust宏的转码器中创建哈希表对象， 然后将捕捉到的所有键值对插入该哈希表：</p>
+<p><img src="hash-transcriber.png"></p>
+<p>在转码器中，注意代码中的<code>$()*</code>，它的意思是其中的代码会重复展开！</p>
+<p><img src="hash-expand.png"></p>
+<p>就像你看到的，当我们调用<code>map!(&quot;name&quot; =&gt; &quot;Finn&quot;, &quot;gender&quot; =&gt; &quot;Boy&quot;)</code>时， 我们在生成两段重复的代码。</p>
+<p><code>key =&gt; value</code>将被转码为在Rust宏的转码器/transcriber中指定的代码，也就是 <code>hm.insert($key, $value)</code>，其中<code>$key</code>和<code>$value</code>是我们在Rust宏的匹配器部分捕捉到的变量。</p>
+<p>好了，让我们看看完整的<code>map!</code>宏实现:</p>
+<p><img src="map.png"></p>
+<p>只用了几行代码，我们就创建了一个功能完整的Rust宏！现在让 我们写个小程序测试一下：</p>
+<p><img src="map-test.png"></p>
+<p>COOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOL.</p>
+<h1 id="引用"><a href="#引用" class="headerlink" title="引用"></a>引用</h1><ul>
+<li>A Beginner’s Guide to Rust Macros(<a target="_blank" rel="noopener" href="https://medium.com/@phoomparin/a-beginners-guide-to-rust-macros-5c75594498f1">https://medium.com/@phoomparin/a-beginners-guide-to-rust-macros-5c75594498f1</a>)</li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2021/04/12/SQLiteDatabaseCorruptException%E5%88%86%E6%9E%90%E4%B8%8E%E8%A7%A3%E5%86%B3/" rel="prev" title="Crash: 'SQLiteDatabaseCorruptException: file is encrypted or is not a database'的分析与解决">
+      <i class="fa fa-chevron-left"></i> Crash: 'SQLiteDatabaseCorruptException: file is encrypted or is not a database'的分析与解决
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#1%E3%80%81%E4%BB%80%E4%B9%88%E6%98%AFRust%E7%9A%84%E5%AE%8F-Macro%EF%BC%9F"><span class="nav-number">1.</span> <span class="nav-text">1、什么是Rust的宏&#x2F;Macro？</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#2%E3%80%81%E5%A6%82%E6%9E%9C%E5%88%9B%E5%BB%BARust%E5%AE%8F-Macro%EF%BC%9F"><span class="nav-number">2.</span> <span class="nav-text">2、如果创建Rust宏&#x2F;Macro？</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#3%E3%80%81%E6%A8%A1%E5%BC%8F%E5%8C%B9%E9%85%8D%E4%B8%8E%E5%8F%98%E9%87%8F%E6%8D%95%E6%8D%89"><span class="nav-number">3.</span> <span class="nav-text">3、模式匹配与变量捕捉</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#4%E3%80%81%E7%BC%96%E5%86%99%E7%AC%AC%E4%B8%80%E4%B8%AARust%E5%AE%8F"><span class="nav-number">4.</span> <span class="nav-text">4、编写第一个Rust宏</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#5%E3%80%81%E9%87%8D%E5%A4%8D%E6%A8%A1%E5%BC%8F%E7%9A%84%E6%8F%90%E5%8F%96%E4%B8%8E%E5%88%A9%E7%94%A8"><span class="nav-number">5.</span> <span class="nav-text">5、重复模式的提取与利用</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#6%E3%80%81%E7%94%A8%E9%87%8D%E5%A4%8D%E6%A8%A1%E5%BC%8F%E5%9C%A8Rust%E4%B8%AD%E5%AE%9E%E7%8E%B0Ruby%E7%9A%84%E5%93%88%E5%B8%8C%E8%A1%A8%E8%AF%AD%E6%B3%95"><span class="nav-number">6.</span> <span class="nav-text">6、用重复模式在Rust中实现Ruby的哈希表语法</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E5%BC%95%E7%94%A8"><span class="nav-number">7.</span> <span class="nav-text">引用</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">biezhihua</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">3</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2021</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">biezhihua</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://muse.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Muse</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>
