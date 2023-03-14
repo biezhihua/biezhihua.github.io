@@ -4,32 +4,30 @@ tag:
   - performance
 ---
 
-# 绿宝石 | 性能优化系列 | 可观测技术
+# 性能优化 | 可观测技术
 
-<Toc />
+## 什么是可观测技术？
 
-## What is observability?
+可观测技术是一种通过检查系统的输出来测量系统内部状态的能力。
 
-观察性（Observability）指的是系统从外部收集和分析各种类型数据（如日志、指标、跟踪和事件）的能力。这个术语最初起源于控制理论和工程领域，并已被应用于软件工程和系统管理领域。
+随着应用程序和基础设施变得越来越动态和复杂，了解和诊断生产环境中出现的问题变得越来越困难。可观测技术提供了一个框架，通过提供对系统内部运作的可见性来理解和诊断这些问题。
 
-在软件工程中，观察性是构建和维护复杂分布式系统的关键方面。随着应用程序和基础设施变得越来越分布式、动态和复杂，了解和诊断生产环境中出现的问题变得越来越困难。观察性提供了一个框架，通过提供对系统内部运作的可见性来理解和诊断这些问题。
-
-观察性涉及收集和分析各种类型的数据，例如：
+可观测技术涉及收集和分析各种类型的数据，例如：
 
 - 日志：系统中事件和活动的文本记录，如错误消息、警告和信息性消息。
 - 指标：系统行为随时间的定量测量，如 CPU 利用率、内存使用和响应时间等。
 - 跟踪：请求在系统中的活动和事务记录，包括它的路径、涉及的服务和在每个步骤花费的时间的信息。
 - 事件：表示系统中重要事件或更改的离散信号或通知，如资源的创建或删除。
 
-通过收集和分析这些数据，观察性使开发人员和运维人员能够了解系统的行为、诊断问题，并做出关于如何提高其性能、可靠性和可扩展性的明智决策。它还为实施自动化警报和监视提供了基础，这可以帮助及时检测和响应问题。
+通过收集和分析这些数据，可观测技术使开发人员能够了解系统的行为、诊断问题，并做出关于如何提高其性能、可靠性和可扩展性的决策。它还为实施自动化警报和监视提供了基础，这可以帮助及时检测和响应问题。
 
-## Why is observability important?
+## 为什么可观测技术很重要？
 
-可观测性的重要性在于它使开发人员和操作员能够了解系统在实际场景中的性能表现，诊断问题，并做出有根据的决策来改进其性能、可靠性和可扩展性。随着应用程序和基础设施变得越来越复杂和分布式，手动诊断在生产环境中发生的问题变得越来越困难。可观测性提供了一种自动收集和分析系统数据的方法，使问题的检测和响应更加快速。
+可观测技术的重要性在于它使开发人员和操作员能够了解系统在实际场景中的性能表现，诊断问题，并做出有根据的决策来改进其性能、可靠性和可扩展性。
 
-可观测性还有助于识别系统可能遇到瓶颈、错误或其他问题的领域，并跟踪性能指标随时间的变化。通过收集和分析系统数据，开发人员和操作员可以识别出可用于做出有根据决策的模式和趋势，以优化系统以获得更好的性能和可靠性。
+随着应用程序和基础设施变得越来越复杂，手动诊断在生产环境中发生的问题变得越来越困难。可观测技术提供了一种自动收集和分析系统数据的方法，使问题的检测和响应更加快速。
 
-可观测性允许你回答一些有趣的问题：
+可观测技术也允许你回答一些有趣的问题：
 - 这个操作到底有没有被执行？执行时间有多长？
 - 为什么两个版本的前后差异这么大？
 - 当 CPU 使用量变高的时候系统都在执行什么操作？
@@ -38,30 +36,19 @@ tag:
 
 ## Android中的的可观测技术
 
-在 Android 中，可观察性（Observability）指的是收集和分析各种类型数据的能力，以便从外部了解和观察 Android 系统。这些数据包括日志、度量、跟踪和事件，这个术语最初是由控制理论和工程领域引入的，后来在软件工程和系统管理领域被广泛采用。
+在 Android 中，可观测技术指的是收集和分析各种类型数据的能力，以便从外部了解和观察 Android 系统。
+
+这些数据包括日志、度量、跟踪和事件，这个术语最初是由控制理论和工程领域引入的，后来在软件工程和系统管理领域被广泛采用。
 
 ### 日志（Log）
 
-Log技术是Android开发中最常用的调试工具之一。它能够记录应用程序的运行状态，帮助开发人员追踪代码中的错误并解决问题。在Android应用程序的开发中，使用Log技术可以输出调试信息、警告信息和错误信息。
+在Android开发中，Log是最常用的调试工具之一。它能够记录应用程序的运行状态，帮助开发人员追踪代码中的错误并解决问题。使用Log技术可以输出调试信息、警告信息和错误信息。
 
-Android中的Log技术提供了五个级别的日志输出，分别是VERBOSE、DEBUG、INFO、WARN和ERROR。通过设置不同的日志级别，可以输出不同级别的信息，从而在开发过程中帮助开发人员更快地定位和解决问题。
+Android中的Log提供了五个级别的日志输出，分别是VERBOSE、DEBUG、INFO、WARN和ERROR。通过设置不同的日志级别，可以输出不同级别的信息，从而在开发过程中帮助开发人员更快地定位和解决问题。
 
-以下是一些常用的Log技术的代码示例：
+在移动设备上，由于设备资源和运行环境的限制，不推荐使用Debug模式。因此，Log就成为了开发人员调试应用程序的重要工具。
 
-```java 
-Log.v(TAG, "Verbose level message");
-Log.d(TAG, "Debug level message");
-Log.i(TAG, "Info level message");
-Log.w(TAG, "Warning level message");
-Log.e(TAG, "Error level message");
-```
-其中，TAG是用于标识日志输出的标签，通常使用当前类名或其他有意义的字符串。
-
-除了以上五个级别的日志输出，Log技术还提供了一些其他的方法，例如输出异常信息、输出格式化字符串等等。在开发过程中，选择合适的日志级别和输出方法非常重要，可以帮助开发人员快速、准确地发现问题，提高开发效率。
-
-在开发过程中，Log技术是一个非常重要的工具。它可以帮助开发人员追踪代码中的错误，并在出现问题时提供必要的信息。在移动设备上，由于设备资源和运行环境的限制，Debug模式的使用是不推荐的，因此Log技术就成为了开发人员调试应用程序的重要工具。
-
-使用Log技术可以输出应用程序的运行状态，包括代码执行路径、变量值和异常信息等等。通过查看日志输出，开发人员可以快速定位问题所在，并进行相应的修复。此外，Log技术还可以用于性能分析和代码优化，帮助开发人员更好地了解应用程序的运行情况，提高应用程序的性能和稳定性。
+通过使用Log，开发人员可以输出应用程序的运行状态，包括代码执行路径、变量值和异常信息等。通过查看日志输出，开发人员可以快速定位问题所在，并进行相应的修复。此外，Log还可以用于性能分析和代码优化，帮助开发人员更好地了解应用程序的运行情况，提高应用程序的性能和稳定性。
 
 ### 指标（Metric）
 
@@ -73,38 +60,45 @@ Android提供了一些用于收集和记录指标数据的工具和库。其中�
 
 ### 跟踪（Trace）
 
-Trace技术是Android平台提供的一种性能分析工具，它可以用于检测应用程序中的性能瓶颈，并帮助开发者找出需要优化的代码段。
+Trace是Android平台提供的一种性能分析工具，它可以用于检测应用程序中的性能瓶颈，并帮助开发者找出需要优化的代码段。
 
-Trace技术通过在代码中插入标记点（Trace Markers），来记录应用程序的执行过程，包括方法调用、线程切换等等。这些标记点可以帮助开发者了解应用程序的运行状态，比如执行时间、调用顺序、线程运行情况等等。
+Trace通过在代码中插入标记点（Trace Markers），来记录应用程序的执行过程，包括方法调用、线程切换等等。这些标记点可以帮助开发者了解应用程序的运行状态，比如执行时间、调用顺序、线程运行情况等等。
 
-在Android平台上，Trace技术提供了一组API，使得开发者可以在代码中灵活地使用Trace技术来记录和分析应用程序的性能。具体来说，开发者可以使用以下三个API来使用Trace技术：
+在Android平台上，Trace技术提供了一组API，使得开发者可以在代码中灵活地使用Trace技术来记录和分析应用程序的性能。
 
-Debug.startMethodTracing()：开始记录方法调用信息，并输出到文件中。
-Debug.stopMethodTracing()：停止记录方法调用信息，并将输出文件保存到指定的位置。
-TraceCompat.beginSection()和TraceCompat.endSection()：用于记录自定义的Trace Markers。
+具体来说，开发者可以使用以下三个API来使用Trace：
 
-Trace技术是Android开发中非常实用的性能分析工具，它可以帮助开发者快速定位应用程序中的性能瓶颈，从而优化代码，提高应用程序的性能。
+- `Debug.startMethodTracing()`：开始记录方法调用信息，并输出到文件中。
+- `Debug.stopMethodTracing()`：停止记录方法调用信息，并将输出文件保存到指定的位置。
+- `TraceCompat.beginSection()`和`TraceCompat.endSection()`：用于记录自定义的Trace Markers。
+
+Trace是Android开发中非常实用的性能分析工具，它可以帮助开发者快速定位应用程序中的性能瓶颈，从而优化代码，提高应用程序的性能。
 
 ## Android中用于收集和分析各种类型的数据的工具
 
 ### 可用工具概览
 
-#### [Android Studio Profiler](https://developer.android.com/studio/profile/android-profiler)
+Android中有很多工具可用于收集和分析上文提到的四种数据类型，这里对他们进行一个简要的介绍。
+
+#### [Android Studio Profiler](https://developer.android.com/studio/profile/android-profiler) [Android Studio Electric Eel | 2022.1.1 Patch 2]
 
 Android Studio Profiler是Android Studio集成的一款强大的性能分析工具，可以帮助开发者分析和优化应用程序在Android设备上的性能。 它提供了各种性能数据，如CPU使用率，内存使用情况，网络传输速度和磁盘I / O，还提供了几种调试工具，如方法跟踪器，内存分配器和GPU渲染等工具。此外，它还提供了实时的应用性能分析，开发者可以通过此工具观察应用程序的CPU使用率，内存使用情况等情况，以帮助他们及时发现性能问题。
 
-目前 Android Studio Profiler 已经集成了 4 类性能分析工具： CPU、Memory、Network、Battery，其中 CPU 相关性能分析工具为 CPU Profiler，也是本章的主角，它把 CPU 相关的性能分析工具都集成在了一起，开发者可以根据自己需求来选择使用哪一个。可能很多人都知道，谷歌已经开发了一些独立的 CPU 性能分析工具，如 Perfetto、SimplePerf、Java Method Trace 等，现在又出来一个 CPU Profiler，显然不可能去重复造轮子，CPU Profiler 目前做法就是：从这些已知的工具中获取数据，然后把数据解析成自己想要的样式，通过统一的界面展示出来。
+目前 Android Studio Profiler 已经集成了 4 类性能分析工具： CPU、Memory、Network、Battery，其中 CPU 相关性能分析工具为 CPU Profiler，它把 CPU 相关的性能分析工具都集成在了一起，开发者可以根据自己需求来选择使用哪一个。谷歌已经开发了一些独立的 CPU 性能分析工具，如 Perfetto、SimplePerf、Java Method Trace 等，目前CPU Profiler做法就是：从这些已知的工具中获取数据，然后把数据解析成自己想要的样式，通过统一的界面展示出来。
 
 CPU Profiler 集成了性能分析工具：Perfetto、SimplePerf、Java Method Trace，它具备了这些工具的全部或部分功能，如下：
-- Callstack Simple（Samples java/kotlin and native code using SimplePerf）：它是用 SimplePerf，它是用 SimplePerf，它是用 是从 CPU 的性能监控单元 PMU 硬件组件获取数据。 C/C++ Method Trace 只具备 SimplePerf 部分功能，用于分析 C/C++ 函数调用和耗时情况。
-- System Trace（Traces Java/Kotlin and native code at the Android platform level）：它是用 Perfetto 抓取的信息，可用于分析进程函数耗时、调度、渲染等情况，但是它一个精简版，只能显示进程强相关的信息且会过滤掉耗时短的事件，建议将 Trace 导出文件后在 https://ui.perfetto.dev/ 上进行分析。
-- Java/Kotlin Method Trace（Instruments Java/Kotlin code using Android Runtime, tracking every method call (this incurs high overhead making timing information inaccurate)）：它是从虚拟机获取函数调用栈信息，用于分析 Java 函数调用和耗时情况。
+
+- **Callstack Simple（Samples java/kotlin and native code using SimplePerf）**：它是用 SimplePerf抓取的信息，从 CPU 的性能监控单元 PMU 硬件组件获取数据。 C/C++ Method Trace 只具备 SimplePerf 部分功能，用于分析 C/C++ 函数调用和耗时情况。
+
+- **System Trace（Traces Java/Kotlin and native code at the Android platform level）**：它是用 Perfetto 抓取的信息，可用于分析进程函数耗时、调度、渲染等情况，但是它一个精简版，只能显示进程强相关的信息且会过滤掉耗时短的事件，建议将 Trace 导出文件后在 https://ui.perfetto.dev/ 上进行分析。
+
+- **Java/Kotlin Method Trace（Instruments Java/Kotlin code using Android Runtime, tracking every method call (this incurs high overhead making timing information inaccurate)）**：它是从虚拟机获取函数调用栈信息，用于分析 Java 函数调用和耗时情况。请注意使用此方法，会有很高的开销，致使获取的耗时信息是不准确的。
 
 #### [Perfetto](https://perfetto.dev/) :
 
 Perfetto 是 Android 10 中引入的平台级跟踪工具。这是适用于 Android、Linux 和 Chrome 的成熟开源跟踪项目。与 Systrace 不同，它提供数据源超集，可让您以协议缓冲区二进制流形式记录任意长度的跟踪记录。您可以在 Perfetto 界面中打开这些跟踪记录。
 
-Perfetto 相比 Systrace 最大的改进是可以支持长时间数据抓取，这是得益于它有一个可在后台运行的服务，通过它实现了对收集上来的数据进行 Protobuf 的编码并存盘。从数据来源来看，核心原理与 Systrace 是一致的，也都是基于 Linux 内核的 Ftrace 机制实现了用户空间与内核空间关键事件的记录（ATRACE、CPU 调度）。Systrace 提供的功能 Perfetto 都支持，由此才说 Systrace 最终会被 Perfetto 替代。
+Perfetto 相比 Systrace 最大的改进是可以支持长时间数据抓取，这是得益于它有一个可在后台运行的服务，通过它实现了对收集上来的数据进行 Protobuf 的编码并存盘。从数据来源来看，核心原理与 Systrace 是一致的，也都是基于 Linux 内核的 Ftrace 机制实现了用户空间与内核空间关键事件的记录（ATRACE、CPU 调度）。Systrace 提供的功能 Perfetto 都支持。
 
 Perfetto 所支持的数据类型、获取方法，以及分析方式上看也是前所未有的全面，它几乎支持所有的类型与方法。数据类型上通过 ATRACE 实现了 Trace 类型支持，通过可定制的节点读取机制实现了 Metric 类型的支持，在 UserDebug 版本上通过获取 Logd 数据实现了 Log 类型的支持。
 

@@ -5,7 +5,7 @@ tag:
 ---
 
 
-# 红宝石 | 问题排查系列 | Native Crash Problems
+# 问题排查 | Native Crash Problems
 
 ## 关于Native Crash的类型
 
