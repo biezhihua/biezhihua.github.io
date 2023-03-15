@@ -38,7 +38,7 @@ export default defineUserConfig({
         GitHub: "https://github.com/biezhihua"
       },
     },
-    hotReload: true,
+    hotReload: false,
     logo: '/images/favicon-32x32.png',
     navbar: navbar,
     sidebar: sidebar,
