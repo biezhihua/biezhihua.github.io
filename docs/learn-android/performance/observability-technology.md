@@ -78,19 +78,19 @@ Android 提供了一些用于收集和记录指标数据的工具和库。其中
 
 Trace 是 Android 平台提供的一种性能分析工具，它可以用于检测应用程序中的性能瓶颈，并帮助开发者找出需要优化的代码段。
 
-Trace 通过在代码中插入标记点（Trace Markers）（Trace Point），来记录应用程序的执行过程，包括方法调用、线程切换等等。这些标记点可以帮助开发者了解应用程序的运行状态，比如执行时间、调用顺序、线程运行情况等等。
+Trace 通过在代码中插入标记点（Trace Point），来记录应用程序的执行过程，包括方法调用、线程切换等等。这些标记点可以帮助开发者了解应用程序的运行状态，比如执行时间、调用顺序、线程运行情况等等。
 
 Trace 特别适用于 Android 应用与系统级的分析场景，用它可以诊断：函数调用链、Binder 调用时的调用链、跨进程事件流等复杂场景。
 
 Trace 技术提供了一组API，使得开发者可以在代码中灵活地使用 Trace 技术来记录和分析应用程序的性能。具体来说，开发者可以使用以下三个API来使用 Trace：
 - `Debug.startMethodTracing()`：开始记录方法调用信息，并输出到文件中。
 - `Debug.stopMethodTracing()`：停止记录方法调用信息，并将输出文件保存到指定的位置。
-- `TraceCompat.beginSection()`：开始记录自定义的 Trace Markers。
-- `TraceCompat.endSection()`：停止记录自定义的 Trace Markers。
+- `TraceCompat.beginSection()`：开始记录自定义的 Trace Point。
+- `TraceCompat.endSection()`：停止记录自定义的 Trace Point。
 
-此外，Android 系统中，一些重要的模块都已经默认插入了一些 Trace Markers，通过 TraceTag 来分类，其中信息来源如下
-- Framework Java 层的 TracePoint 通过 android.os.Trace 类完成。
-- Framework Native 层的 TracePoint 通过 ATrace 宏完成。
+此外，Android 系统中，一些重要的模块都已经默认插入了一些 Trace Point，通过 Trace Tag 来分类，其中信息来源如下：
+- Framework Java 层的 Trace Point 通过 android.os.Trace 类完成。
+- Framework Native 层的 Trace Point 通过 ATrace 宏完成。
 - App 开发者可以通过 android.os.Trace 类自定义 Trace。
 
 总之，Trace 是 Android 开发中非常实用的性能分析工具，它可以帮助开发者快速定位应用程序中的性能瓶颈，从而优化代码，提高应用程序的性能。
@@ -166,35 +166,121 @@ Android平台提供了几种不同的选项来捕获或生成系统跟踪信息�
 
 ### [Perfetto](https://perfetto.dev/) 
 
-Perfetto 是 Android 10 中引入的平台级跟踪工具。这是适用于 Android、Linux 和 Chrome 的成熟开源跟踪项目。与 Systrace 不同，它提供数据源超集，可让您以协议缓冲区二进制流形式记录任意长度的跟踪记录。您可以在 Perfetto 界面中打开这些跟踪记录。
+> 建议在运行Android 10及更高版本的设备上使用Perfetto。
 
-Perfetto 相比 Systrace 最大的改进是可以支持长时间数据抓取，这是得益于它有一个可在后台运行的服务，通过它实现了对收集上来的数据进行 Protobuf 的编码并存盘。从数据来源来看，核心原理与 Systrace 是一致的，也都是基于 Linux 内核的 Ftrace 机制实现了用户空间与内核空间关键事件的记录（ATRACE、CPU 调度）。Systrace 提供的功能 Perfetto 都支持。
+![](/learn-android/performance/perfetto.png)
 
-Perfetto 所支持的数据类型、获取方法，以及分析方式上看也是前所未有的全面，它几乎支持所有的类型与方法。数据类型上通过 ATRACE 实现了 Trace 类型支持，通过可定制的节点读取机制实现了 Metric 类型的支持，在 UserDebug 版本上通过获取 Logd 数据实现了 Log 类型的支持。
+Perfetto 是 Android 10 中引入的平台级跟踪工具。这是适用于 Android、Linux 和 Chrome 的成熟开源跟踪项目。与 Systrace 不同，它提供数据源超集，可让以协议缓冲区二进制流形式记录任意长度的跟踪记录。可以在 Perfetto 界面中打开这些跟踪记录。
+
+Perfetto 相比 Systrace 最大的改进是可以支持长时间数据抓取，这是得益于它有一个可在后台运行的服务，通过它实现了对收集上来的数据进行 Protobuf 的编码并存盘。
+
+Perfetto 使用不同的来源从设备中收集性能跟踪数据，包括：
+- 使用 ftrace 收集内核信息。
+- 使用 Atrace 收集服务和应用中的用户空间注释。
+- 使用 heapprofd 收集服务和应用程序的本地内存使用信息。
+
+Perfetto 所支持的数据类型、获取方法，以及分析方式上也是前所未有的全面，它几乎支持所有的类型与方法。数据类型上通过 ATRACE 实现了 Trace 类型支持，通过可定制的节点读取机制实现了 Metric 类型的支持，在 UserDebug 版本上通过获取 Logd 数据实现了 Log 类型的支持。
+
+在数据抓取层面，可以通过 Perfetto.dev 网页、命令行工具手动触发抓取与结束，通过设置中的开发者选项触发长时间抓取，甚至可以通过框架中提供的 Perfetto Trigger API 来动态开启数据抓取，基本上涵盖了我们在项目上能遇到的所有的情境。
+
+在数据分析层面，Perfetto 提供了类似 Systrace 操作的数据可视化分析网页，但底层实现机制完全不同，最大的好处是可以支持超大文件的渲染，这是 Systrace 做不到的（超过 300M 以上时可能会崩溃、可能会超卡）。
+
+Perfetto 是继Systrace之后新一代的性能分析工具，未来会完全取代 Systrace。
+
+本系列的大部分文章都会从Perfetto这个工具的视角进行分析，其使用方法后续文章会详细介绍。
 
 ### [Systrace](https://source.android.com/docs/core/tests/debug/systrace)
 
-Systrace 是 Trace 类型的可视化分析工具，是第一代系统级性能分析工具。Trace 类型所支持的功能它都有支持。在 Perfetto 出现之前，基本上是唯一的性能分析工具，它将 Android 系统和 App 的运行信息以图形化的方式展示出来，与 Log 相比，Systrace 的图像化方式更为直观；与 TraceView 相比，抓取 Systrace 时候的性能开销基本可以忽略，最大程度地减少观察者效应带来的影响。
+> Systrace 适用于所有Android 4.3（API级别18）及更高版本的平台，但建议在运行Android 10及更高版本的设备上使用Perfetto。
 
-在系统的一些关键操作（比如 Touch 操作、Power 按钮、滑动操作等）、系统机制（input 分发、View 绘制、进程间通信、进程管理机制等）、软硬件信息（CPU 频率信息、CPU 调度信息、磁盘信息、内存信息等）的关键流程上，插入类似 Log 的信息，我们称之为 TracePoint（本质是 Ftrace 信息），通过这些 TracePoint 来展示一个核心操作过程的执行时间、某些变量的值等信息。然后 Android 系统把这些散布在各个进程中的 TracePoint 收集起来，写入到一个文件中。导出这个文件后，Systrace 通过解析这些 TracePoint 的信息，得到一段时间内整个系统的运行信息。
+![](/learn-android/performance/systrace.png)
 
-Android 系统中，一些重要的模块都已经默认插入了一些 TracePoint，通过 TraceTag 来分类，其中信息来源如下
-- Framework Java 层的 TracePoint 通过 android.os.Trace 类完成
-- Framework Native 层的 TracePoint 通过 ATrace 宏完成
-- App 开发者可以通过 android.os.Trace 类自定义 Trace
+Systrace 是一个传统的平台提供的命令行工具，它可以在短时间内记录设备活动并生成一个压缩的文本文件。该工具会产生一个报告，结合了来自 Android 内核的数据，例如CPU调度程序、磁盘活动和应用程序线程等。
 
-这样 Systrace 就可以把 Android 上下层的所有信息都收集起来并集中展示，对于 Android 开发者来说，Systrace 最大的作用就是把整个 Android 系统的运行状态，从黑盒变成了白盒。全局性和可视化使得 Systrace 成为 Android 开发者在分析复杂的性能问题的时候的首选。
+Systrace 是多种其他工具的封装容器：它是 atrace 的主机端封装容器。
+- atrace 用于控制用户空间 trace 和设置 ftrace。
+- ftrace 是 Linux 内核提供的一个跟踪工具，可以追踪内核中各个模块的调用情况和性能瓶颈，包括CPU调度、进程间通信、内存管理等方面。
+- Systrace 使用 atrace 来启用 trace ，其在 Android 系统内核中使用 ftrace 功能，记录各个组件的调用情况并将其输出到文本文件中，最终生成可视化的性能分析报告。
 
-### [ATrace](https://perfetto.dev/docs/data-sources/atrace)
+Systrace 通过在 Android 系统的各个组件中插入调用跟踪代码（Trace Point）来捕获性能数据，并使用 ftrace 收集和处理这些数据。通过分析这些数据，可以得出应用程序在运行时的行为和性能瓶颈，帮助开发人员进行调试和优化。
 
-ATrace是Android系统中的一个命令行工具，用于跟踪和分析系统各种事件，例如CPU使用情况、内存分配、输入事件等等。它可以帮助开发者分析应用程序和系统的性能瓶颈，定位问题和优化代码。ATrace通过连接到设备并使用adb shell命令来执行跟踪和分析操作，可以生成包含跟踪数据的日志文件，然后使用专业工具进行分析。
+在 Android 系统中，一些重要的模块都已经默认插入了一些 Trace Point，通过 Trace Tag 来分类，例如：系统的一些关键操作（比如 Touch 操作、Power 按钮、滑动操作等）、系统机制（input 分发、View 绘制、进程间通信、进程管理机制等）、软硬件信息（CPU 频率信息、CPU 调度信息、磁盘信息、内存信息等）的等模块上都有Trace Point，其数据来源如下：
+- Framework Java 层的 Trace Point 通过 android.os.Trace 类完成。
+- Framework Native 层的 Trace Point 通过 ATrace 宏完成。
+- App 开发者可以通过 android.os.Trace 类自定义 Trace。
 
-ATrace和Perfetto的关系：
-- ATrace 和 Perfetto 都是 Android 系统中用于性能分析的工具，但它们具有不同的功能和用途。
-- ATrace 是一个用于跟踪和分析 Android 系统中事件的工具，包括 CPU、GPU、内存、磁盘、网络等事件。它可以帮助开发人员了解系统中的性能瓶颈和优化机会。
-- Perfetto 是一个完整的系统跟踪和性能分析工具，它能够提供更全面的性能数据和更好的可视化。它支持在 Android 设备上采集各种跟踪数据，包括 CPU、GPU、内存、磁盘、网络、系统事件等。除了 Android 系统本身，它还支持应用程序的跟踪，以及与其他系统的集成，如 Chrome 浏览器和 Fuchsia 操作系统。
-- ATrace 是一个轻量级的跟踪工具，而 Perfetto 则是一个更全面的系统跟踪和性能分析工具，提供了更多的数据和功能。
-- Perfetto使用了ATrace作为其底层跟工具。具体而言，Perfetto使用了一个称为“ATRACE HAL”的组件来连接到Android的ATRACE服务，并将跟踪数据收集到Perfetto中进行进一步的分析和可视化。Perfetto还支持使用FTrace和Linux Perf等其他跟踪工具来收集系统跟踪数据。
+Systrace 还可以通过Android Debug Bridge（ADB）与设备进行通信，收集设备运行时的各种信息，例如CPU、内存、网络等数据。它可以对这些数据进行过滤和排序，以提供开发人员更精细的性能分析。
+
+对于 Android 开发者来说，Systrace 最大的作用就是把整个 Android 系统的运行状态，从黑盒变成了白盒。全局性和可视化使得 Systrace 成为 Android 开发者在分析复杂的性能问题的时候的首选。
+
+**Systrace 和 atrace 和 ftrace 之间的关系**：
+- ftrace：是一个内核函数跟踪器，function tracer，旨在帮助开发人员和系统设计者可以找到内核内部发生的事情。为数据采集部分。
+- atrace：Android tracer，使用ftrace来跟踪Android上层的函数调用。为数据采集部分。
+- systrace：Android 的 trace 数据分析工具，将 atrace 采集上来的数据，以图形化的方式展现出来。
+
+### [atrace](https://perfetto.dev/docs/data-sources/atrace)
+
+atrace 是 Android 系统中的一个命令行工具，用于跟踪和分析系统各种事件，例如CPU使用情况、内存分配、输入事件等等。它可以帮助开发者分析应用程序和系统的性能瓶颈，定位问题和优化代码。
+
+atrace 通过连接到设备并使用 adb shell 命令来执行跟踪和分析操作，可以生成包含跟踪数据的日志文件，然后使用专业工具进行分析。
+
+atrace 它允许开发人员在应用程序代码中插入时间戳和注释，以便在跟踪文件中显示。要使用 atrace，需要在设备上启用开发者选项，并使用命令行工具将设备连接到计算机上。然后，可以使用以下命令在跟踪文件中启用和禁用 atrace：
+- 启用：`adb shell atrace --async_start <category>`
+- 禁用：`adb shell atrace --async_stop`
+- 其中，`<category>`参数指定要跟踪的类别，例如gfx（图形）、input（输入）或view（视图）。跟踪文件将保存在设备上，可以使用类似于adb pull的命令将其下载到计算机上进行分析。
+
+atrace (frameworks/native/cmds/atrace) 使用 ftrace 捕获内核事件，使用 adb 在设备上运行 atrace。atrace 会执行以下操作：
+- 通过设置属性 (debug.atrace.tags.enableflags) 来设置用户模式跟踪。
+- 通过写入相应的 ftrace sysfs 节点来启用所需的 ftrace 功能。不过，由于 ftrace 支持的功能更多，您可以自行设置一些 sysfs 节点，然后使用 atrace。
+
+atrace 所支持的 category:
+```
+         gfx - Graphics
+       input - Input
+        view - View System
+     webview - WebView
+          wm - Window Manager
+          am - Activity Manager
+          sm - Sync Manager
+       audio - Audio
+       video - Video
+      camera - Camera
+         hal - Hardware Modules
+         app - Application
+         res - Resource Loading
+      dalvik - Dalvik VM
+          rs - RenderScript
+      bionic - Bionic C Library
+       power - Power Management
+          pm - Package Manager
+          ss - System Server
+    database - Database
+     network - Network
+         adb - ADB
+         pdx - PDX services
+       sched - CPU Scheduling
+         irq - IRQ Events
+         i2c - I2C Events
+        freq - CPU Frequency
+        idle - CPU Idle
+        disk - Disk I/O
+         mmc - eMMC commands
+       workq - Kernel Workqueues
+  regulators - Voltage and Current Regulators
+  binder_driver - Binder Kernel driver
+  binder_lock - Binder global lock trace
+   pagecache - Page cache
+```
+
+**atrace 和 ftrace 之间的关系**：
+- ftrace：是一个内核函数跟踪器，function tracer，旨在帮助开发人员和系统设计者可以找到内核内部发生的事情。为数据采集部分。
+- atrace：Android tracer，使用ftrace来跟踪Android上层的函数调用。为数据采集部分。
+
+### [ftrace](https://source.android.google.cn/docs/core/tests/debug/ftrace?hl=zh-cn):
+
+ftrace是Linux内核中的一种跟踪工具，它可以用于收集和分析内核和用户空间的各种跟踪数据。它可以帮助开发人员了解系统运行的细节，从而优化应用程序的性能。
+
+在Android中，ftrace 可以作为 Systrace 的数据源，也可以作为 Perfetto 的数据源，为他们收集系统级别的跟踪数据。
 
 ### [Traceview](https://developer.android.com/studio/profile/traceview) 
 
@@ -204,29 +290,12 @@ Traceview 是 Android SDK 中的一个性能分析工具，它用于分析 Andro
 
 Traceview 支持两种类型的跟踪：方法调用跟踪和时间轴跟踪。方法调用跟踪提供了方法级别的性能分析，可以展示每个方法被调用的次数、执行时间和 CPU 占用率等信息。时间轴跟踪提供了更全面的视图，包括线程执行情况、锁的等待和释放、GC 等事件。
 
-使用 Traceview 可以很方便地找到应用中耗时的方法或者线程，并且可以与代码结合使用，帮助优化应用的性能。Traceview 已经被新的 Android Studio Profiler 工具替代，但仍然可以在老版本的 Android Studio 中使用。
-
-### [FTrace](https://www.bing.com/search?q=atrace&cvid=b446260481014e4386f8ea3975bb6124&aqs=edge..69i57j0l8.1050j0j1&pglt=2211&FORM=ANNTA1&PC=U531&mkt=zh-CN):
-
-FTrace是Linux内核中的一种跟踪工具，它可以用于收集和分析内核和用户空间的各种跟踪数据。它可以帮助开发人员了解系统运行的细节，从而优化应用程序的性能。
-
-在Android中，FTrace可以与Systrace工具一起使用，以收集系统级别的跟踪数据。Systrace将FTrace输出的数据可视化为时间线形式，使开发人员可以更直观地了解系统的行为。
-
-FTrace和Perfetto的关系:
-- FTrace和Perfetto是两种不同的跟踪工具，但它们可以相互配合使用来提高系统跟踪的效率和深度。
-- FTrace是Linux内核自带的跟踪工具，可以用于跟踪内核函数调用、进程调度、中断处理等系统级事件，通过将这些事件输出到trace buffer中来进行分析和优化。
-- Perfetto是一个跨平台的系统跟踪工具，主要用于跟踪Android、Chrome OS和Linux系统中的事件，它可以收集包括CPU使用率、内存分配、网络数据传输等各种系统级事件。相比FTrace，Perfetto提供了更丰富的数据可视化和分析工具，可以帮助开发者更好地理解系统的运行状况。
-- 在Android系统中，Perfetto集成了FTrace，使用FTrace可以收集更多的系统跟踪数据，并将其输出到Perfetto trace buffer中进行分析。因此，FTrace和Perfetto可以互相配合使用来实现更全面的系统跟踪和分析。
+使用 Traceview 可以很方便地找到应用中耗时的方法或者线程，并且可以与代码结合使用，帮助优化应用的性能。Traceview 已经被新的 Android Profiler 工具替代，但仍然可以在老版本的 Android Studio 中使用。
 
 ### [Simpleperf](https://android.googlesource.com/platform/system/extras/+/master/Simpleperf/doc/README.md)
 
 Simpleperf是一种本地CPU分析工具，可用于分析Android应用程序和运行在Android上的本地进程。它能够分析Android上的Java和C++代码，支持的Android版本为L及以上。Simpleperf的设计目的是提供一种轻量级的、易于使用的工具，用于解决Android性能分析中的常见问题。
 
-Simpleperf和Perfetto的关系：
-- Simpleperf和Perfetto都是Android平台上的性能分析工具，但它们的设计目的和实现方式不同。
-- Simpleperf是一种本地CPU分析工具，可用于分析Android应用程序和运行在Android上的本地进程。它能够分析Android上的Java和C++代码，支持的Android版本为L及以上。Simpleperf的设计目的是提供一种轻量级的、易于使用的工具，用于解决Android性能分析中的常见问题。
-- Perfetto则是一种系统跟踪工具，可以用于收集Android系统中各种类型的跟踪数据。它的设计目的是提供一种高度可扩展的跟踪框架，可用于在Android系统中收集大量的、多样化的跟踪数据。Perfetto支持的Android版本为O及以上，它的实现方式涉及底层系统组件和内核模块。
-- 因此，Simpleperf和Perfetto是两种不同的性能分析工具，它们在设计目的、实现方式和使用场景等方面存在差异。
 
 ## 引用
 
@@ -242,6 +311,10 @@ Simpleperf和Perfetto的关系：
 - https://androidperformance.com/2022/01/07/The-Performace-1-Performance-Tools
 - https://developer.android.com/agi/sys-trace/system-profiler
 - https://developer.android.com/topic/performance/tracing
+- https://developer.android.com/studio/command-line/perfetto
+- https://developer.android.com/studio/command-line/systrace
+- https://www.cnblogs.com/pyjetson/p/14946007.html
+- http://bcoder.com/java/android-atrace-systrace-usage-instruction
 
 ## 版权声明
 
