@@ -16,31 +16,53 @@ tag:
 
 ## 大纲 - Outline
 
-- 可观测技术 - Observable Technology
-    - Android中都有哪些可观测技术？都有什么作用？能帮助我们做什么？
+- 第01篇：**可观测技术 - 概述**
+    - 本篇文章会介绍：Android中都有哪些可观测技术？都有什么作用？能帮助我们做什么？
 
-- 流畅性 - Performance and Fluidity
-    - 当我们提及流畅性时，指的到底是什么？从用户角度和技术角度各有什么区别？
+- 第02篇：**流畅性 - 概述**
+    - 本篇文章会介绍：当我们提及流畅性时，指的到底是什么？从用户角度和技术角度各有什么区别？
 
-- 性能分析工具 - Performance Analysis Tools
-    - Perfetto
-    - Android Studio Profiler
+- 第03篇：**流畅性 - Why 60 fps?**
+    - 本篇文章会介绍：基本概念、帧率匹配。
 
-- 从Perfetto角度来理解Android系统 - Understanding the Android System from a Perfetto Perspective
-    - App 主线程运行原理（主线程和渲染线程）
-    - Message、Handler、MessageQueue、Looper 机制
-    - 屏幕刷新机制和 Vsync
-    - Choreographer 机制
-    - Buffer 工作流和 SurfaceFlinger 工作流
-    - Input 流程
-    - ANR 的设计思想
-    - Android 运行机制，包括进程、线程、消息队列、Looper、Handler 等。
-    - Android 绘制机制，包括 View 的绘制流程、SurfaceView 和 TextureView 的区别、硬件加速等。
+- 第04篇：**性能分析工具 - Perfetto**
+    - 本篇文章会介绍：如何识别Perfetto中的展示效果。
 
-- 性能问题实战
-    - 深入分析卡顿问题
-    - 深入分析响应速度问题
-    - 深入分析内存问题
+- 第05篇：**性能分析工具 - Android Studio Profiler**
+    - 本篇文章会介绍：如何利用集成工具排查性能问题。
+
+- 第06篇：**从Perfetto角度来理解Android系统 - 概述**
+    - 本篇文章会介绍：一帧的渲染过程，以及其中涉及到的各个部分和阶段，用来引入剩余文章内容。
+
+- 第07篇：**从Perfetto角度来理解Android系统 - Vsync**
+    - 本篇文章会介绍：介绍Vsync机制；
+
+- 第08篇：**从Perfetto角度来理解Android系统 - Message、Handler、MessageQueue、Looper**
+    - 本篇文章会介绍：。
+
+- 第09篇：**从Perfetto角度来理解Android系统 - Choreographer**
+    - 本篇文章会介绍：介绍Choreographer机制；Vsync机制和Choreographer机制是如何协作的。
+
+- 第10篇：**从Perfetto角度来理解Android系统 - SurfaceFlinger**
+    - 本篇文章会介绍：介绍SurfaceFlinger机制；Vsync机制和SurfaceFlinger机制是如何协作的。
+
+- 第11篇：**从Perfetto角度来理解Android系统 - MainThread && RenderThread**
+    - 本篇文章会介绍：介绍主线程与渲染线程的创建与协作关系。
+
+- 第12篇：**从Perfetto角度来理解Android系统 - SystemServer**
+    - 本篇文章会介绍：介绍主线程与渲染线程的创建与协作关系。
+
+- 第13篇：**从Perfetto角度来理解Android系统 - Input**
+    - 本篇文章会介绍：。
+
+- 第14篇：**从Perfetto角度来理解Android系统 - Binder**
+    - 本篇文章会介绍：。
+
+- 第15篇：**从Perfetto角度来理解Android系统 - Trip Buffer**
+    - 本篇文章会介绍：。
+
+- 第16篇：**实战 - 深入分析卡顿问题**
+    - 本篇文章会介绍：。
 
 ## 引用 - Reference
 
