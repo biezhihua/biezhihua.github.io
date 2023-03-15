@@ -276,7 +276,7 @@ atrace 所支持的 category:
 - ftrace：是一个内核函数跟踪器，function tracer，旨在帮助开发人员和系统设计者可以找到内核内部发生的事情。为数据采集部分。
 - atrace：Android tracer，使用ftrace来跟踪Android上层的函数调用。为数据采集部分。
 
-### [ftrace](https://source.android.google.cn/docs/core/tests/debug/ftrace?hl=zh-cn):
+### [ftrace](https://source.android.google.cn/docs/core/tests/debug/ftrace?hl=zh-cn)
 
 ftrace是Linux内核中的一种跟踪工具，它可以用于收集和分析内核和用户空间的各种跟踪数据。它可以帮助开发人员了解系统运行的细节，从而优化应用程序的性能。
 
