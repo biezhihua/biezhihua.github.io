@@ -6,13 +6,6 @@ export const navbar = [
         ]
     },
     {
-        text: 'Android',
-        children: [
-            '/learn-android/performance/README.md',
-            '/learn-android/problem/README.md',
-        ]
-    },
-    {
         text: 'LeetCode',
         children: [
             "/learn-leetcode/README.md",
