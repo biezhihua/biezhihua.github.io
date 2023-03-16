@@ -99,7 +99,7 @@ Trace 技术提供了一组API，使得开发者可以在代码中灵活地使�
 
 > Tools for collecting and analyzing various types of data in Android
 
-Android 中有很多工具可用于收集和分析可用于性能优化的数据，这里对他们进行一个简要的介绍。
+Android 中有很多工具可以收集和分析可用于性能优化的数据，这里对他们进行一个简要的介绍。
 
 这里先给一个工具之间关系的架构图，大家有个初步的印象。
 
