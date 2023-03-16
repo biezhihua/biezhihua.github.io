@@ -32,7 +32,7 @@ tag:
 - 性能优化：通过监测系统的各个组件，可以了解系统的性能瓶颈，从而采取相应的优化措施，提高系统的性能和稳定性。
 - 技术成长：对个人来说，当面对复杂的系统，通过阅读代码来了解整个运行过程其实是很困难的事情，更高效的方法就是借助此类工具，以最直观的的方式获取软件运行的状态。
 
-更重要的可观测性技术允许你回答一些有趣的问题来摆脱某些技术困境，例如：[ref-1]
+更重要的可观测性技术允许你回答一些有趣的问题来摆脱某些技术困境，例如：
 - 这个操作到底有没有被执行？执行时间有多长？
 - 为什么两个版本的前后差异这么大？
 - 当 CPU 使用量变高的时候系统都在执行什么操作？
@@ -100,6 +100,10 @@ Trace 技术提供了一组API，使得开发者可以在代码中灵活地使�
 > Tools for collecting and analyzing various types of data in Android
 
 Android 中有很多工具可用于收集和分析可用于性能优化的数据，这里对他们进行一个简要的介绍。
+
+这里先给一个工具之间关系的架构图，大家有个初步的印象。
+
+![](/learn-android/performance/profile-tools-arch.png)
 
 ### [Android Profiler](https://developer.android.com/studio/profile/android-profiler) 
 
@@ -276,11 +280,33 @@ atrace 所支持的 category:
 - ftrace：是一个内核函数跟踪器，function tracer，旨在帮助开发人员和系统设计者可以找到内核内部发生的事情。为数据采集部分。
 - atrace：Android tracer，使用ftrace来跟踪Android上层的函数调用。为数据采集部分。
 
+
+### [Simpleperf](https://developer.android.com/ndk/guides/simpleperf)
+
+> https://android.googlesource.com/platform/system/extras/+/master/simpleperf/doc/README.md
+> 支持的 Android 版本为L及以上
+
+Simpleperf 是一种 Native CPU 分析工具，可用于分析 Android 应用程序和运行在 Android 上的 Native 进程。它能够分析 Android 上的 Java 和 C++ 代码。Simpleperf 的设计目的是提供一种轻量级的、易于使用的工具，用于解决 Android 性能分析中的常见问题。
+
+其底层实现原理如下：
+- 对于应用程序的性能分析，Simpleperf 通过采集和分析进程中的事件，例如CPU指令、内存访问、函数调用等来获取性能数据。它利用了Linux内核中提供的一些性能计数器，例如硬件性能计数器和软件性能计数器，以及CPU中的调试寄存器，来收集这些事件。
+- 对于内核层的性能分析，Simpleperf 通过采集和分析内核函数的事件来获取性能数据。它利用了Linux内核中提供的动态追踪（Dynamic Tracing）技术，例如 ftrace 和 perf_events ，来捕获内核函数的调用和返回事件。
+- Simpleperf 在采集性能数据时，采用了采样（Sampling）的方式。采样是指在一定的时间间隔内（例如每秒钟采集1000次），随机地选择一个线程或进程，并记录其当前正在执行的指令或函数调用栈。这种方法可以避免对系统性能造成太大的影响，并且可以获取到全局的性能数据。
+- Simpleperf 将采集到的性能数据存储在内存中，然后将其写入磁盘文件。它还提供了一些工具，例如report和annotate，用于解析和分析性能数据，并生成易于理解的报告和图表。
+- Simpleperf 的底层实现原理主要是通过采集和分析事件来获取性能数据，利用采样的方式避免对系统性能造成太大的影响，然后将数据存储并解析分析。
+
 ### [ftrace](https://source.android.google.cn/docs/core/tests/debug/ftrace?hl=zh-cn)
 
-ftrace是Linux内核中的一种跟踪工具，它可以用于收集和分析内核和用户空间的各种跟踪数据。它可以帮助开发人员了解系统运行的细节，从而优化应用程序的性能。
+ftrace 是Linux内核中的一种跟踪工具，它可以用于收集和分析内核和用户空间的各种跟踪数据。它可以帮助开发人员了解系统运行的细节，从而优化应用程序的性能。
 
-在Android中，ftrace 可以作为 Systrace 的数据源，也可以作为 Perfetto 的数据源，为他们收集系统级别的跟踪数据。
+ftrace 是Linux内核中的一个跟踪框架，它的实现原理如下：
+- ftrace利用Linux内核中的动态追踪技术，通过在内核中插入一些跟踪点（tracepoint）来捕获系统的事件，例如函数调用、中断发生、进程调度等。这些跟踪点可以手动添加或者自动产生。
+- ftrace 提供了多种跟踪器（tracer），例如函数图（function graph）、系统调用（syscall）、模块加载（module）等，可以根据不同的需求选择合适的跟踪器进行跟踪。
+- ftrace 还提供了多种输出方式，例如ring buffer、trace_pipe、trace_file等，可以将跟踪数据输出到不同的位置，方便用户进行分析。
+- ftrace 的跟踪功能可以通过/sys/kernel/debug/tracing目录下的文件进行配置和控制。例如，可以通过设置tracing_on文件来启用或停用跟踪功能；可以通过设置tracing_thresh文件来调整跟踪事件的阈值。
+- ftrace 还支持对用户态进程进行跟踪，用户可以通过系统调用（例如perf_event_open）来注册自己的跟踪点，并将跟踪数据输出到ftrace中进行分析。
+
+在Android中，ftrace 可以作为 Systrace、Perfetto、Simpleperf 的数据源。
 
 ### [Traceview](https://developer.android.com/studio/profile/traceview) 
 
@@ -292,15 +318,10 @@ Traceview 支持两种类型的跟踪：方法调用跟踪和时间轴跟踪。�
 
 使用 Traceview 可以很方便地找到应用中耗时的方法或者线程，并且可以与代码结合使用，帮助优化应用的性能。Traceview 已经被新的 Android Profiler 工具替代，但仍然可以在老版本的 Android Studio 中使用。
 
-### [Simpleperf](https://android.googlesource.com/platform/system/extras/+/master/Simpleperf/doc/README.md)
-
-Simpleperf是一种本地CPU分析工具，可用于分析Android应用程序和运行在Android上的本地进程。它能够分析Android上的Java和C++代码，支持的Android版本为L及以上。Simpleperf的设计目的是提供一种轻量级的、易于使用的工具，用于解决Android性能分析中的常见问题。
-
-
 ## 引用
 
 - https://zhuanlan.zhihu.com/p/593844343
-- [ref-1](https://www.androidperformance.com/2022/01/07/The-Performace-1-Performance-Tools/)
+- https://www.androidperformance.com/2022/01/07/The-Performace-1-Performance-Tools/
 - https://www.cnblogs.com/DataFlux/p/15343529.html
 - https://juejin.cn/post/7110142192928161823#heading-10
 - https://juejin.cn/post/7073727491000664095
@@ -315,6 +336,7 @@ Simpleperf是一种本地CPU分析工具，可用于分析Android应用程序和
 - https://developer.android.com/studio/command-line/systrace
 - https://www.cnblogs.com/pyjetson/p/14946007.html
 - http://bcoder.com/java/android-atrace-systrace-usage-instruction
+- https://android.googlesource.com/platform/system/extras/+/master/simpleperf/doc/README.md
 
 ## 版权声明
 
