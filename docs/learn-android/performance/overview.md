@@ -70,6 +70,7 @@ tag:
 ## 引用 - Reference
 
 - https://androidperformance.com/2021/10/27/if-i-write-a-book-about-performance
+- https://developer.android.com/topic/performance
 
 ## 版权声明
 
