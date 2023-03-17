@@ -2,9 +2,10 @@
 tag:
   - android
   - performance
+  - fluency
 ---
 
-# Android | 性能优化 | 第01篇 - 可观测性技术 - Observability Technology
+# Android | 性能优化 - 流畅性 | 第01篇 - 可观测性技术 - Observability Technology
 
 ## 什么是可观测性技术？
 

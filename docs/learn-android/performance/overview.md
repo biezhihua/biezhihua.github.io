@@ -2,9 +2,10 @@
 tag:
   - android
   - performance
+  - fluency
 ---
 
-# Android | 性能优化 | 第00篇 - 概述 - Overview
+# Android | 性能优化- 流畅性 | 第00篇 - 概述 - Overview
 
 ## 前言 - Foreword
 
