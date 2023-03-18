@@ -5,11 +5,13 @@ tag:
   - fluency
 ---
 
-# Android | 性能优化 | 流畅性 | 第00篇 - 概述
+# Android | 性能优化 | 流畅性 - 第00篇 - 序
 
 > Outline
 
-## 前言 - Foreword
+## 前言
+
+> Foreword
 
 最近碰到不少性能优化相关的问题，又恰好拜读了很多优秀的博客与文章，萌生出总结一下知识体系的想法。 
 
@@ -22,7 +24,9 @@ tag:
 
 本系列文章将会聚焦于流畅性相关的问题。
 
-## 性能优化 - 流畅性 - 大纲 - Outline
+## 大纲 
+
+> Outline
 
 此处依据我自己的理解，列举了性能优化相关的文章大纲，同时也构建了一个性能优化相关的垂直知识体系。
 
@@ -74,7 +78,9 @@ tag:
 - 第16篇：**性能优化 - 流畅性 - 实战 - 分析和解决卡顿问题**
     - 本篇文章会介绍：模拟碰到过的实际案例，分析和解决其碰到的性能问题。
 
-## 引用 - Reference
+## 引用
+
+> Reference
 
 - https://androidperformance.com/2021/10/27/if-i-write-a-book-about-performance
 - https://developer.android.com/topic/performance
