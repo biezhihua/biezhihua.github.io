@@ -5,7 +5,7 @@ tag:
   - fluency
 ---
 
-# Android | 性能优化 - 流畅性 | 第03篇 - 可观测性技术
+# Android | 性能优化 | 流畅性 | 第03篇 - 可观测性技术
 
 > Observability Technology
 

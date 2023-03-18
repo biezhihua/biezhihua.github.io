@@ -6,6 +6,8 @@ tag:
 
 # Android | 性能优化 | Google官方文档概述
 
+- [performance](https://developer.android.com/topic/performance)
+
 ```
 - In this guide
 - Inspecting performance
