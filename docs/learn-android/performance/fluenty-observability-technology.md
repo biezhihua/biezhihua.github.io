@@ -358,6 +358,11 @@ Traceview 支持两种类型的跟踪：方法调用跟踪和时间轴跟踪。�
 - https://blog.csdn.net/tq08g2z/article/details/77311712
 - https://android.googlesource.com/platform/system/extras/+/master/simpleperf/README.md
 - https://developer.android.com/guide/topics/manifest/profileable-element
+- https://zhuanlan.zhihu.com/p/25277481
+- https://blog.openresty.com.cn/cn/dynamic-tracing/
+- https://github.com/brendangregg/FlameGraph
+- http://aospxref.com/
+- https://android.googlesource.com/platform/system/extras/+/master/simpleperf/demo/README.md
 
 ## 版权声明
 
