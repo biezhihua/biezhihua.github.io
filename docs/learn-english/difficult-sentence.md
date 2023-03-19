@@ -315,3 +315,10 @@ values stored in the array positions appear within the rectangles
     - appear `[predicate verb phrase]`
     - within the rectangles `[adverbial of place]`
 - knowledge:
+
+### 20 
+
+Perfetto provides also a brand new trace visualizer for opening and querying hours-long traces, available at ui.perfetto.dev
+- knowledge:
+    - brand + new + sth.
+    -   n. 崭新的..., 全新的...
