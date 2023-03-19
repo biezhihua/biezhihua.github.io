@@ -64,3 +64,7 @@ tag:
 - https://developer.android.com/topic/performance/rendering
 - https://developer.android.com/training/articles/perf-anr
 - https://androidperformance.com/2021/04/24/android-systrace-smooth-in-action-1/
+
+## 版权声明
+
+本文采用[知识共享署名-非商业性使用 4.0 国际许可协议](https://creativecommons.org/licenses/by-nc/4.0/)进行许可

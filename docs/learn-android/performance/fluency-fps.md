@@ -65,16 +65,16 @@ FPS（Frames Per Second）指的是每秒钟显示的画面帧数。在Android�
 - 90FPS：每秒可以在屏幕上均匀的更新 90 张图像帧，也就是1/60 ~= 11.11 ms 要更新一帧。
 - 120FPS：每秒可以在屏幕上均匀的更新 120 张图像帧，也就是1/60 ~= 8.33 ms 要更新一帧。
 
-## 每帧都要做那些工作才能保证流畅性？
+## 每帧所做工作
 
-对于系统的每一帧，都有很繁重的任务要完成才能保证应用的流畅性，如下：
-- Vsync - 处理VSYNC信号
-- Input - 处理输入事件
-- Animation - 处理动画事件
-- Perform Traversals - 处理遍历工作（Layout）
-- Draw - 处理绘制
-- Sync - 处理渲染数据
-- SwapBuffer - 刷新图像
+对于Android的每一帧，都有很繁重的任务要完成才能保证应用的流畅性，如下：
+- Vsync               - 处理VSYNC信号
+- Input               - 处理输入事件
+- Animation           - 处理动画事件
+- Perform Traversals  - 处理遍历工作（Layout）
+- Draw                - 处理绘制
+- Sync                - 处理渲染数据
+- SwapBuffer          - 刷新图像
 
 ![](/learn-android/performance/perf-test-frame-latency.png)
 
@@ -84,3 +84,7 @@ FPS（Frames Per Second）指的是每秒钟显示的画面帧数。在Android�
 - https://androidperformance.com/2019/05/27/why-60-fps
 - https://developer.android.com/training/testing/performance?hl=zh-cn
 - https://www.youtube.com/watch?v=WH9AFhgwmDw&hl=zh-cn
+
+## 版权声明
+
+本文采用[知识共享署名-非商业性使用 4.0 国际许可协议](https://creativecommons.org/licenses/by-nc/4.0/)进行许可
