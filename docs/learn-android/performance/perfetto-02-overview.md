@@ -26,9 +26,27 @@ article: false
 在Android上，Perfetto是下一代系统跟踪系统，取代了基于chromium的systrace。完全支持基于atrace的检测。详见Android开发者文档。
 
 ### Tracing SDK and user-space instrumentation
+
 ### Tracing in Chromium
+
 ## Trace analysis
+
+除了跟踪记录功能，Perfetto代码库还包括一个专门用于导入、解析和查询新的和旧的跟踪格式的项目——跟踪处理器。
+
+Trace Processor是一个可移植的c++ 17库，它提供了面向列的表存储，专为有效地将数小时的跟踪数据保存在内存中而设计，并公开了一个基于流行的SQLite查询引擎的SQL查询接口。跟踪数据模型变成一组SQL表，可以以非常强大和灵活的方式查询和连接这些SQL表，以分析跟踪数据。
+
+在此基础上，Trace Processor还包括一个基于跟踪的度量子系统，该子系统由预烘焙的和可扩展的查询组成，可以以JSON或protobuf消息的形式输出关于跟踪的强类型摘要(例如，不同频率状态下的CPU使用情况，按进程和线程细分)。
+
+基于跟踪的度量允许在性能测试场景、批分析或大型跟踪语料库中轻松集成跟踪。
+
+Trace Processor还为低延迟查询和构建跟踪可视化器而设计。如今，Trace Processor被Perfetto UI用作Web Assembly模块，Android Studio和Android GPU Inspector用作原生c++库。
+
 ## Trace visualization
+
+Perfetto还提供了一个全新的跟踪可视化工具，用于打开和查询数小时长的跟踪，可在ui.perfetto.dev中获得。新的可视化工具利用了现代web平台技术。其基于WebWorkers的多线程设计使UI始终响应;Trace Processor和SQLite的分析能力通过WebAssembly在浏览器中完全可用。
+
+Perfetto UI在被打开一次之后就可以完全离线工作。使用UI打开的跟踪由浏览器本地处理，不需要任何服务器端交互。
+
 ## Contributing
 
 ## Reference
