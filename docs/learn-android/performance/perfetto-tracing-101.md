@@ -1,5 +1,5 @@
 ---
-article： false
+article: false
 ---
 
 # Perfetto - Tracing 101
