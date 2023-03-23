@@ -70,6 +70,8 @@ EOF
 
 #### Scheduling details
 
+https://perfetto.dev/docs/data-sources/cpu-scheduling
+
 Enables high-detailed tracking of scheduling events
 
 ```shell
