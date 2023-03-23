@@ -38,7 +38,7 @@ Android发展至今天，性能优化可以分为多种优化方向：
 - 第02篇：[**性能优化 - 流畅性 - 帧率**](./fluency-fps.md)
     - 本篇文章会介绍：基本概念；帧率匹配；60FPS、90FPS、120FPS的差异。
 
-- 第03篇：[**性能优化 - 流畅性 - 可观测技术**](./fluency-observability-technology.md)
+- 第03篇：[**性能优化 - 流畅性 - 可观测技术**](./fluenty-observability-technology.md)
     - 本篇文章会介绍：Android中都有哪些可观测技术？都有什么作用？能帮助我们做什么？
 
 - 第04篇：[**性能优化 - 流畅性 - 性能分析工具 - Perfetto**](./fluency-tools-perfetto.md)
