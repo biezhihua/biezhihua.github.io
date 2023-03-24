@@ -2,7 +2,7 @@
 article: false
 ---
 
-# Recording traces on Android boot
+# Perfetto - 11 - Recording traces on Android boot
 
 ## Steps
 ## Implementation details

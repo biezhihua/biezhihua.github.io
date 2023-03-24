@@ -2,7 +2,7 @@
 article: false
 ---
 
-# Quickstart: Record traces on Android
+# Perfetto - 03 - Quickstart: Record traces on Android
 
 Perfetto允许你从各种数据源(内核调度器通过ftrace，用户空间检测通过atrace和本网站列出的所有其他数据源)收集Android设备的系统范围性能跟踪。
 

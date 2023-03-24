@@ -2,7 +2,7 @@
 article: false
 ---
 
-# Frequently Asked Questions
+# Perfetto - 10 - Frequently Asked Questions
 
 ## How do I open trace in UI from command line?
 ## Incorrectly displayed overlapping events in JSON trace

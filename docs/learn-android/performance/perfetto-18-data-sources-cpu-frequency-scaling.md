@@ -2,7 +2,7 @@
 article: false
 ---
 
-# CPU frequency and idle states CPU频率和空闲状态
+# Perfetto - 18 - CPU frequency and idle states CPU频率和空闲状态
 
 ## Basic
 

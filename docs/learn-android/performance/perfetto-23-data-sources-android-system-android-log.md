@@ -2,7 +2,7 @@
 article: false
 ---
 
-# Android Log
+# Perfetto - 23 - Android Log
 
 
 ## UI

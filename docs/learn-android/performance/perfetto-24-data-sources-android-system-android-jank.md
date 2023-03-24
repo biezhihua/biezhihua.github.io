@@ -2,7 +2,7 @@
 article: false
 ---
 
-# Android Jank detection with FrameTimeline
+# Perfetto - 24 - Android Jank detection with FrameTimeline
 
 如果一个帧在屏幕上显示的时间与调度器给出的预测当前时间不匹配，则该帧被称为janky。
 

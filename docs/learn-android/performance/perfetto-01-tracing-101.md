@@ -2,7 +2,7 @@
 article: false
 ---
 
-# Perfetto - Tracing 101
+# Perfetto - 01 - Tracing 101
 
 本页提供了性能分析的鸟瞰图。目的是引导那些不知道什么是“追踪”的人。
 

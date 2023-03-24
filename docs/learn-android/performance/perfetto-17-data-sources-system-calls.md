@@ -2,7 +2,7 @@
 article: false
 ---
 
-# System calls
+# Perfetto - 17 - System calls
 
 在Linux和Android上(仅限userdebug版本)，Perfetto可以跟踪系统调用。
 

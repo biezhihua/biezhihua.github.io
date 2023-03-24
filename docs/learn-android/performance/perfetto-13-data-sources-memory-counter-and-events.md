@@ -2,7 +2,7 @@
 article: false
 ---
 
-# Memory counters and events
+# Perfetto - 13 - Memory counters and events
 
 Perfetto允许在Android和Linux上收集大量内存事件和计数器。这些事件来自内核接口，包括ftrace和/proc接口，有两种类型:轮询计数器和内核在ftrace缓冲区中推送的事件。
 

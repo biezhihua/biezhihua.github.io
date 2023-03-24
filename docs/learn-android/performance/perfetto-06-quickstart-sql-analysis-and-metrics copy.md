@@ -2,7 +2,7 @@
 article: false
 ---
 
-# Quickstart: SQL-based analysis and trace-based metrics
+# Perfetto - 06 - Quickstart: SQL-based analysis and trace-based metrics
 
 ## Trace Processor
 

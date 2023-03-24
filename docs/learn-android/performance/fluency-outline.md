@@ -15,22 +15,24 @@ tag:
 
 最近碰到不少性能优化相关的问题，又恰好拜读了很多优秀的博客与文章，萌生出总结一下知识体系的想法。 
 
-Android发展至今天，性能优化可以分为多种优化方向：
+Android发展至今天，性能优化可分为多种优化方向：
 - 应用相关：
-    - 流畅性（滑动列表的时候掉帧、窗口动画不连贯、重启手机进入桌面卡顿）（渲染缓慢、帧冻结）
+    - 流畅度（滑动列表的时候掉帧、窗口动画不连贯、重启手机进入桌面卡顿）（渲染缓慢、帧冻结）
     - 响应速度（应用启动白屏过长、点击电源键亮屏慢、滑动不跟手）（App start time、ANR）
     - 稳定性（界面操作没有反应、闪退、点击图标没有响应）（Crash）
 - 构建相关：
     - 包大小
     - 构建速度
 
-本系列文章将会聚焦于流畅性相关的问题。
+本系列文章将流畅度问题和响应速度问题统一为流畅性问题，并聚焦于流畅性问题的定义、分析和排查等方面。
 
 ## 大纲 
 
 > Outline
 
-此处依据我自己的理解，列举了性能优化相关的文章大纲，同时也构建了一个性能优化相关的垂直知识体系。
+此处依据我自己的理解，列举了性能优化相关的文章大纲，同时也构建了一个性能优化流畅性相关的垂直知识体系。
+
+本系列文章以定义问题、寻找关键点、搞清楚该使用的技术、弄明白该使用的工具、如何准确快速的定位问题、实战演示的思路来编写文章，最终教会读者如何性能优化自己的应用。
 
 - 第01篇：[**性能优化 - 流畅性 - 概述**](./fluency-overview.md)
     - 本篇文章会介绍：当我们提及流畅性时，指的到底是什么？从用户角度和技术角度各有什么区别？
@@ -86,9 +88,9 @@ Android发展至今天，性能优化可以分为多种优化方向：
 
 - https://androidperformance.com/2021/10/27/if-i-write-a-book-about-performance
 - https://developer.android.com/topic/performance
-- [Gracker](https://androidperformance.com/)
-- [《一本讲 Android 流畅性的书，应该有什么内容？》](https://androidperformance.com/2021/10/27/if-i-write-a-book-about-performance)
-- https://androidperformance.com/2021/04/24/android-systrace-smooth-in-action-1/
+- https://androidperformance.com
+- https://androidperformance.com/2021/10/27/if-i-write-a-book-about-performance
+- https://androidperformance.com/2021/04/24/android-systrace-smooth-in-action-1
 
 ## 版权声明
 

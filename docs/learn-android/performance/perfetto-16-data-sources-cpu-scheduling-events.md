@@ -2,7 +2,7 @@
 article: false
 ---
 
-# CPU Scheduling events
+# Perfetto - 16 - CPU Scheduling events
 
 在Android和Linux上，Perfetto可以通过Linux内核的ftrace基础设施收集调度器跟踪。
 

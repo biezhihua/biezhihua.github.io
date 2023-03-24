@@ -1,7 +1,7 @@
 ---
 article: false
 ---
-# Perfetto - System profiling, app tracing and trace analysis
+# Perfetto - 02 - System profiling, app tracing and trace analysis
 
 ## Recording traces
 
