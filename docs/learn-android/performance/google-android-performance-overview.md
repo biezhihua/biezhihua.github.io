@@ -1,0 +1,154 @@
+---
+article: false
+---
+
+# Android | 性能优化 | Google官方文档概述
+
+- [performance](https://developer.android.com/topic/performance)
+
+```
+- In this guide
+- Inspecting performance
+    - About inspecting performance
+    - Android Studio Profilers
+    - Profiling and tracing
+        - System tracing
+            - Overview
+            - Capture trace
+                - Capture a trace in Android Studio
+                - Capture a trace on a device
+                - Capture a trace from the command line
+            - Navigate a Systrace report
+            - Custom events
+                - Define custom events
+                - Custom trace events in native code
+        - Inspect GPU rendering speed and overdraw
+- Improving performance
+    - How to improve performace
+    - Baseline Profiles
+        - About Baseline Profiles
+        - Create Baseline Prfiles
+        - Automate measurement with the Macrobenchmark library
+        - Manually create and measure Baseline Profiles
+    - App startup
+        - Tools and libraries to understand app performance
+        - App startup analysis and optimization
+        - App startup library
+    - Guides
+        - Set up environment for testing
+        - Working in the background
+        - Performance class
+        - App Standby Buckets
+        - App hibernation
+        - Verifying app behavior on the Android runtime (ART)
+    - Solving common problems
+        - App startup time
+        - Rendering
+            - Performance of rendering
+            - Reduce overdraw
+            - Performance and view hierarchies
+            - Analying with profile GPU rendering
+            - Slow rendering
+                - Keeping your app responsive
+                - Improve layout performance
+        - Memory 
+            - About memeory management
+            - Memory allocation among properties
+            - Manage your app's memeory
+            - Processes and threads
+        - Battery and power
+        - Reduce app size
+        - Harware acceleration
+    - Performance best practices
+        - Use Baseline Profiles
+        - Use the App Startup library to avoid separate content provider initialization
+        - Lazily load libraries initialization, or disable auto init of libraries on app startup
+        - Use ViewStubs to lazily inflate layout resources at runtime
+        - Optimize your splash screen loading on app startup
+        - Use scalable image types
+        - Use Performance APIs to understand device capabilities
+        - Prioritize cold startup traces
+- Monitoring performance
+    - About monitoring performance
+    - Android vitals
+        - About Android Vitals
+        - ANRs
+        - Crashes
+        - Slow Rendering
+        - Frozen Frames
+        - App startup time
+        - Tracking jank
+```
+
+```
+- 检查应用性能
+    - 关于检查性能
+    - Android Studio 分析器
+    - 性能分析和跟踪
+        - 系统跟踪
+            - 概述
+            - 捕获跟踪
+                - 在 Android Studio 中捕获跟踪
+                - 在设备上捕获跟踪
+                - 从命令行捕获跟踪
+            - 导航 Systrace 报告
+            - 自定义事件
+                - 定义自定义事件
+                - 在本地代码中使用自定义跟踪事件
+        - 检查 GPU 渲染速度和过度绘制
+- 改善性能
+    - 如何改善性能
+    - 基准剖面
+        - 关于基准剖面
+        - 创建基准剖面
+        - 使用 Macrobenchmark 库自动测量
+        - 手动创建和测量基准剖面
+    - 应用启动
+        - 了解应用性能的工具和库
+        - 应用启动分析和优化
+        - 应用启动库
+    - 指南
+        - 设置测试环境
+        - 在后台工作
+        - 性能类
+        - 应用待机存储桶
+        - 应用休眠
+        - 在 Android 运行时 (ART) 上验证应用行为
+    - 解决常见问题
+        - 应用启动时间
+        - 渲染
+            - 渲染性能
+            - 减少过度绘制
+            - 性能和视图层次结构
+            - 使用 Profile GPU 渲染进行分析
+            - 缓慢的渲染
+                - 保持应用响应
+                - 提高布局性能
+        - 内存
+            - 关于内存管理
+            - 属性间的内存分配
+            - 管理应用的内存
+            - 进程和线程
+        - 电池和电源
+        - 减小应用大小
+        - 硬件加速
+    - 性能最佳实践
+        - 使用基准剖面
+        - 使用应用启动库避免单独内容提供程序初始化
+        - 惰性加载库初始化，或在应用启动时禁用库的自动初始化
+        - 使用 ViewStubs 在运行时惰性填充布局资源
+        - 在应用启动时优化闪屏加载
+        - 使用可伸缩的图像类型
+        - 使用性能 API 了解设备能力
+        - 优先考虑冷启动跟踪
+- 监控性能
+    - 关于监控性能
+    - Android Vitals
+        - 关于Android Vitals
+        - ANR（应用无响应）
+        - 崩溃
+        - 渲染缓慢
+        - 冻结帧
+        - 应用启动时间
+        - 跟踪卡顿
+```
