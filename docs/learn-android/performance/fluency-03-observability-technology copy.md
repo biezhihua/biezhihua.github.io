@@ -85,20 +85,14 @@ Trace 通过在代码中插入标记点（Trace Point），来记录应用程序
 
 Trace 特别适用于 Android 应用与系统级的分析场景，用它可以诊断：函数调用链、Binder 调用时的调用链、跨进程事件流等复杂场景。
 
-Trace 技术提供了一组API，使得开发者可以在代码中灵活地使用 Trace 技术来记录和分析应用程序的性能。具体来说，开发者可以使用以下三个API来使用 Trace：
-- `Debug.startMethodTracing()`：开始记录方法调用信息，并输出到文件中。
-- `Debug.stopMethodTracing()`：停止记录方法调用信息，并将输出文件保存到指定的位置。
-- `TraceCompat.beginSection()`：开始记录自定义的 Trace Point。
-- `TraceCompat.endSection()`：停止记录自定义的 Trace Point。
-
-此外，Android 系统中，一些重要的模块都已经默认插入了一些 Trace Point，通过 Trace Tag 来分类，其中信息来源如下：
+Android 系统中，一些重要的模块都已经默认插入了一些 Trace Point，通过 Trace Tag 来分类，其中信息来源如下：
 - Framework Java 层的 Trace Point 通过 android.os.Trace 类完成。
 - Framework Native 层的 Trace Point 通过 ATrace 宏完成。
 - App 开发者可以通过 android.os.Trace 类自定义 Trace。
 
 Trace 是 Android 开发中非常实用的性能分析工具，它可以帮助开发者快速定位应用程序中的性能瓶颈，从而优化代码，提高应用程序的性能。
 
-## Android中收集和分析各种类型数据的工具
+## Android中用于可观测技术的工具
 
 > Tools for collecting and analyzing various types of data in Android
 
@@ -225,6 +219,17 @@ Systrace 还可以通过Android Debug Bridge（ADB）与设备进行通信，收
 - atrace：Android tracer，使用ftrace来跟踪Android上层的函数调用。为数据采集部分。
 - systrace：Android 的 trace 数据分析工具，将 atrace 采集上来的数据，以图形化的方式展现出来。
 
+### [Simpleperf](https://developer.android.com/ndk/guides/simpleperf)
+
+> https://android.googlesource.com/platform/system/extras/+/master/simpleperf/doc/README.md
+> 支持的 Android 版本为L及以上
+
+Simpleperf 是一种 Native CPU 分析工具，可用于分析 Android 应用程序和运行在 Android 上的 Native 进程。它能够分析 Android 上的 Java 和 C++ 代码。Simpleperf 的设计目的是提供一种轻量级的、易于使用的工具，用于解决 Android 性能分析中的常见问题。
+
+Simpleperf 主要功能分为事件摘要（stat），记录样本(record)和生成数据报告(report)三个功能。stat功能给出了在一个时间段内被分析的进程中发生了多少事件的摘要。record功能必须在Android系统中运行，当 Simpleperf 运行分析时会不断将数据写入到性能数据文件，所以它可以随时停止，随时拷贝分析数据文件。分析完毕后我们可以需要将输出数据文件拷贝到PC上，再使用report功能解析成数据报告。
+
+现代CPU具有一个硬件组件，称为性能监控单元(PMU)。PMU具有一些硬件计数器，计数一些诸如经历了多少次CPU周期，执行了多少条指令，或发生了多少次缓存未命中等事件。Linux内核将这些硬件计数器包装到硬件perf事件 (hardware perf events)中。此外，Linux内核还提供了独立于硬件的软件事件和跟踪点事件。Linux内核通过 perf_event_open 系统调用将这些都暴露给了用户空间，这正是 Simpleperf 所使用的机制。
+
 ### [atrace](https://perfetto.dev/docs/data-sources/atrace)
 
 atrace 是 Android 系统中的一个命令行工具，用于跟踪和分析系统各种事件，例如CPU使用情况、内存分配、输入事件等等。它可以帮助开发者分析应用程序和系统的性能瓶颈，定位问题和优化代码。
@@ -296,16 +301,6 @@ ftrace 是Linux内核中的一个跟踪框架，它的实现原理如下：
 
 在Android中，ftrace 可以作为 Systrace、Perfetto、Simpleperf 的数据源。
 
-### [Simpleperf](https://developer.android.com/ndk/guides/simpleperf)
-
-> https://android.googlesource.com/platform/system/extras/+/master/simpleperf/doc/README.md
-> 支持的 Android 版本为L及以上
-
-Simpleperf 是一种 Native CPU 分析工具，可用于分析 Android 应用程序和运行在 Android 上的 Native 进程。它能够分析 Android 上的 Java 和 C++ 代码。Simpleperf 的设计目的是提供一种轻量级的、易于使用的工具，用于解决 Android 性能分析中的常见问题。
-
-Simpleperf 主要功能分为事件摘要（stat），记录样本(record)和生成数据报告(report)三个功能。stat功能给出了在一个时间段内被分析的进程中发生了多少事件的摘要。record功能必须在Android系统中运行，当 Simpleperf 运行分析时会不断将数据写入到性能数据文件，所以它可以随时停止，随时拷贝分析数据文件。分析完毕后我们可以需要将输出数据文件拷贝到PC上，再使用report功能解析成数据报告。
-
-现代CPU具有一个硬件组件，称为性能监控单元(PMU)。PMU具有一些硬件计数器，计数一些诸如经历了多少次CPU周期，执行了多少条指令，或发生了多少次缓存未命中等事件。Linux内核将这些硬件计数器包装到硬件perf事件 (hardware perf events)中。此外，Linux内核还提供了独立于硬件的软件事件和跟踪点事件。Linux内核通过 perf_event_open 系统调用将这些都暴露给了用户空间，这正是 Simpleperf 所使用的机制。
 
 ### [Traceview](https://developer.android.com/studio/profile/traceview) 
 
