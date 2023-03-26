@@ -11,7 +11,7 @@ tag:
 
 本篇文章翻译自perfetto的[tracing-101](https://perfetto.dev/docs/tracing-101)，目的是为那些不知道"tracing"是什么的人提供一些引导。
 
-此外，在Perfetto的相关文章中涉及到了很多名词，例如：trace、tracing、profiling、a trace file、profile、traces、profiles、profiler等，不太了解的人非常容易迷糊，这里也做一下简要的介绍。
+此外，在Perfetto的相关文章中涉及到了很多名词，例如：trace、tracing、profiling、a trace file、profile、traces、profiles、profiler等，单词都类似，但是在不同的上下文中却有不同的含义，不太了解的人非常容易迷糊，这里也做一下简要的介绍。
 
 **trace**：
 - 在Perfetto中，trace是指包含与软件系统执行相关的事件和数据的详细记录文件。通过收集和记录有关系统行为的各个方面的数据生成trace file，例如内核事件、应用程序级别事件、CPU使用率、内存分配、网络活动等等。使用各种数据源（例如ftrace、系统调用和自定义插桩）收集数据，然后以压缩的二进制格式存储在trace file中。可以使用Perfetto的可视化工具和API打开和分trace file，以深入了解系统的性能和行为。 
