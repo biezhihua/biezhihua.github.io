@@ -4,11 +4,16 @@ article: false
 
 # Perfetto - 03 - Quickstart: Record traces on Android
 
-Perfetto允许你从各种数据源(内核调度器通过ftrace，用户空间检测通过atrace和本网站列出的所有其他数据源)收集Android设备的系统范围性能跟踪。
+Perfetto允许你从各种数据源（例如通过ftrace记录内核调度信息，通过atrace记录用户空间的数据）收集Android设备的系统级性能跟踪数据。
 
 ## Starting the tracing services
 
-Perfetto基于平台服务。https://perfetto.dev/docs/concepts/service-model
+Perfetto基于Android 9（P）之后可用的平台服务构建，但默认情况下仅在Android 11（R）之后启用。在Android 9（P）和10（Q）上，您需要执行以下操作以确保在开始之前启用跟踪服务：
+
+＃仅在非Pixel手机上的Android 9（P）和10（Q）上需要。
+adb shell setprop persist.traced.enable 1
+
+如果您运行的Android版本早于P，则仍然可以使用record_android_trace脚本使用Perfetto捕获跟踪。请参见下面的通过cmdline记录跟踪的说明。
 
 ## Recording a trace
 
@@ -1029,9 +1034,50 @@ python3 record_android_trace -o trace_file.perfetto-trace -t 10s -b 32mb sched f
          ion - ION allocation (HAL)
 ```
 
+```shell
+full
+python3 record_android_trace -o trace_file.perfetto-trace -t 10s -b 128mb gfx input view webview wm am sm audio video camera hal res dalvik r bionic power pm s database network adb vibrator aidl nnapi rro pdx sched irq i2c freq idle disk sync workq memreclaim regulators binder_driver binder_lock pagecache memory thermal gfx ion
+```
+
+```shell
+commmon
+python3 record_android_trace -o trace_file.perfetto-trace -t 10s -b 32mb sched freq idle am wm gfx view binder_driver hal dalvik camera input res memory
+```
+
+```config
+buffers {
+  size_kb: 102400
+  fill_policy: RING_BUFFER
+}
+
+data_sources {
+  config {
+    name: "linux.ftrace"
+    ftrace_config {
+      # Enables specific system events tags.
+      atrace_categories: "am"
+      atrace_categories: "pm"
+
+      # Enables events for a specific app.
+      atrace_apps: "com.google.android.apps.docs"
+
+      # Enables all events for all apps.
+      atrace_apps: "*"
+    }
+  }
+}
+```
+
+```shell
+./record_android_trace -c config.pbtx -o trace_file.perfetto-trace 
+```
+
+
 
 # Reference
 
+- https://juejin.cn/post/7119764025210044423
+- https://docs.kernel.org/trace/ftrace.html
 - https://perfetto.dev/docs/quickstart/android-tracing
 - https://perfetto.dev/docs/concepts/service-model
 - https://perfetto.dev/docs/reference/perfetto-cli
