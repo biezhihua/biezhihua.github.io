@@ -163,9 +163,22 @@ public static void main(String[] args) {
 }
 ```
 
-当选中方法片段，可以看到片段的详细信息，例如：Start time、Duration、Thread等，这些都可以为性能优化提供帮助：
+当选中方法片段，可以看到片段的详细信息，例如：Start time、Duration、Process、Thread等，这些都可以为性能优化提供帮助：
 
 ![](/learn-android/performance/fluency-tools-perfetto-cpu-system-calls-detail.png)
+
+关于Slice Details内字段解释如下：
+| 字段 | 解释 |
+| --- | --- |
+| Name | 该片段的名称。例如，在CPU片段中，名称可以是系统调用名称或进程/线程名称。 |
+| Category | 该片段的类别。例如，在CPU片段中，类别可以是系统调用、进程/线程、binder。 |
+| Start time | 该片段的开始时间戳（以微秒为单位），相对于当前追踪的开始时间。 |
+| Absolute time | 该片段的开始时间戳（以微秒为单位），相对于Unix纪元时间戳（1970年1月1日）。 |
+| Duration | 该片段的持续时间（以微秒为单位）。 |
+| Thread duration | 该片段在该线程上的持续时间（以微秒为单位）。 |
+| Process | 包含该片段的进程的PID（进程标识符）。 |
+| User ID | 包含该片段的进程的用户ID。 |
+| Slice ID | 该片段的唯一标识符。 |
 
 
 ## 引用
