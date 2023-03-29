@@ -115,11 +115,65 @@ record_android_trace -o trace_file.perfetto-trace -t 10s -b 32mb sched freq idle
 
 这些状态通常与事件的开始状态和其他上下文信息一起使用，来提供对系统行为的完整视图。
 
+### 系统调用 - system calls
+
+#### 基础
+
+在Linux和Android（仅限userdebug、profilable版本），Perfetto可以跟踪系统调用。
+
+system calls对于理解Android系统的运行过程具有非常大的帮助。
+
+#### UI
+
+在UI层面，系统调用与每个线程片段的跟踪轨迹一起显示：
+
+![](/learn-android/performance/fluency-tools-perfetto-cpu-system-calls.png)
+
+这里是一段启动Android系统setting app的system call，可以清晰的看到setting app的启动过程涉及到了诸多函数的a调用：ActivityThreadMain、bindApplication、activityStart、activityResume。
+
+以ActivityThreadMain这个调用为例，在`frameworks/base/core/java/android/app/ActivityThread.java`文件中为`main`函数增加了trace信息，其底层使用的是atrace向ftrace添加事件来实现的。
+
+```java
+public static void main(String[] args) {
+    Trace.traceBegin(Trace.TRACE_TAG_ACTIVITY_MANAGER, "ActivityThreadMain");
+
+    // Install selective syscall interception
+    AndroidOs.install();
+
+    ......
+
+    Looper.prepareMainLooper();
+
+    ......
+
+    ActivityThread thread = new ActivityThread();
+    thread.attach(false, startSeq);
+
+    if (sMainThreadHandler == null) {
+        sMainThreadHandler = thread.getHandler();
+    }
+
+    ......
+
+    // End of event ActivityThreadMain.
+    Trace.traceEnd(Trace.TRACE_TAG_ACTIVITY_MANAGER);
+    Looper.loop();
+
+    throw new RuntimeException("Main thread loop unexpectedly exited");
+}
+```
+
+当选中方法片段，可以看到片段的详细信息，例如：Start time、Duration、Thread等，这些都可以为性能优化提供帮助：
+
+![](/learn-android/performance/fluency-tools-perfetto-cpu-system-calls-detail.png)
+
+
 ## 引用
 
 - https://ui.perfetto.dev/#!/record
 - https://perfetto.dev/
 - https://github.com/google/perfetto
+- https://cs.android.com/android/platform/superproject/+/master:frameworks/base/core/java/android/app/ActivityThread.java;l=7875?q=ActivityThreadMain&hl=zh-cn
 
 ## 版权声明
 
