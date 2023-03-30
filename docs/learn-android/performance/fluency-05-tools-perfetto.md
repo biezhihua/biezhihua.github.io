@@ -52,7 +52,7 @@ record_android_trace -o trace_file.perfetto-trace -t 10s -b 32mb sched freq idle
 
 其中部分翻译自官方文档，部分来自于经验总结。
 
-### CPU调度事件 - CPU Scheduling events 
+### CPU - Scheduling details
 
 #### 基础
 
@@ -63,7 +63,64 @@ record_android_trace -o trace_file.perfetto-trace -t 10s -b 32mb sched freq idle
 - 正在运行的线程被取消调度的原因（例如，抢占，阻塞在互斥锁上，阻塞的系统调用或任何其他等待队列）。
 - 一个线程何时变为可执行状态的时间点，即使它没有立即被放置在任何CPU运行队列中，还可以查看使其可执行的原线程。
 
-#### UI
+#### 记录trace
+
+##### 使用UI
+
+通过开启配置：Record new trace -> CPU - Scheduling details，来记录trace。
+
+![](/learn-android/performance/fluency-tools-perfetto-cpu-scheduling-details.png)
+
+##### 使用命令行
+
+config.pbtx:
+```
+buffers: {
+    size_kb: 63488
+    fill_policy: DISCARD
+}
+buffers: {
+    size_kb: 2048
+    fill_policy: DISCARD
+}
+data_sources: {
+    config {
+        name: "linux.process_stats"
+        target_buffer: 1
+        process_stats_config {
+            scan_all_processes_on_start: true
+        }
+    }
+}
+data_sources: {
+    config {
+        name: "linux.ftrace"
+        ftrace_config {
+            ftrace_events: "sched/sched_switch"
+            ftrace_events: "power/suspend_resume"
+            ftrace_events: "sched/sched_wakeup"
+            ftrace_events: "sched/sched_wakeup_new"
+            ftrace_events: "sched/sched_waking"
+            ftrace_events: "sched/sched_process_exit"
+            ftrace_events: "sched/sched_process_free"
+            ftrace_events: "task/task_newtask"
+            ftrace_events: "task/task_rename"
+        }
+    }
+}
+duration_ms: 10000
+```
+
+记录trace的命令：
+```
+// windows
+python3 record_android_trace -c config.pbtx -o trace_file.perfetto-trace
+
+// mac or linux
+record_android_trace -c config.pbtx -o trace_file.perfetto-trace
+```
+
+#### UI解读
 
 - 当缩小界面时，UI显示了CPU使用情况的量化视图，其中折叠了CPU调度信息：
 
@@ -77,9 +134,11 @@ record_android_trace -o trace_file.perfetto-trace -t 10s -b 32mb sched freq idle
 
 ![](/learn-android/performance/fluency-tools-perfetto-cpu-sched-details.png)
 
-- 当向下滚动时，当展开单个进程时，调度事件也会为每个线程创建一个跟踪，这允许跟踪单个线程状态的演变：
+- 当向下滚动时，展开单个进程，调度事件也会为每个线程创建一个跟踪，这允许跟踪单个线程状态的演变：
 
 ![](/learn-android/performance/fluency-tools-perfetto-cpu-process-threads.png)
+
+请注意，只有在开启了Scheduling details的配置后，可视化工具才会正确的显示进程、线程名。
 
 #### 调度唤醒和延迟分析 - Scheduling wakeups and latency analysis 
 
@@ -115,7 +174,115 @@ record_android_trace -o trace_file.perfetto-trace -t 10s -b 32mb sched freq idle
 
 这些状态通常与事件的开始状态和其他上下文信息一起使用，来提供对系统行为的完整视图。
 
-### 系统调用 - system calls
+### CPU - Scheduling details & Syscalls
+
+在Linux和Android（仅限userdebug、profilable版本），Perfetto可以跟踪系统调用，开启后会记录所有syscall的进入和退出。
+
+#### 记录trace
+
+##### 使用UI
+
+通过开启配置：Record new trace -> CPU -> Scheduling details 和 Syscalls，来记录trace。
+
+![](/learn-android/performance/fluency-tools-perfetto-cpu-scheduling-details.png)
+
+##### 使用命令行
+
+config.pbtx:
+```
+buffers: {
+    size_kb: 63488
+    fill_policy: DISCARD
+}
+buffers: {
+    size_kb: 2048
+    fill_policy: DISCARD
+}
+data_sources: {
+    config {
+        name: "linux.ftrace"
+        ftrace_config {
+            ftrace_events: "raw_syscalls/sys_enter"
+            ftrace_events: "raw_syscalls/sys_exit"
+        }
+    }
+}
+duration_ms: 10000
+```
+
+
+config.pbtx:
+```
+buffers: {
+    size_kb: 63488
+    fill_policy: DISCARD
+}
+buffers: {
+    size_kb: 2048
+    fill_policy: DISCARD
+}
+data_sources: {
+    config {
+        name: "linux.process_stats"
+        target_buffer: 1
+        process_stats_config {
+            scan_all_processes_on_start: true
+        }
+    }
+}
+data_sources: {
+    config {
+        name: "linux.ftrace"
+        ftrace_config {
+            ftrace_events: "sched/sched_switch"
+            ftrace_events: "power/suspend_resume"
+            ftrace_events: "sched/sched_wakeup"
+            ftrace_events: "sched/sched_wakeup_new"
+            ftrace_events: "sched/sched_waking"
+            ftrace_events: "raw_syscalls/sys_enter"
+            ftrace_events: "raw_syscalls/sys_exit"
+            ftrace_events: "sched/sched_process_exit"
+            ftrace_events: "sched/sched_process_free"
+            ftrace_events: "task/task_newtask"
+            ftrace_events: "task/task_rename"
+        }
+    }
+}
+duration_ms: 10000
+```
+
+记录trace的命令：
+```
+// windows
+python3 record_android_trace -c config.pbtx -o trace_file.perfetto-trace
+
+// mac or linux
+record_android_trace -c config.pbtx -o trace_file.perfetto-trace
+```
+
+#### UI解读
+
+![](/learn-android/performance/fluency-tools-perfetto-cpu-system-calls-detail-trace.png)
+
+当向下滚动时，展开单个进程，调度事件也会为每个线程创建一个跟踪，里面包含了syscalls的函数，经常看到的有：
+- `sys_futex`、`sys_exit`、`sys_epoll_pwait`、`sys_clone`、`sys_writev`、`sys_ioctl`、`sys_recvfrom`、`sys_read`、`sys_rt_sigtimedwait`等。
+
+
+| 函数名 | 解释 | 使用场景 |
+| --- | --- | --- |
+| sys\_futex | 系统调用，用于操作互斥锁、条件变量等同步原语。 | 在多线程应用程序中使用，用于实现线程同步和互斥。 |
+| sys\_exit | 系统调用，用于终止当前进程。 | 在应用程序中，用于正常退出或异常退出进程。 |
+| sys\_epoll\_pwait | 系统调用，用于等待多个文件描述符上的事件。 | 在网络编程中，用于异步地等待TCP套接字的数据到达。 |
+| sys\_clone | 系统调用，用于创建新的进程或线程。 | 在多线程应用程序中使用，用于创建新的线程。 |
+| sys\_writev | 系统调用，用于向文件描述符写入数据。 | 在应用程序中，用于将数据写入文件、管道、套接字等。 |
+| sys\_ioctl | 系统调用，用于控制设备和文件描述符的操作。 | 在应用程序中，用于与设备驱动程序通信以控制硬件设备。 |
+| sys\_recvfrom | 系统调用，用于从套接字接收数据。 | 在网络编程中，用于接收UDP套接字上的数据。 |
+| sys\_read | 系统调用，用于从文件描述符读取数据。 | 在应用程序中，用于从文件、管道、套接字等读取数据。 |
+| sys\_rt\_sigtimedwait | 系统调用，用于等待实时信号。 | 在实时信号处理中使用，用于等待实时信号并处理信号。 |
+
+注意：这些函数的使用场景可能因操作系统版本、编程语言、应用程序类型等因素而异。以上仅提供一般的参考。
+
+### CPU - Scheduling details & Syscalls
 
 #### 基础
 
