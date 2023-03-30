@@ -383,8 +383,7 @@ public static void main(String[] args) {
 | Process | 包含该片段的进程的PID（进程标识符）。 |
 | User ID | 包含该片段的进程的用户ID。 |
 | Slice ID | 该片段的唯一标识符。 |
-
-
+‘
 ## 引用
 
 - https://ui.perfetto.dev/#!/record
