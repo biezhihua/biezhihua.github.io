@@ -4,6 +4,8 @@ article: false
 
 # Perfetto - 22 - ATrace: Android system and app trace events
 
+在Android操作系统中，“android apps & svcs”指的是运行在Android设备上的所有应用程序和系统服务。这包括用户安装的第三方应用程序、预装的系统应用程序和系统服务，例如Wi-Fi、蓝牙、GPS、音频服务等等。这些应用程序和服务共同组成了Android操作系统的功能集合，并为用户提供各种各样的功能和服务，例如通信、娱乐、工具、社交等等。在Perfetto中，跟踪“android apps & svcs”可以帮助用户分析应用程序和系统服务的性能和行为，识别性能瓶颈和优化机会，并最终提高设备的整体性能和用户体验。
+
 ## ATrace
 
 在Android上，本地和托管应用程序可以向跟踪中注入自定义切片和计数器跟踪点。这可以通过以下方法实现:

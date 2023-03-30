@@ -282,21 +282,58 @@ record_android_trace -c config.pbtx -o trace_file.perfetto-trace
 
 注意：这些函数的使用场景可能因操作系统版本、编程语言、应用程序类型等因素而异。以上仅提供一般的参考。
 
-### CPU - Scheduling details & Syscalls
+### Android app&svcs - Atrace usersapce annotations
 
 #### 基础
 
-在Linux和Android（仅限userdebug、profilable版本），Perfetto可以跟踪系统调用。
+在Android上，开发者可以使用atrace向trace中插入自定义的跟踪点（trace point），可以通过以下方法实现:
+- Java/Kotlin apps (SDK): `android.os.Trace`。
+- Native processes (NDK): `ATrace_beginSection()` / `ATrace_setCounter()`定义在`<trace.h>`。
+- Android internal processes：`libcutils/trace.h`中定义的`ATRACE_BEGIN()` / `ATRACE_INT()`。
 
-system calls对于理解Android系统的运行过程具有非常大的帮助。
+有两种类型的跟踪事件:System events和App events:。
+- System events:由Android内部使用libcutils触发。这些事件按类别分组(也称为标签 - TAG)，例如:am - ActivityManager， pm - PackageManager。TAG可用于跨多个进程启用事件组，而不必担心是哪个特定的系统进程发出它们。
+- App events:与System events具有相同的语义。然而，与System events不同的是，它们没有任何标签（TAG）过滤功能(所有应用程序事件共享相同的标签ATRACE_TAG_APP)，但可以在每个应用程序的基础上启用。
+
+atrace有不可忽略的成本，每个事件需要1-10us。这是因为每个事件都涉及到一个字符串化、一个来自执行环境的JNI调用，以及一个用户空间`<->`内核空间的往返，以将标记写入`/sys/kernel/debug/tracing/trace_marker`(这是最昂贵的部分)。
+
+可以在atrace的[源码](https://cs.android.com/android/platform/superproject/+/master:frameworks/native/cmds/atrace/atrace.cpp)中找到关于TAG的定义，基本上涉及到了系统应用的方方面面：
+
+```
+{ "gfx",        "Graphics",                 ATRACE_TAG_GRAPHICS, { } },
+{ "input",      "Input",                    ATRACE_TAG_INPUT, { } },
+{ "view",       "View System",              ATRACE_TAG_VIEW, { } },
+{ "webview",    "WebView",                  ATRACE_TAG_WEBVIEW, { } },
+{ "wm",         "Window Manager",           ATRACE_TAG_WINDOW_MANAGER, { } },
+{ "am",         "Activity Manager",         ATRACE_TAG_ACTIVITY_MANAGER, { } },
+{ "sm",         "Sync Manager",             ATRACE_TAG_SYNC_MANAGER, { } },
+{ "audio",      "Audio",                    ATRACE_TAG_AUDIO, { } },
+{ "video",      "Video",                    ATRACE_TAG_VIDEO, { } },
+{ "camera",     "Camera",                   ATRACE_TAG_CAMERA, { } },
+{ "hal",        "Hardware Modules",         ATRACE_TAG_HAL, { } },
+{ "res",        "Resource Loading",         ATRACE_TAG_RESOURCES, { } },
+{ "dalvik",     "Dalvik VM",                ATRACE_TAG_DALVIK, { } },
+{ "rs",         "RenderScript",             ATRACE_TAG_RS, { } },
+{ "bionic",     "Bionic C Library",         ATRACE_TAG_BIONIC, { } },
+{ "power",      "Power Management",         ATRACE_TAG_POWER, { } },
+{ "pm",         "Package Manager",          ATRACE_TAG_PACKAGE_MANAGER, { } },
+{ "ss",         "System Server",            ATRACE_TAG_SYSTEM_SERVER, { } },
+{ "database",   "Database",                 ATRACE_TAG_DATABASE, { } },
+{ "network",    "Network",                  ATRACE_TAG_NETWORK, { } },
+{ "adb",        "ADB",                      ATRACE_TAG_ADB, { } },
+{ "vibrator",   "Vibrator",                 ATRACE_TAG_VIBRATOR, { } },
+{ "aidl",       "AIDL calls",               ATRACE_TAG_AIDL, { } },
+{ "nnapi",      "NNAPI",                    ATRACE_TAG_NNAPI, { } },
+{ "rro",        "Runtime Resource Overlay", ATRACE_TAG_RRO, { } },
+```
 
 #### UI
 
-在UI层面，系统调用与每个线程片段的跟踪轨迹一起显示：
+在UI层面，这些被插桩的函数会在进程trace分组中创建切片（slice）和计数器（counter），这样的能力非常的重要，可以帮助开发者理解系统和App的执行流程，以快速定位到性能问题。
 
-![](/learn-android/performance/fluency-tools-perfetto-cpu-system-calls.png)
+![](/learn-android/performance/fluency-tools-perfetto-android-app-svcs-atrace.png)
 
-这里是一段启动Android系统setting app的system call，可以清晰的看到setting app的启动过程涉及到了诸多函数的a调用：ActivityThreadMain、bindApplication、activityStart、activityResume。
+这里是一段启动Android系统设置App的system call，可以清晰的看到s设置App的启动过程涉及到了诸多函数的调用：ActivityThreadMain、bindApplication、activityStart、activityResume。
 
 以ActivityThreadMain这个调用为例，在`frameworks/base/core/java/android/app/ActivityThread.java`文件中为`main`函数增加了trace信息，其底层使用的是atrace向ftrace添加事件来实现的。
 

@@ -4,6 +4,8 @@ article: false
 
 # Perfetto - 18 - CPU frequency and idle states CPU频率和空闲状态
 
+Frequency scaling的翻译为“频率缩放”，它是指通过改变CPU的时钟频率来控制CPU的功耗和性能的一种技术。在现代的计算机系统中，CPU是消耗大量电力的设备，频率缩放技术可以通过降低CPU的时钟频率来降低功耗，并延长电池寿命。同时，当需要更高的性能时，频率缩放技术也可以通过增加CPU的时钟频率来提高CPU的性能。频率缩放技术通常由操作系统内核或硬件设备自动控制，并在不同的应用程序或任务之间动态调整CPU的时钟频率，以实现更好的平衡功耗和性能之间的权衡。
+
 ## Basic
 
 该数据源在Linux和Android (Since P)上可用。它通过Linux内核ftrace基础设施记录CPU电源管理方案的变化。它涉及三个方面:
