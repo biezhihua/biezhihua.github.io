@@ -200,29 +200,6 @@ buffers: {
 }
 data_sources: {
     config {
-        name: "linux.ftrace"
-        ftrace_config {
-            ftrace_events: "raw_syscalls/sys_enter"
-            ftrace_events: "raw_syscalls/sys_exit"
-        }
-    }
-}
-duration_ms: 10000
-```
-
-
-config.pbtx:
-```
-buffers: {
-    size_kb: 63488
-    fill_policy: DISCARD
-}
-buffers: {
-    size_kb: 2048
-    fill_policy: DISCARD
-}
-data_sources: {
-    config {
         name: "linux.process_stats"
         target_buffer: 1
         process_stats_config {
@@ -418,25 +395,6 @@ buffers: {
 }
 data_sources: {
     config {
-        name: "android.surfaceflinger.frametimeline"
-    }
-}
-duration_ms: 10000
-```
-
-
-config.pbtx:
-```
-buffers: {
-    size_kb: 63488
-    fill_policy: DISCARD
-}
-buffers: {
-    size_kb: 2048
-    fill_policy: DISCARD
-}
-data_sources: {
-    config {
         name: "linux.process_stats"
         target_buffer: 1
         process_stats_config {
@@ -494,7 +452,7 @@ record_android_trace -c config.pbtx -o trace_file.perfetto-trace
 
 **对于SurfaceFlinger，也会添加两个新的跟踪内容 - Expected Timeline & Actual Timeline。**
 
-表示其应该在内部完成的期望时间，以及完成合成帧并呈现在屏幕上所需的实际时间。在这里，SurfaceFlinger的是显示为堆栈的所有内容。这包括Composer和DisplayHAL。因此，这些片段表示SurfaceFlinger主线程的开始到屏幕更新。
+表示其应该在内部完成的期望时间，以及完成合成帧并呈现在屏幕上所需的实际时间。在这里，SurfaceFlinger的工作内容显示为堆栈中的所有内容。这包括Composer和DisplayHAL。因此，这些片段表示SurfaceFlinger主线程的开始到屏幕更新。
 
 ![](/learn-android/performance/fluency-tools-perfetto-android-app-svcs-frametimeline-doframe.png)
 
