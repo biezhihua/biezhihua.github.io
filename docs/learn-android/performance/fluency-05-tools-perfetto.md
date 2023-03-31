@@ -383,7 +383,143 @@ public static void main(String[] args) {
 | Process | 包含该片段的进程的PID（进程标识符）。 |
 | User ID | 包含该片段的进程的用户ID。 |
 | Slice ID | 该片段的唯一标识符。 |
-‘
+
+### Android app&svcs - Android Jank/dʒæŋk/ detection with FrameTimeline
+
+这一部分官方讲的非常好，直接翻译过来的。
+
+#### 基础
+
+一帧画面如果呈现在屏幕上的时间与调度器给出的预测呈现时间不匹配，那么这个帧被称为jank。
+
+janky 可能导致的问题有：
+- 不稳定的帧率
+- 延迟增加
+
+FrameTimeline是SurfaceFlinger中检测jank的模块，并报告jank的源头。SurfaceViews目前不受支持，但将在未来支持。
+
+#### 记录trace
+
+##### 使用UI
+
+![](/learn-android/performance/fluency-tools-perfetto-android-app-svcs-frametimeline-ui.png)
+
+##### 使用命令行
+
+config.pbtx:
+```
+buffers: {
+    size_kb: 63488
+    fill_policy: DISCARD
+}
+buffers: {
+    size_kb: 2048
+    fill_policy: DISCARD
+}
+data_sources: {
+    config {
+        name: "android.surfaceflinger.frametimeline"
+    }
+}
+duration_ms: 10000
+```
+
+
+config.pbtx:
+```
+buffers: {
+    size_kb: 63488
+    fill_policy: DISCARD
+}
+buffers: {
+    size_kb: 2048
+    fill_policy: DISCARD
+}
+data_sources: {
+    config {
+        name: "linux.process_stats"
+        target_buffer: 1
+        process_stats_config {
+            scan_all_processes_on_start: true
+        }
+    }
+}
+data_sources: {
+    config {
+        name: "android.surfaceflinger.frametimeline"
+    }
+}
+data_sources: {
+    config {
+        name: "linux.ftrace"
+        ftrace_config {
+            ftrace_events: "sched/sched_switch"
+            ftrace_events: "power/suspend_resume"
+            ftrace_events: "sched/sched_wakeup"
+            ftrace_events: "sched/sched_wakeup_new"
+            ftrace_events: "sched/sched_waking"
+            ftrace_events: "sched/sched_process_exit"
+            ftrace_events: "sched/sched_process_free"
+            ftrace_events: "task/task_newtask"
+            ftrace_events: "task/task_rename"
+        }
+    }
+}
+duration_ms: 10000
+```
+
+记录trace的命令：
+```
+// windows
+python3 record_android_trace -c config.pbtx -o trace_file.perfetto-trace
+
+// mac or linux
+record_android_trace -c config.pbtx -o trace_file.perfetto-trace
+```
+
+#### UI
+
+**对于每个应用，会添加两个新的跟踪内容 - Expected Timeline & Actual Timeline。**
+
+![](/learn-android/performance/fluency-tools-perfetto-android-app-svcs-frametimeline.png)
+
+- 期望时间轴（Expected Timeline）：每个片段表示给应用程序渲染帧的时间。为避免系统中出现jank，应用程序应在这个时间范围内完成。
+- 实际时间轴（Actual Timeline）：这些片段表示应用程序完成帧的实际时间（包括GPU工作）并将其发送到SurfaceFlinger进行组合。
+    - 注意：FrameTimeline目前尚不知道应用程序的实际帧开始时间，所以使用了预期的开始时间。这里的片段结束时间表示m`max(gpu time, post time)`。post时间是应用程序的帧发布到SurfaceFlinger的时间。
+    - ![](/learn-android/performance/fluency-tools-perfetto-android-app-svcs-frametimeline-post-time.png)
+
+![](/learn-android/performance/fluency-tools-perfetto-android-app-svcs-frametimeline-sf-vsyncid.png)
+
+此外，主线程和RenderThread中的片段的名称表示从choreographer接收到的标记。可以将实际时间轴跟踪（Actual Timeline）中的片段与期望时间轴跟踪（Expected Timeline）中的相应片段进行比较，以查看应用程序的性能表现如何。
+
+**对于SurfaceFlinger，也会添加两个新的跟踪内容 - Expected Timeline & Actual Timeline。**
+
+表示其应该在内部完成的期望时间，以及完成合成帧并呈现在屏幕上所需的实际时间。在这里，SurfaceFlinger的是显示为堆栈的所有内容。这包括Composer和DisplayHAL。因此，这些片段表示SurfaceFlinger主线程的开始到屏幕更新。
+
+![](/learn-android/performance/fluency-tools-perfetto-android-app-svcs-frametimeline-doframe.png)
+
+> 在Android操作系统中，Display HAL（Hardware Abstraction Layer）是用于抽象底层硬件接口的一个组件。它提供了一个标准化的接口，让Android的图形系统能够在不同的硬件设备上运行，并且让硬件厂商可以轻松地支持Android的图形系统。Display HAL的主要作用是提供显示屏幕的基本功能，例如在屏幕上显示图像、调整屏幕亮度、旋转屏幕等等。在Android的架构中，Display HAL是图形系统和硬件之间的接口，它与硬件抽象层（HAL）和Android图形系统（例如SurfaceFlinger）进行交互，并且为Android应用程序提供了标准的显示功能。通过使用Display HAL，Android能够支持各种不同的屏幕和硬件设备，并且提供一致的用户体验。
+
+**选择实际时间线片段，并选择详细信息提供有关帧发生了什么的更多信息。这些包括：**
+
+![](/learn-android/performance/fluency-tools-perfetto-android-app-svcs-frametimeline-selection.png)
+
+- Present Type
+    - 帧是早期、准时还是迟到呈现的。
+- On time finish 准时完成
+    - 应用程序是否按时完成了帧的工作？
+- Jank Type
+    - 这个帧有没有观察到jank？如果是，这显示观察到了什么类型的jank。如果没有，则类型将为None。
+- Prediction type
+    - 预测是否在FrameTimeline收到此帧时过期？如果是，它将说已过期的预测。如果没有，那就是有效预测。
+- GPU Composition
+    - 告诉帧是否由GPU合成。
+- Layer Name
+    - 呈现该帧的层/表面的名称。一些进程会将帧更新到多个表面。在这里，具有相同令牌的多个切片将显示在实际时间轴中。层名称可以是区分这些切片的一种好方法。
+- Is Buffer? 是否为缓冲区？
+    - 一个布尔值，告诉我们这帧是否对应于缓冲区或者动画。
+
+
 ## 引用
 
 - https://ui.perfetto.dev/#!/record
