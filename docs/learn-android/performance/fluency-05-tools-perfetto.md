@@ -420,6 +420,34 @@ duration_ms: 10000
     - 一个布尔值，告诉我们这帧是否对应于缓冲区或者动画。
 
 
+### VSYNC
+
+Perfetto中Surfaceflinger中的VSYNC-app、VSYNC-appSf、VSYNC-sf的0和1的含义:
+
+Perfetto 是一款用于性能分析的开源软件套件。在 Perfetto 的追踪中，你可能会看到与 SurfaceFlinger 相关的 VSYNC 事件，例如 VSYNC-app、VSYNC-appSf 和 VSYNC-sf。这些事件主要涉及 Android 显示系统的垂直同步 (VSYNC) 信号。
+
+以下是 VSYNC-app、VSYNC-appSf 和 VSYNC-sf 的含义：
+
+- VSYNC-app：这个事件表示应用程序的 VSYNC 信号。它通知应用程序何时开始渲染下一帧。VSYNC-app 事件有两个状态：0 和 1。0 表示 VSYNC 信号的开始，1 表示 VSYNC 信号的结束。
+
+- VSYNC-appSf：这个事件与 VSYNC-app 类似，但它是针对 SurfaceFlinger 应用程序的。这个信号在应用程序的绘制完毕后，通知 SurfaceFlinger 开始合成帧。同样，0 表示信号的开始，1 表示信号的结束。
+
+- VSYNC-sf：这个事件表示 SurfaceFlinger 的 VSYNC 信号。它通知 SurfaceFlinger 何时开始将缓冲区的内容推送到显示器。VSYNC-sf 也有两个状态：0 和 1。0 表示 VSYNC 信号的开始，1 表示 VSYNC 信号的结束。
+
+总之，在 Perfetto 追踪中，0 通常表示 VSYNC 事件的开始，而 1 表示 VSYNC 事件的结束。这些事件可用于分析 Android 显示系统的性能，以优化应用程序的渲染和显示性能。
+
+在Perfetto中Surfaceflinger进程中VSYNC-app时间轴内，value=0时持续16.67ms的含义，与value=1时持续16.67ms的含义:
+
+在 Perfetto 中，SurfaceFlinger 进程的 VSYNC-app 时间轴显示了 VSYNC 信号的周期。在一个典型的 60 Hz 刷新率的显示器上，VSYNC 信号的周期为 16.67 毫秒（1000 ms / 60 Hz）。这意味着每 16.67 毫秒，一个新的垂直同步信号（VSYNC）会被发送，以通知应用程序开始渲染下一帧。在 Perfetto 的 VSYNC-app 时间轴中，value=0 和 value=1 分别表示 VSYNC 信号的开始和结束。
+
+以下是 value=0 与 value=1 在 VSYNC-app 时间轴中的含义：
+
+value=0：这表示 VSYNC-app 信号的开始。在这个时刻，应用程序会收到通知，开始准备渲染下一帧。在时间轴上，这个状态会持续大约 16.67 毫秒，即一个 VSYNC 信号周期。
+
+value=1：这表示 VSYNC-app 信号的结束。在这个时刻，应用程序应该已经完成了下一帧的渲染工作。与 value=0 类似，这个状态也会在时间轴上持续大约 16.67 毫秒。
+
+简而言之，在 Perfetto 中，SurfaceFlinger 进程的 VSYNC-app 时间轴中的 value=0 和 value=1 分别表示 VSYNC 信号的开始和结束。这些信号用于同步应用程序的帧渲染与显示器的刷新率，以确保流畅且无撕裂的图像显示。在时间轴上，这些状态会持续一个 VSYNC 信号周期（例如，16.67 毫秒）。
+
 ## 引用
 
 - https://ui.perfetto.dev/#!/record

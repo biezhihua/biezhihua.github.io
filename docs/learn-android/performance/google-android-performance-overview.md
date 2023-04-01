@@ -2,7 +2,7 @@
 article: false
 ---
 
-# Android | 性能优化 | Google官方文档概述
+# google-android-performance
 
 - [performance](https://developer.android.com/topic/performance)
 
