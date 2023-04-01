@@ -52,16 +52,27 @@ record_android_trace -o trace_file.perfetto-trace -t 10s -b 32mb sched freq idle
 
 其中部分翻译自官方文档，部分来自于经验总结。
 
+下面是使用config.pbtx记录trace的命令：
+```
+// windows
+python3 record_android_trace -c config.pbtx -o trace_file.perfetto-trace
+
+// mac or linux
+record_android_trace -c config.pbtx -o trace_file.perfetto-trace
+```
+
 ### CPU - Scheduling details
 
 #### 基础
 
 在Android和Linux上，Perfetto可以通过Linux内核ftrace基础设施收集CPU调度器跟踪信息。
 
-可以获取细粒度的调度事件，例如：
+通过这个配置，可以获取细粒度的调度事件，例如：
 - 任何时间点哪些线程在哪个CPU核上调度，精确到纳秒。
-- 正在运行的线程被取消调度的原因（例如，抢占，阻塞在互斥锁上，阻塞的系统调用或任何其他等待队列）。
+- 正在运行的线程被取消调度的原因。
+    - 例如，抢占，阻塞在互斥锁上，阻塞的系统调用或任何其他等待队列。
 - 一个线程何时变为可执行状态的时间点，即使它没有立即被放置在任何CPU运行队列中，还可以查看使其可执行的原线程。
+- 能识别出进程名称、线程名称。
 
 #### 记录trace
 
@@ -111,15 +122,6 @@ data_sources: {
 duration_ms: 10000
 ```
 
-记录trace的命令：
-```
-// windows
-python3 record_android_trace -c config.pbtx -o trace_file.perfetto-trace
-
-// mac or linux
-record_android_trace -c config.pbtx -o trace_file.perfetto-trace
-```
-
 #### UI解读
 
 - 当缩小界面时，UI显示了CPU使用情况的量化视图，其中折叠了CPU调度信息：
@@ -134,7 +136,7 @@ record_android_trace -c config.pbtx -o trace_file.perfetto-trace
 
 ![](/learn-android/performance/fluency-tools-perfetto-cpu-sched-details.png)
 
-- 当向下滚动时，展开单个进程，调度事件也会为每个线程创建一个跟踪，这允许跟踪单个线程状态的演变：
+- 当向下滚动时，会按照进程分组，展开单个进程，调度事件也会为每个线程创建一个时间线，这允许跟踪单个线程状态的演变：
 
 ![](/learn-android/performance/fluency-tools-perfetto-cpu-process-threads.png)
 
@@ -147,15 +149,15 @@ record_android_trace -c config.pbtx -o trace_file.perfetto-trace
 - 除当前CPU外的其他某些CPU，但是调度器负载平衡器可能需要一些时间才能将线程移动到另一个CPU。
   - 除非使用实时线程优先级，否则大多数Linux内核调度器配置都不是严格的工作保存配置。例如，调度器可能希望等待一段时间，以便在当前CPU上运行的线程进入空闲状态，避免跨CPU迁移，这可能在开销和功率方面更昂贵。
 
-而这种情况就会造成线程的延迟，在Perfetto上选择一个CPU切片就可以看到这种状态：
+这种情况就会造成线程的延迟，在Perfetto上选择一个CPU切片就可以看到这种状态：
 
 ![](/learn-android/performance/fluency-tools-perfetto-cup-scheduling-latency.png)
 
 #### 线程end_state状态
 
-在Perfetto中，end\_state提供了有关事件结束时线程状态的信息。下面是一些常见的状态及其解释：
+在Perfetto中，end_state提供了有关事件结束时线程状态的信息。下面是一些常见的状态及其解释：
 
-| end\_state | 翻译 | 解释 |
+| end_state | 翻译 | 解释 |
 | --- | --- | --- |
 | R | Runnable | 线程在结束时处于“运行”状态，即正在CPU上运行。 |
 | R+ | Runnable (Preempted) | 线程在结束时处于“运行”状态，但是它已经超过了原定的时间配额（time slice），并且内核已经决定将它挂起。 |
@@ -174,7 +176,7 @@ record_android_trace -c config.pbtx -o trace_file.perfetto-trace
 
 这些状态通常与事件的开始状态和其他上下文信息一起使用，来提供对系统行为的完整视图。
 
-### CPU - Scheduling details & Syscalls
+### CPU - Syscalls
 
 在Linux和Android（仅限userdebug、profilable版本），Perfetto可以跟踪系统调用，开启后会记录所有syscall的进入和退出。
 
@@ -200,50 +202,22 @@ buffers: {
 }
 data_sources: {
     config {
-        name: "linux.process_stats"
-        target_buffer: 1
-        process_stats_config {
-            scan_all_processes_on_start: true
-        }
-    }
-}
-data_sources: {
-    config {
         name: "linux.ftrace"
         ftrace_config {
-            ftrace_events: "sched/sched_switch"
-            ftrace_events: "power/suspend_resume"
-            ftrace_events: "sched/sched_wakeup"
-            ftrace_events: "sched/sched_wakeup_new"
-            ftrace_events: "sched/sched_waking"
             ftrace_events: "raw_syscalls/sys_enter"
             ftrace_events: "raw_syscalls/sys_exit"
-            ftrace_events: "sched/sched_process_exit"
-            ftrace_events: "sched/sched_process_free"
-            ftrace_events: "task/task_newtask"
-            ftrace_events: "task/task_rename"
         }
     }
 }
 duration_ms: 10000
 ```
 
-记录trace的命令：
-```
-// windows
-python3 record_android_trace -c config.pbtx -o trace_file.perfetto-trace
-
-// mac or linux
-record_android_trace -c config.pbtx -o trace_file.perfetto-trace
-```
-
 #### UI解读
 
 ![](/learn-android/performance/fluency-tools-perfetto-cpu-system-calls-detail-trace.png)
 
-当向下滚动时，展开单个进程，调度事件也会为每个线程创建一个跟踪，里面包含了syscalls的函数，经常看到的有：
-- `sys_futex`、`sys_exit`、`sys_epoll_pwait`、`sys_clone`、`sys_writev`、`sys_ioctl`、`sys_recvfrom`、`sys_read`、`sys_rt_sigtimedwait`等。
-
+当向下滚动，展开单个进程，调度事件也会为每个线程创建一个时间线，里面包含了syscalls的函数，经常看到的有：
+- `sys_futex`、`sys_exit`、`sys_epoll_pwait`、`sys_clone`、`sys_writev`、`sys_ioctl`、`sys_recvfrom`、`sys_read`、`sys_rt_sigtimedwait`等，它们的含义为：
 
 | 函数名 | 解释 | 使用场景 |
 | --- | --- | --- |
@@ -263,7 +237,7 @@ record_android_trace -c config.pbtx -o trace_file.perfetto-trace
 
 #### 基础
 
-在Android上，开发者可以使用atrace向trace中插入自定义的跟踪点（trace point），可以通过以下方法实现:
+在Android上，开发者可以使用atrace向trace文件中插入自定义的跟踪点（trace point），可以通过以下方法实现:
 - Java/Kotlin apps (SDK): `android.os.Trace`。
 - Native processes (NDK): `ATrace_beginSection()` / `ATrace_setCounter()`定义在`<trace.h>`。
 - Android internal processes：`libcutils/trace.h`中定义的`ATRACE_BEGIN()` / `ATRACE_INT()`。
@@ -272,7 +246,7 @@ record_android_trace -c config.pbtx -o trace_file.perfetto-trace
 - System events:由Android内部使用libcutils触发。这些事件按类别分组(也称为标签 - TAG)，例如:am - ActivityManager， pm - PackageManager。TAG可用于跨多个进程启用事件组，而不必担心是哪个特定的系统进程发出它们。
 - App events:与System events具有相同的语义。然而，与System events不同的是，它们没有任何标签（TAG）过滤功能(所有应用程序事件共享相同的标签ATRACE_TAG_APP)，但可以在每个应用程序的基础上启用。
 
-atrace有不可忽略的成本，每个事件需要1-10us。这是因为每个事件都涉及到一个字符串化、一个来自执行环境的JNI调用，以及一个用户空间`<->`内核空间的往返，以将标记写入`/sys/kernel/debug/tracing/trace_marker`(这是最昂贵的部分)。
+atrace有不可忽略的成本，每个事件需要1-10us。这是因为每个事件都涉及到一个字符串化、一个来自执行环境的JNI调用，以及一个用户空间<->内核空间的往返，以将标记写入/sys/kernel/debug/tracing/trace_marker(这是最昂贵的部分)。
 
 可以在atrace的[源码](https://cs.android.com/android/platform/superproject/+/master:frameworks/native/cmds/atrace/atrace.cpp)中找到关于TAG的定义，基本上涉及到了系统应用的方方面面：
 
@@ -306,13 +280,13 @@ atrace有不可忽略的成本，每个事件需要1-10us。这是因为每个�
 
 #### UI
 
-在UI层面，这些被插桩的函数会在进程trace分组中创建切片（slice）和计数器（counter），这样的能力非常的重要，可以帮助开发者理解系统和App的执行流程，以快速定位到性能问题。
+在UI层面，这些被插桩的函数会在进程分组下的线程中创建切片（slice）和计数器（counter），这样的能力非常的重要，可以帮助开发者理解系统和App的执行流程，以快速定位到性能问题。
 
 ![](/learn-android/performance/fluency-tools-perfetto-android-app-svcs-atrace.png)
 
-这里是一段启动Android系统设置App的system call，可以清晰的看到s设置App的启动过程涉及到了诸多函数的调用：ActivityThreadMain、bindApplication、activityStart、activityResume。
+这里是一段启动Android系统设置App的trace信息，可以清晰的看到设置App的启动过程涉及到了诸多函数的调用：ActivityThreadMain、bindApplication、activityStart、activityResume。
 
-以ActivityThreadMain这个调用为例，在`frameworks/base/core/java/android/app/ActivityThread.java`文件中为`main`函数增加了trace信息，其底层使用的是atrace向ftrace添加事件来实现的。
+以ActivityThreadMain这个调用为例，在`frameworks/base/core/java/android/app/ActivityThread.java`文件中为`main`函数增加了trace信息，其底层使用的是atrace借助ftrace向内核添加事件来实现的。
 
 ```java
 public static void main(String[] args) {
@@ -361,15 +335,13 @@ public static void main(String[] args) {
 | User ID | 包含该片段的进程的用户ID。 |
 | Slice ID | 该片段的唯一标识符。 |
 
-### Android app&svcs - Android Jank/dʒæŋk/ detection with FrameTimeline
-
-这一部分官方讲的非常好，直接翻译过来的。
+### Android app&svcs - Frame timeline
 
 #### 基础
 
 一帧画面如果呈现在屏幕上的时间与调度器给出的预测呈现时间不匹配，那么这个帧被称为jank。
 
-janky 可能导致的问题有：
+jank 可能导致的问题有：
 - 不稳定的帧率
 - 延迟增加
 
@@ -395,70 +367,40 @@ buffers: {
 }
 data_sources: {
     config {
-        name: "linux.process_stats"
-        target_buffer: 1
-        process_stats_config {
-            scan_all_processes_on_start: true
-        }
-    }
-}
-data_sources: {
-    config {
         name: "android.surfaceflinger.frametimeline"
-    }
-}
-data_sources: {
-    config {
-        name: "linux.ftrace"
-        ftrace_config {
-            ftrace_events: "sched/sched_switch"
-            ftrace_events: "power/suspend_resume"
-            ftrace_events: "sched/sched_wakeup"
-            ftrace_events: "sched/sched_wakeup_new"
-            ftrace_events: "sched/sched_waking"
-            ftrace_events: "sched/sched_process_exit"
-            ftrace_events: "sched/sched_process_free"
-            ftrace_events: "task/task_newtask"
-            ftrace_events: "task/task_rename"
-        }
     }
 }
 duration_ms: 10000
 ```
 
-记录trace的命令：
-```
-// windows
-python3 record_android_trace -c config.pbtx -o trace_file.perfetto-trace
-
-// mac or linux
-record_android_trace -c config.pbtx -o trace_file.perfetto-trace
-```
-
 #### UI
 
-**对于每个应用，会添加两个新的跟踪内容 - Expected Timeline & Actual Timeline。**
+**对于每个应用，会添加两个新的时间线 - Expected Timeline & Actual Timeline。**
 
 ![](/learn-android/performance/fluency-tools-perfetto-android-app-svcs-frametimeline.png)
 
-- 期望时间轴（Expected Timeline）：每个片段表示给应用程序渲染帧的时间。为避免系统中出现jank，应用程序应在这个时间范围内完成。
-- 实际时间轴（Actual Timeline）：这些片段表示应用程序完成帧的实际时间（包括GPU工作）并将其发送到SurfaceFlinger进行组合。
-    - 注意：FrameTimeline目前尚不知道应用程序的实际帧开始时间，所以使用了预期的开始时间。这里的片段结束时间表示m`max(gpu time, post time)`。post时间是应用程序的帧发布到SurfaceFlinger的时间。
-    - ![](/learn-android/performance/fluency-tools-perfetto-android-app-svcs-frametimeline-post-time.png)
+- **期望时间轴（Expected Timeline）**：每个片段表示给应用程序渲染帧的时间。为避免系统中出现jank，应用程序应在这个时间范围内完成。
+- **实际时间轴（Actual Timeline）**：这些片段表示应用程序完成帧的实际时间（包括GPU工作）并将其发送到SurfaceFlinger进行组合。
+    - 注意：FrameTimeline目前尚不知道应用程序的实际帧开始时间，所以使用了预期的开始时间。这里的片段结束时间表示为`max(gpu time, post time)`。`post time`是应用程序的帧被提交给到SurfaceFlinger的时间。
+    - 由于GPU的工作是并行执行的，所以`post time`既有可能在GPU完成工作之前，也可能在GPU完成工作之后。
 
 ![](/learn-android/performance/fluency-tools-perfetto-android-app-svcs-frametimeline-sf-vsyncid.png)
 
-此外，主线程和RenderThread中的片段的名称表示从choreographer接收到的标记。可以将实际时间轴跟踪（Actual Timeline）中的片段与期望时间轴跟踪（Expected Timeline）中的相应片段进行比较，以查看应用程序的性能表现如何。
+在 Perfetto 中，时间线上的切片名称后面的数字代表从 Choreographer 收到的标记（token）。你可以将实际时间线轨道上的切片与预期时间线轨道上的相应切片进行比较，以了解应用程序的表现是否符合预期。此外，为了进行调试，该标记（token）会添加到应用程序的 doFrame 和 RenderThread 切片中。对于 SurfaceFlinger，同样的标记也会显示在 onMessageReceived 中。
 
-**对于SurfaceFlinger，也会添加两个新的跟踪内容 - Expected Timeline & Actual Timeline。**
+> 问：这里面的token是指什么？
 
-表示其应该在内部完成的期望时间，以及完成合成帧并呈现在屏幕上所需的实际时间。在这里，SurfaceFlinger的工作内容显示为堆栈中的所有内容。这包括Composer和DisplayHAL。因此，这些片段表示SurfaceFlinger主线程的开始到屏幕更新。
+> ChatGPT答：在这个上下文中，"token"指的是"标记"或者"令牌"。在Android中，Choreographer是一个系统服务，用于协调UI线程和VSYNC信号之间的帧率同步。当应用程序请求下一帧时，Choreographer会向应用程序提供一个"token"，以便在应用程序完成绘制并将帧提交到SurfaceFlinger之后，SurfaceFlinger可以根据token对帧进行排序。在这个过程中，这个token可以被用来识别每一帧并将其与期望帧进行比较，从而检测应用程序的性能问题。
+
+**对于SurfaceFlinger，也会添加两个新的时间线 - Expected Timeline & Actual Timeline。**
+
+表示其应该在内部完成的期望时间，以及完成合成帧并呈现在屏幕上所需的实际时间。在这里，SurfaceFlinger的工作内容显示为堆栈中的所有内容。这包括Composer和DisplayHAL。因此，这些片段表示SurfaceFlinger主线程的开始到屏幕更新过程。
 
 ![](/learn-android/performance/fluency-tools-perfetto-android-app-svcs-frametimeline-doframe.png)
 
 > 在Android操作系统中，Display HAL（Hardware Abstraction Layer）是用于抽象底层硬件接口的一个组件。它提供了一个标准化的接口，让Android的图形系统能够在不同的硬件设备上运行，并且让硬件厂商可以轻松地支持Android的图形系统。Display HAL的主要作用是提供显示屏幕的基本功能，例如在屏幕上显示图像、调整屏幕亮度、旋转屏幕等等。在Android的架构中，Display HAL是图形系统和硬件之间的接口，它与硬件抽象层（HAL）和Android图形系统（例如SurfaceFlinger）进行交互，并且为Android应用程序提供了标准的显示功能。通过使用Display HAL，Android能够支持各种不同的屏幕和硬件设备，并且提供一致的用户体验。
 
-**选择实际时间线片段，并选择详细信息提供有关帧发生了什么的更多信息。这些包括：**
+**选择实际时间线的片段，并选择详细信息提供有关帧发生了什么的更多信息。这些包括：**
 
 ![](/learn-android/performance/fluency-tools-perfetto-android-app-svcs-frametimeline-selection.png)
 
