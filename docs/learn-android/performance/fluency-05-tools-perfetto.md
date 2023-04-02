@@ -422,31 +422,90 @@ duration_ms: 10000
 
 ### VSYNC
 
-Perfetto中Surfaceflinger中的VSYNC-app、VSYNC-appSf、VSYNC-sf的0和1的含义:
+在上文Atrace usersapce annotations中，可以通过配置获取大量通过atrace记录的trace point信息，除了易于理解的App时间线、RenderThread时间线、surfaceflinger时间线，还有比较关键的VSYNC-app、VSYNC-sf、BufferTX等。
 
-Perfetto 是一款用于性能分析的开源软件套件。在 Perfetto 的追踪中，你可能会看到与 SurfaceFlinger 相关的 VSYNC 事件，例如 VSYNC-app、VSYNC-appSf 和 VSYNC-sf。这些事件主要涉及 Android 显示系统的垂直同步 (VSYNC) 信号。
+![](/learn-android/performance/fluency-tools-perfetto-async.png)
 
-以下是 VSYNC-app、VSYNC-appSf 和 VSYNC-sf 的含义：
+想要看懂VSYNC-app时间线、VSYNC-sf时间线、BufferTX时间线与App时间线、RenderThread时间线、surfaceflinger时间线的协作关系不是易事，下面逐个介绍。
 
-- VSYNC-app：这个事件表示应用程序的 VSYNC 信号。它通知应用程序何时开始渲染下一帧。VSYNC-app 事件有两个状态：0 和 1。0 表示 VSYNC 信号的开始，1 表示 VSYNC 信号的结束。
+#### VSYNC的工作原理
 
-- VSYNC-appSf：这个事件与 VSYNC-app 类似，但它是针对 SurfaceFlinger 应用程序的。这个信号在应用程序的绘制完毕后，通知 SurfaceFlinger 开始合成帧。同样，0 表示信号的开始，1 表示信号的结束。
+在 Android 系统中，VSYNC（垂直同步）信号用于同步屏幕刷新频率和应用程序渲染帧的频率。以下是从源码角度分析 Android 系统中 VSYNC 信号的工作原理：
 
-- VSYNC-sf：这个事件表示 SurfaceFlinger 的 VSYNC 信号。它通知 SurfaceFlinger 何时开始将缓冲区的内容推送到显示器。VSYNC-sf 也有两个状态：0 和 1。0 表示 VSYNC 信号的开始，1 表示 VSYNC 信号的结束。
+1.  产生 VSYNC 信号：
+    - VSYNC 信号的产生由显示子系统（通常是 GPU）负责。在 Android 系统中，显示子系统通过 SurfaceFlinger（SF）服务来管理。SurfaceFlinger 位于 `frameworks/native/services/surfaceflinger/` 目录下。
 
-总之，在 Perfetto 追踪中，0 通常表示 VSYNC 事件的开始，而 1 表示 VSYNC 事件的结束。这些事件可用于分析 Android 显示系统的性能，以优化应用程序的渲染和显示性能。
+2.  分发 VSYNC 信号：
+    - SurfaceFlinger 通过 EventThread 类来监听和分发 VSYNC 信号。EventThread 类位于 `frameworks/native/services/surfaceflinger/EventThread.cpp` 文件中。当 EventThread 收到 VSYNC 信号时，它会将信号发送给已注册的回调（通常是应用程序）。
 
-在Perfetto中Surfaceflinger进程中VSYNC-app时间轴内，value=0时持续16.67ms的含义，与value=1时持续16.67ms的含义:
+3.  应用程序处理 VSYNC 信号：
+    - 在 Android 应用程序中，VSYNC 信号主要通过 Choreographer 类来处理。Choreographer 类位于 `frameworks/base/core/java/android/view/Choreographer.java` 文件中。当 Choreographer 收到 VSYNC 信号时，它会执行预设的回调，包括处理输入事件、更新动画、计算布局和绘制界面元素等。
 
-在 Perfetto 中，SurfaceFlinger 进程的 VSYNC-app 时间轴显示了 VSYNC 信号的周期。在一个典型的 60 Hz 刷新率的显示器上，VSYNC 信号的周期为 16.67 毫秒（1000 ms / 60 Hz）。这意味着每 16.67 毫秒，一个新的垂直同步信号（VSYNC）会被发送，以通知应用程序开始渲染下一帧。在 Perfetto 的 VSYNC-app 时间轴中，value=0 和 value=1 分别表示 VSYNC 信号的开始和结束。
+4.  提交帧到 SurfaceFlinger：
+    - 当应用程序完成帧的渲染后，它会将帧提交给 SurfaceFlinger。这是通过 Surface 类来完成的，该类位于 `frameworks/base/core/java/android/view/Surface.java` 文件中。应用程序将新渲染的帧存储在一个名为 BufferQueue 的数据结构中，然后通知 SurfaceFlinger 可以从 BufferQueue 中获取新帧。
 
-以下是 value=0 与 value=1 在 VSYNC-app 时间轴中的含义：
+5.  合成帧：
+    - SurfaceFlinger 收到新帧后，会进行合成。合成的过程涉及到处理多个层（Layer）以生成最终显示在屏幕上的图像。合成过程在 `frameworks/native/services/surfaceflinger/CompositionEngine.cpp` 文件中进行。SurfaceFlinger 使用 GLES 或 Vulkan 来进行合成，具体取决于系统配置。
 
-value=0：这表示 VSYNC-app 信号的开始。在这个时刻，应用程序会收到通知，开始准备渲染下一帧。在时间轴上，这个状态会持续大约 16.67 毫秒，即一个 VSYNC 信号周期。
+6.  发送帧到显示子系统：
+    - SurfaceFlinger 将合成后的帧发送回显示子系统，通常是 GPU。这样，显示子系统就可以将帧显示在屏幕上。这个过程可以在 `frameworks/native/services/surfaceflinger/DispSync.cpp` 文件中找到。
 
-value=1：这表示 VSYNC-app 信号的结束。在这个时刻，应用程序应该已经完成了下一帧的渲染工作。与 value=0 类似，这个状态也会在时间轴上持续大约 16.67 毫秒。
+7.  循环处理：
+    - 当下一个 VSYNC 信号到来时，这个过程会继续重复。
 
-简而言之，在 Perfetto 中，SurfaceFlinger 进程的 VSYNC-app 时间轴中的 value=0 和 value=1 分别表示 VSYNC 信号的开始和结束。这些信号用于同步应用程序的帧渲染与显示器的刷新率，以确保流畅且无撕裂的图像显示。在时间轴上，这些状态会持续一个 VSYNC 信号周期（例如，16.67 毫秒）。
+总之，从源码的角度来看，Android 系统中 VSYNC 信号的工作原理涉及到从显示子系统产生信号，通过 SurfaceFlinger 分发信号，应用程序处理信号，合成帧，最后将帧显示在屏幕上。这个过程确保了屏幕刷新和应用程序渲染帧的频率保持同步，从而提供更好的用户体验。
+
+#### VSYNC-app、VSYNC-sf 的含义
+
+在 Android 系统中，VSYNC-app 和 VSYNC-sf 是与屏幕刷新和帧渲染相关的两个事件。
+
+- VSYNC-app：这个事件表示应用程序的 VSYNC 信号。它通知应用程序何时应该开始渲染新的一帧。应用程序在接收到 VSYNC-app 信号后，需要在下一个 VSYNC-app 信号到来之前完成渲染工作，以保证屏幕显示内容的流畅性。VSYNC-app 的触发频率取决于设备的屏幕刷新率（例如，60Hz、90Hz、120Hz 等）。
+
+- VSYNC-sf：这个事件表示 SurfaceFlinger（Android 的系统级合成器）的 VSYNC 信号。它通知 SurfaceFlinger 何时开始将各个应用程序的缓冲区内容合成并推送到显示器。SurfaceFlinger 在接收到 VSYNC-sf 信号后，需要在下一个 VSYNC-sf 信号到来之前完成合成工作，以确保显示内容的更新与屏幕刷新同步。
+
+总之，VSYNC-app 和 VSYNC-sf 分别代表应用程序和 SurfaceFlinger 的 VSYNC 信号，它们在不同层次上控制和协调帧的渲染和显示过程，以确保屏幕内容的流畅更新。
+
+#### VSYNC-app和VSYNC-sf由谁触发
+
+VSYNC-app 和 VSYNC-sf 都是由硬件层的 VSYNC 信号触发的。VSYNC 信号是由显示器的垂直同步信号产生的，用于表明显示器准备好接收新的帧。当接收到 VSYNC 信号时，Android 系统会将其传递给相应的组件，以便它们开始执行相应的操作。
+
+- VSYNC-app：当接收到硬件层的 VSYNC 信号时，Android 系统会将该信号传递给应用程序。具体来说，信号会传递给 Choreographer 类（位于 framework/base/core/java/android/view/Choreographer.java），它负责调度应用程序的帧渲染。当 Choreographer 收到 VSYNC 信号时，它会触发对应的帧回调，以便应用程序开始渲染新帧。
+
+- VSYNC-sf：同样，当接收到硬件层的 VSYNC 信号时，Android 系统会将该信号传递给 SurfaceFlinger。SurfaceFlinger 是 Android 系统的核心组件，负责合成各个应用程序和系统 UI 的图像。在源码层面，VSYNC-sf 信号由 SurfaceFlinger 类（位于 frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp）处理。当 SurfaceFlinger 接收到 VSYNC-sf 信号时，它会开始执行合成任务，将不同图层的图像组合在一起，并将结果发送到显示器。
+
+因此，VSYNC-app 和 VSYNC-sf 都是由硬件层的 VSYNC 信号触发的，只是它们在 Android 系统中的具体实现和目标有所不同。VSYNC-app 针对应用程序的帧渲染，而 VSYNC-sf 针对 SurfaceFlinger 的图像合成和显示更新。
+
+#### VSYNC-app时间线中0和1的变化的含义
+
+当VSYNC-app值从0变为1时，代表着VSYNC信号的到来。当VSYNC-app值从1变为0时，也代表着VSYNC信号的到来。他们的间隔就是每帧的持续时间，应用程序应该在此时间内绘制完当前帧。
+
+![](/learn-android/performance/fluency-tools-perfetto-async-app-sf-buffertx.png)
+
+在 Perfetto 工具中，VSYNC-app 时间线展示了 VSYNC-app 信号的触发情况。在这个时间线中，0 和 1 的变化表示 VSYNC-app 信号的状态变化。
+
+- 当 VSYNC-app 的值从 0 变为 1 时，这表示一个新的 VSYNC-app 信号到达，通知应用程序开始渲染新的一帧。应用程序应该在下一个 VSYNC-app 信号到来之前完成当前帧的渲染。
+
+- 当 VSYNC-app 的值从 1 变为 0 时，这表示一个 VSYNC-app 信号周期结束，即表示从上一个 VSYNC-app 信号到来到当前这个 VSYNC-app 信号之间的时间段。
+
+这种 0 和 1 的变化方式是为了在时间轴上直观地表示 VSYNC-app 信号的到来和周期。通过观察 VSYNC-app 时间线上的 0 和 1，我们可以了解应用程序的帧渲染是否跟随 VSYNC-app 信号保持同步，以及应用程序的渲染性能。
+
+#### VSYNC-sf时间线中0和1的变化的含义
+
+当VSYNC-sf值从0变为1时，代表着VSYNC信号的到来。当VSYNC-sf值从1变为0时，也代表着VSYNC信号的到来。他们的间隔就是Surfaceflinger开始处理合成渲染的新一帧的耗时。
+
+![](/learn-android/performance/fluency-tools-perfetto-async-app-sf-buffertx.png)
+
+在 Perfetto 工具中，VSYNC-sf 时间线展示了 VSYNC-sf 信号的触发情况。在这个时间线中，0 和 1 的变化表示 VSYNC-sf 信号的状态变化。
+
+- 当 VSYNC-sf 的值从 0 变为 1 时，这表示一个新的 VSYNC-sf 信号到达，通知 SurfaceFlinger 开始处理合成渲染的新一帧。SurfaceFlinger 应该在下一个 VSYNC-sf 信号到来之前完成当前帧的合成。
+
+- 当 VSYNC-sf 的值从 1 变为 0 时，这表示一个 VSYNC-sf 信号周期结束，即表示从上一个 VSYNC-sf 信号到来到当前这个 VSYNC-sf 信号之间的时间段。
+
+这种 0 和 1 的变化方式是为了在时间轴上直观地表示 VSYNC-sf 信号的到来和周期。通过观察 VSYNC-sf 时间线上的 0 和 1，我们可以了解 SurfaceFlinger 的帧合成是否跟随 VSYNC-sf 信号保持同步，以及 SurfaceFlinger 的合成性能。
+
+#### BufferTX
+
+SurfaceFlinger 的 BufferTX (Buffer Transaction) 事件表示一个缓冲区交换操作。当应用程序完成一帧的渲染并将其放入一个缓冲区时，应用程序会通知 SurfaceFlinger，请求将新渲染的帧与当前显示的帧进行交换。
 
 ## 引用
 
