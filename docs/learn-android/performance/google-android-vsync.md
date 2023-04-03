@@ -250,7 +250,7 @@ VSYNC-sf：VSYNC-sf 信号与 SurfaceFlinger 同步，用于通知 SurfaceFlinge
 总之，VSYNC-app 和 VSYNC-sf 都与 VSYNC 信号有关，但它们在 Android 渲染管道的不同阶段发挥作用。VSYNC-app 关注应用程序的帧渲染，而 VSYNC-sf 关注 SurfaceFlinger 的图像合成和显示更新。在源码层面，两者分别由 Choreographer 类和 SurfaceFlinger 类处理。
 
 ### Perfetto中surfaceflinger中BufferTX的含义
-s
+
 在 Perfetto 中，SurfaceFlinger 的 BufferTX (Buffer Transaction) 事件表示一个缓冲区交换操作。当应用程序完成一帧的渲染并将其放入一个缓冲区时，应用程序会通知 SurfaceFlinger，请求将新渲染的帧与当前显示的帧进行交换。这种交换操作被称为 Buffer Transaction。
 
 Buffer Transaction 在 Perfetto 中可用于跟踪应用程序与 SurfaceFlinger 之间的缓冲区交换操作。通过分析这些事件，您可以了解应用程序何时完成帧渲染，以及何时请求将新渲染的帧与当前显示的帧进行交换。这对于分析应用程序的性能和渲染时间非常有用。
@@ -324,4 +324,28 @@ AppDuration 和 sfDuration 并不直接影响 VSYNC-app 和 VSYNC-sf 的计算�
 
 这种 0 和 1 的变化方式是为了在时间轴上直观地表示 VSYNC-sf 信号的到来和周期。通过观察 VSYNC-sf 时间线上的 0 和 1，我们可以了解 SurfaceFlinger 的帧合成是否跟随 VSYNC-sf 信号保持同步，以及 SurfaceFlinger 的合成性能。
 
-### 帮我分析frameworks/native/services/surfaceflinger/BufferStateLayer的作用
+### BufferTX时间线中数值变化的含义
+
+SurfaceFlinger 的 BufferTX (Buffer Transaction) 事件表示一个缓冲区交换操作。当应用程序完成一帧的渲染并将其放入一个缓冲区时，应用程序会通知 SurfaceFlinger，请求将新渲染的帧与当前显示的帧进行交换。
+
+从源码的角度解释，BufferTX时间线中数值变化的含义可以从以下注释中理解（这段注释摘自Android源码库的`frameworks/native/services/surfaceflinger/BufferStateLayer.h`文件）：
+
+```cpp
+// This integer is incremented every time a buffer arrives at the server for this layer,
+// and decremented when a buffer is dropped or latched. When changed the integer is exported
+// to systrace with ATRACE_INT and mBlastTransactionName. This way when debugging perf it is
+// possible to see when a buffer arrived at the server, and in which frame it latched.
+//
+// You can understand the trace this way:
+//     - If the integer increases, a buffer arrived at the server.
+//     - If the integer decreases in latchBuffer, that buffer was latched
+//     - If the integer decreases in setBuffer or doTransaction, a buffer was dropped
+```
+
+从这段注释中可以看出，BufferTX时间线的数值代表了以下几种情况：
+
+1.  数值增加：表示有新的缓冲区（帧）到达服务器。
+2.  数值减少（在`latchBuffer`中）：表示缓冲区被锁定（用于渲染）。
+3.  数值减少（在`setBuffer`或`doTransaction`中）：表示缓冲区（帧）被丢弃。
+
+这种表示方式有助于分析和调试渲染性能，以确保应用程序的帧率和响应时间达到预期水平。

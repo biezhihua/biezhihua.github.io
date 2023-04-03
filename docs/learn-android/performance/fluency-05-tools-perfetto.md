@@ -422,11 +422,11 @@ duration_ms: 10000
 
 ### VSYNC
 
-在上文Atrace usersapce annotations中，可以通过配置获取大量通过atrace记录的trace point信息，除了易于理解的App时间线、RenderThread时间线、surfaceflinger时间线，还有比较关键的VSYNC-app、VSYNC-sf、BufferTX等。
+在上文Atrace usersapce annotations中，可以通过配置获取大量通过atrace记录的trace point信息，除了易于理解的App、RenderThread、Surfaceflinger，还有比较关键的VSYNC-app、VSYNC-sf、BufferTX等。
 
 ![](/learn-android/performance/fluency-tools-perfetto-async.png)
 
-想要看懂VSYNC-app时间线、VSYNC-sf时间线、BufferTX时间线与App时间线、RenderThread时间线、surfaceflinger时间线的协作关系不是易事，下面逐个介绍。
+想要看懂VSYNC-app、VSYNC-sf线、BufferTX与Ap、RenderThread、surfaceflinger之间的协作关系不是易事，下面逐个介绍。
 
 #### VSYNC的工作原理
 
@@ -503,9 +503,31 @@ VSYNC-app 和 VSYNC-sf 都是由硬件层的 VSYNC 信号触发的。VSYNC 信�
 
 这种 0 和 1 的变化方式是为了在时间轴上直观地表示 VSYNC-sf 信号的到来和周期。通过观察 VSYNC-sf 时间线上的 0 和 1，我们可以了解 SurfaceFlinger 的帧合成是否跟随 VSYNC-sf 信号保持同步，以及 SurfaceFlinger 的合成性能。
 
-#### BufferTX
+#### BufferTX时间线中数值变化的含义
 
 SurfaceFlinger 的 BufferTX (Buffer Transaction) 事件表示一个缓冲区交换操作。当应用程序完成一帧的渲染并将其放入一个缓冲区时，应用程序会通知 SurfaceFlinger，请求将新渲染的帧与当前显示的帧进行交换。
+
+从源码的角度解释，BufferTX时间线中数值变化的含义可以从以下注释中理解（这段注释摘自Android源码库的`frameworks/native/services/surfaceflinger/BufferStateLayer.h`文件）：
+
+```cpp
+// This integer is incremented every time a buffer arrives at the server for this layer,
+// and decremented when a buffer is dropped or latched. When changed the integer is exported
+// to systrace with ATRACE_INT and mBlastTransactionName. This way when debugging perf it is
+// possible to see when a buffer arrived at the server, and in which frame it latched.
+//
+// You can understand the trace this way:
+//     - If the integer increases, a buffer arrived at the server.
+//     - If the integer decreases in latchBuffer, that buffer was latched
+//     - If the integer decreases in setBuffer or doTransaction, a buffer was dropped
+```
+
+从这段注释中可以看出，BufferTX时间线的数值代表了以下几种情况：
+
+1.  数值增加：表示有新的缓冲区（帧）到达服务器。
+2.  数值减少（在`latchBuffer`中）：表示缓冲区被锁定（用于渲染）。
+3.  数值减少（在`setBuffer`或`doTransaction`中）：表示缓冲区（帧）被丢弃。
+
+这种表示方式有助于分析和调试渲染性能，以确保应用程序的帧率和响应时间达到预期水平。
 
 ## 引用
 
