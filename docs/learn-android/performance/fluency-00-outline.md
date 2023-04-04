@@ -49,7 +49,7 @@ Android发展至今天，性能优化可分为多种优化方向：
 - 第06篇：[**性能优化 - 流畅性 - 性能分析工具 - Android Studio Profiler**](./fluency-06-tools-android-profiler.md)
   - 本篇文章会介绍：如何利用集成工具排查性能问题。
 
-- 第06篇：**性能优化 - 流畅性 - 从Perfetto角度来理解Android系统 - 概述**
+- 第06篇：[**性能优化 - 流畅性 - 从Perfetto角度来理解Android系统 - 概述**](./fluency-07-perfetto-android-system-overview.md)
   - 本篇文章会介绍：一帧的渲染过程，以及其中涉及到的各个部分和阶段，用来引入剩余文章内容。
 
 - 第07篇：**性能优化 - 流畅性 - 从Perfetto角度来理解Android系统 - Vsync**
