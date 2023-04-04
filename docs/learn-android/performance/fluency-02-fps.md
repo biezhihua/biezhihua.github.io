@@ -7,9 +7,7 @@ tag:
 
 # Android | 性能优化 | 流畅性 - 第02篇 - 帧率
 
-> FPS
-
-当用户碰到流畅性的问题时，都会体现为帧率的下降，本篇通过6个问题来回答关于帧率的疑问。
+当用户碰到流畅性的问题时，大多数会体现为帧率的下降，本篇通过6个问题来回答关于帧率的疑问（Power By ChatGPT 3.5）。
 
 ## 什么是帧率？
 
@@ -61,6 +59,7 @@ FPS（Frames Per Second）指的是每秒钟显示的画面帧数。在Android�
 更高的刷新率可以提高屏幕的流畅度和响应速度，让用户感觉到更快的操作和更加流畅的动画效果。但是，更高的刷新率也会消耗更多的电量、也会对应用的质量有更高的要求，因此需要权衡考虑。
 
 不同帧率的更新间隔时间：
+
 - 60FPS：每秒可以在屏幕上均匀的更新 60 张图像帧，也就是1/60 ~= 16.67 ms 要更新一帧。
 - 90FPS：每秒可以在屏幕上均匀的更新 90 张图像帧，也就是1/60 ~= 11.11 ms 要更新一帧。
 - 120FPS：每秒可以在屏幕上均匀的更新 120 张图像帧，也就是1/60 ~= 8.33 ms 要更新一帧。
@@ -68,6 +67,7 @@ FPS（Frames Per Second）指的是每秒钟显示的画面帧数。在Android�
 ## 每帧所做工作？
 
 对于Android的每一帧，都有很繁重的任务要完成才能保证应用的流畅性，如下：
+
 - Vsync               - 处理VSYNC信号
 - Input               - 处理输入事件
 - Animation           - 处理动画事件
@@ -76,14 +76,14 @@ FPS（Frames Per Second）指的是每秒钟显示的画面帧数。在Android�
 - Sync                - 处理渲染数据
 - SwapBuffer          - 刷新图像
 
-![](/learn-android/performance/perf-test-frame-latency.png)
+![perf-test-frame-latency](/learn-android/performance/perf-test-frame-latency.png)
 
-# 引用
+## 引用
 
-- https://www.youtube.com/watch?v=CaMTIgxCSqU
-- https://androidperformance.com/2019/05/27/why-60-fps
-- https://developer.android.com/training/testing/performance?hl=zh-cn
-- https://www.youtube.com/watch?v=WH9AFhgwmDw&hl=zh-cn
+- <https://www.youtube.com/watch?v=CaMTIgxCSqU>
+- <https://androidperformance.com/2019/05/27/why-60-fps>
+- <https://developer.android.com/training/testing/performance?hl=zh-cn>
+- <https://www.youtube.com/watch?v=WH9AFhgwmDw&hl=zh-cn>
 
 ## 版权声明
 
