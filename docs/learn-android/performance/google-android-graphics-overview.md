@@ -196,7 +196,214 @@ OpenGL ES是一个在移动设备和嵌入式设备中广泛使用的图形渲�
 
 需要注意的是，GPU通常是一个专用的硬件加速器，与CPU分离工作。因此，在使用OpenGL ES进行图形渲染时，CPU主要负责提交渲染请求和数据，而GPU负责实际的渲染计算。
 
+### Android中的Surface都可以使用什么手段渲染内容
+
+Android 中的 Surface 可以使用多种方式渲染内容，包括：
+
+1. Canvas：Canvas 是 Android 中用于 2D 渲染的 API，它可以在 Surface 上绘制 2D 图形，如文本、线条、矩形等。
+
+2. OpenGL ES：OpenGL ES 是 Android 中用于 3D 渲染的 API，它可以在 Surface 上绘制 3D 图形和特效，如纹理、灯光、阴影等。
+
+3. Vulkan：Vulkan 是 Android 中的另一个 3D 渲染 API，它与 OpenGL ES 相比更为底层和高效。
+
+通过这些渲染方式，应用程序可以在 Surface 上显示各种不同类型的内容，如视频、游戏、图形等。同时，这些渲染方式也能够利用硬件加速来提高渲染性能和效率。
+
+### Android中View的渲染过程？
+
+Android 应用框架界面以使用 View 开头的对象层次结构为基础。所有界面元素都会经过一系列的测量和一个布局过程，该过程会将这些元素融入到矩形区域中。然后，所有可见 View 对象都会渲染到一个 Surface（当应用置于前台时，由 WindowManager 进行设置）。应用的界面线程(UIThread)会按帧执行布局并渲染到缓冲（BufferQueue）。
+
+### Android中的SurfaceView的使用场景，原理？
+
+Android中的SurfaceView是一种特殊的视图，它可以在自己的单独线程中渲染内容，并在主UI线程之外进行处理，从而可以获得更高的渲染性能和更流畅的动画效果。它通常用于需要频繁更新的视图，如视频播放器、游戏等。
+
+SurfaceView的原理是通过将视图的Surface与一个后台绘制线程关联起来实现的。该后台线程会在Surface中绘制内容，并使用双缓冲技术确保内容平滑地被渲染。当内容被更新时，后台线程会通知SurfaceView进行更新，从而实现内容的实时渲染。
+
+与普通视图不同，SurfaceView在层级结构中不会被其他视图遮盖，因此它可以在屏幕上显示任何内容，而不会被其他视图遮挡。同时，SurfaceView可以通过设置透明度来实现半透明效果，使得它可以与其他视图混合在一起。
+
+需要注意的是，由于SurfaceView是在单独的线程中进行渲染，因此在使用它时需要注意线程同步和资源共享等问题，避免出现并发访问的问题。
+
+### 这段话该如何理解：When the SurfaceView's view component is about to become visible, the framework asks SurfaceControl to request a new surface from SurfaceFlinger
+
+这段话意思是当 SurfaceView 的组件即将变为可见时，Android系统会请求一个新的 Surface，这个请求是通过SurfaceControl完成的，并由SurfaceFlinger提供服务。简单来说，SurfaceView将请求SurfaceFlinger创建一个新的Surface来绘制其内容。
+
+### Android中的SurfaceTexture的使用场景，原理
+
+在Android中，SurfaceTexture是一个非常有用的类，它允许将OpenGL ES渲染的内容与原生视图系统（如Surfaces和Views）进行交互。SurfaceTexture主要用于以下场景：
+
+1. 相机预览：SurfaceTexture可以接收来自Camera API的预览帧，并将其作为OpenGL ES纹理提供。这样，开发人员可以在显示相机预览时应用自定义的图像处理效果，如滤镜、水印等。
+
+2. 视频播放：通过将MediaCodec解码的视频帧输出到SurfaceTexture，我们可以将视频内容渲染到OpenGL ES纹理上。这种方法可以实现对视频帧的高效处理，如实时图像调整、视频混合等。
+
+3. OpenGL ES内容与原生视图系统交互：SurfaceTexture可以将OpenGL ES渲染的内容作为纹理提供给原生视图系统。这使得开发人员可以在原生布局中嵌入OpenGL ES渲染的3D模型或动画。
+
+原理： SurfaceTexture实际上是一个特殊的纹理对象，称为External Texture或Surface Texture。它通过将图像流（如相机预览或视频帧）与OpenGL ES纹理绑定在一起，从而使得图像流可以作为纹理供OpenGL ES使用。这种绑定是通过创建一个名为GL\_TEXTURE\_EXTERNAL\_OES的纹理目标来完成的。
+
+在内部，SurfaceTexture使用一个名为BufferQueue的数据结构来管理图像流。BufferQueue是一个双端队列，负责在生产者（如相机或MediaCodec）和消费者（即SurfaceTexture）之间传递图像缓冲区。当生产者生成新的图像帧时，它将其推入BufferQueue；而消费者则从BufferQueue中获取图像帧并将其作为纹理进行渲染。
+
+总的来说，SurfaceTexture通过将图像流与OpenGL ES纹理结合起来，使得在Android中可以高效地处理和渲染实时图像数据。
+
+### Android中的TextureView的使用场景，原理
+
+在Android中，TextureView是一个自定义视图，它可以在原生视图层次结构中显示OpenGL ES渲染的内容。TextureView的主要使用场景包括：
+
+1. 相机预览：使用TextureView作为相机预览的显示控件。这样，开发人员可以更容易地在相机预览上添加自定义效果（如滤镜、水印等）。
+
+2. 视频播放：TextureView可用于显示视频播放器的输出，使开发人员可以在原生布局中播放和控制视频内容。
+
+3. 游戏和动画：TextureView可以用于在原生布局中嵌入OpenGL ES渲染的3D模型或动画，这对于需要与其他Android UI组件交互的游戏和应用程序非常有用。
+
+原理： TextureView的工作原理与SurfaceTexture密切相关。TextureView内部包含一个SurfaceTexture对象，该对象用于接收图像流（如相机预览或视频帧），并将其作为OpenGL ES纹理提供。然后，TextureView将此纹理绘制到其内部的Canvas上。
+
+为了实现这一过程，TextureView需要使用一个名为GLConsumer的类。GLConsumer负责从SurfaceTexture接收纹理，然后将其绘制到Canvas上。这个过程是通过在TextureView的onDraw()方法中调用GLConsumer的draw()方法来完成的。
+
+总之，TextureView是一个在Android原生视图层次结构中显示OpenGL ES渲染内容的强大控件。它通过内部的SurfaceTexture对象和GLConsumer类来实现图像流与OpenGL ES纹理之间的交互。
+
+### Android中的SurfaceTextture与TextureView有什么关系，使用场景有什么差异，我该如何理解他们两个呢？
+
+Android中的SurfaceTexture和TextureView是密切相关的，但它们在使用场景和功能上有所差异。以下是关于它们之间的关系和差异的解释：
+
+关系：
+
+1. TextureView内部使用了SurfaceTexture。当创建一个TextureView时，它会自动创建一个与之关联的SurfaceTexture对象。
+2. SurfaceTexture负责接收图像流（如相机预览、视频帧等），并将其作为OpenGL ES纹理提供给TextureView。
+3. TextureView将SurfaceTexture提供的纹理绘制到其内部的Canvas上，并显示在Android原生视图层次结构中。
+
+使用场景差异：
+
+1. SurfaceTexture主要用于处理底层的图像流和OpenGL纹理。它通常在OpenGL ES渲染管线中使用，例如在自定义渲染器中使用SurfaceTexture作为纹理输入，或者作为图像流（如相机预览）的消费者。使用SurfaceTexture时，开发者需要处理底层的OpenGL ES绘制和渲染逻辑。
+
+2. TextureView是一个更高级别的抽象，它是一个自定义视图，可以在原生视图层次结构中显示OpenGL ES渲染的内容。TextureView隐藏了底层的OpenGL ES渲染细节，开发者可以直接将TextureView添加到布局中，并在需要的时候更新其内容。TextureView适用于那些需要与其他Android UI组件交互的场景，如相机预览、视频播放、游戏和动画等。
+
+总之，SurfaceTexture是一个底层的图像流处理组件，主要用于OpenGL ES渲染管线，而TextureView则是一个更高级别的抽象，允许开发者在原生布局中显示OpenGL ES渲染的内容。在使用它们时，需要根据具体的应用场景和需求来选择合适的组件。
+
+### 选择 SurfaceView 或 TextureView
+
+注意：在 API 24 及更高版本中，建议实现 SurfaceView 而不是 TextureView。
+SurfaceView 和 TextureView 扮演的角色类似，且都是视图层次结构的组成部分。不过，SurfaceView 和 TextureView 拥有截然不同的实现。SurfaceView 采用与其他 View 相同的参数，但 SurfaceView 内容在呈现时是透明的。
+
+与 SurfaceView 相比，TextureView 具有更出色的 Alpha 版和旋转处理能力，但在视频上以分层方式合成界面元素时，SurfaceView 具有性能方面的优势。当客户端使用 SurfaceView 呈现内容时，SurfaceView 会为客户端提供单独的合成层。如果设备支持，SurfaceFlinger 会将单独的层合成为硬件叠加层。当客户端使用 TextureView 呈现内容时，界面工具包会使用 GPU 将 TextureView 的内容合成到视图层次结构中。对内容进行的更新可能会导致其他 View 元素重绘，例如，在其他 View 被置于 TextureView 顶部时。View 呈现完成后，SurfaceFlinger 会合成应用界面层和所有其他层，以便每个可见像素合成两次。
+
+### > Android中SurfaceFlinger 和 WindowManager 还有View之间的协作关系如何？ 原理如何？
+
+在Android系统中，SurfaceFlinger、WindowManager和View是图形渲染和窗口管理的核心组件。它们之间的协作关系非常重要，因为它们共同负责管理和呈现屏幕上的UI元素。让我们详细了解一下这三个组件的作用和它们之间的关系。
+
+1. **View**: View是Android系统中的基本UI组件，负责显示和处理屏幕上的一个矩形区域。View有很多子类，如TextView、ImageView、Button等。在一个Android应用中，开发者使用View及其子类来构建用户界面。View组件之间通过View树的形式组织起来，形成一个层次结构。
+
+2. **WindowManager**: WindowManager是Android系统的一个核心服务，负责管理应用程序窗口的生命周期、大小、位置和Z顺序。每个窗口都与一个View树相关联。WindowManager会将窗口（即View树）与屏幕进行匹配，并将其呈现在屏幕上。此外，WindowManager还负责处理窗口之间的事件分发和视图绘制的优化。
+
+3. **SurfaceFlinger**: SurfaceFlinger是Android系统的一个底层组件，负责将来自不同窗口的图形缓冲区（即Surface）合成到屏幕上。SurfaceFlinger将所有可见的窗口（包括应用窗口、状态栏、导航栏等）的图像组合在一起，并将最终的图像显示在设备的屏幕上。SurfaceFlinger使用OpenGL ES进行合成，并通过Hardware Composer (HWC)将合成后的图像发送给显示硬件。
+
+这三个组件之间的协作关系如下：
+
+* 开发者通过View及其子类构建应用程序的用户界面。
+* 当应用程序运行时，WindowManager负责管理应用程序的窗口，并将窗口与屏幕进行匹配。
+* View树中的每个View在其自己的Canvas上进行绘制操作。Canvas负责将绘制的内容存储在一个图形缓冲区（即Surface）中。
+* WindowManager将所有可见窗口的Surface提交给SurfaceFlinger。
+* SurfaceFlinger使用OpenGL ES将这些Surface进行合成，并通过Hardware Composer将合成后的图像发送给显示硬件，最终呈现在设备的屏幕上。
+
+通过这种方式，View、WindowManager和SurfaceFlinger共同协作，实现了Android设备上图形的渲染和呈现。
+
+#### SurfaceFlinger
+
+SurfaceFlinger 可通过两种方式接受缓冲区：通过 BufferQueue 和 SurfaceControl，或通过 ASurfaceControl。
+
+SurfaceFlinger 接受缓冲区的一种方式是通过 BufferQueue 和 SurfaceControl。当应用进入前台时，它会从 WindowManager 请求缓冲区。然后，WindowManager 会从 SurfaceFlinger 请求层。层是 surface（包含 BufferQueue）和 SurfaceControl（包含显示框架等层元数据）的组合。SurfaceFlinger 创建层并将其发送至 WindowManager。然后，WindowManager 将 Surface 发送至应用，但会保留 SurfaceControl 来操控应用在屏幕上的外观。
+
+##### 该如何理解“A layer is a combination of a surface, which contains the BufferQueue, and a SurfaceControl”中的内容？
+
+这句话的意思是，一个层是由Surface和SurfaceControl组成的，其中Surface包含BufferQueue，而SurfaceControl则表示这个Surface的控制器。在Android中，层被用于将应用程序的不同UI元素组合成最终的用户界面。每个层都可以包含一个或多个Surface，每个Surface都有自己的BufferQueue，用于缓冲渲染的图像数据。同时，每个Surface都由一个SurfaceControl控制器控制，用于控制这个Surface的位置、大小和其他属性。因此，一个层可以包含多个Surface和SurfaceControl，它们协同工作，完成最终的图像渲染。
+
+#### WindowManager
+
+WindowManager 会控制 window 对象，它们是用于容纳 view 对象的容器。window 对象始终由 surface 对象提供支持。WindowManager 会监督生命周期、输入和聚焦事件、屏幕方向、转换、动画、位置、变形、Z 轴顺序以及窗口的许多其他方面。WindowManager 会将所有窗口元数据发送到 SurfaceFlinger，以便 SurfaceFlinger 可以使用这些数据在屏幕上合成 Surface。
+
+### Android中Surface和BufferQueue之间的关系？图形缓冲区又指什么？
+
+在Android中，Surface和BufferQueue之间存在紧密的关系。首先，让我们了解一下它们的定义：
+
+Surface: Surface是Android中的一个基本概念，它代表了一块用于渲染图形的内存区域。简而言之，Surface可以理解为一块用于存储绘制结果的画布。这些绘制结果可以是来自于Canvas 2D、OpenGL ES、Vulkan等不同的渲染技术。
+
+BufferQueue: BufferQueue是Android系统中用于在图像生产者（例如Canvas 2D、OpenGL ES等）和图像消费者（例如SurfaceFlinger）之间传递图形缓冲区的一种数据结构。BufferQueue维护了一组图形缓冲区，这些缓冲区用于存储生产者产生的图像。BufferQueue通过生产者和消费者之间的同步和异步模式来实现高效的图形数据传输。
+
+图形缓冲区：图形缓冲区（Graphic Buffer）是用于存储渲染结果的内存区域。在Android系统中，图形缓冲区通常包含一个或多个图像帧，这些帧可以是2D或3D图形的像素数据。图形缓冲区的内容可以由不同的渲染技术生成，例如Canvas 2D、OpenGL ES或Vulkan。一旦生成，这些图形缓冲区将通过BufferQueue传递给图像消费者进行处理或显示。
+
+Surface和BufferQueue之间的关系：
+
+Surface是图像渲染的终点。无论使用何种渲染技术，所有的渲染结果都会存储在Surface中。
+
+BufferQueue作为图像生产者和消费者之间的桥梁，负责将图形缓冲区从生产者传递给消费者。在Android系统中，图像生产者将渲染结果存储在图形缓冲区中，并将其传递给BufferQueue。然后，BufferQueue将这些缓冲区提供给图像消费者（如SurfaceFlinger）进行处理或显示。
+
+当图像生产者完成渲染并将图形缓冲区传递给BufferQueue时，BufferQueue会将这些缓冲区与Surface关联起来。这样，当图像消费者请求图形数据时，它可以从Surface中获取与BufferQueue关联的图形缓冲区。
+
+Surface实际上代表了BufferQueue的生产者端，而图像消费者（如SurfaceFlinger）则代表了BufferQueue的消费者端。因此，Surface和BufferQueue之间存在紧密的关系，它们共同协作来实现Android设备上的图形渲染和显示。
+
+总之，Surface和BufferQueue之间的关系是密切的。
+
+------
+
+在Android中，Surface和BufferQueue之间存在紧密的关系。Surface是一个用于渲染图像的高级抽象，它表示一个可以绘制的矩形区域。而BufferQueue是一个底层的数据结构，负责在图形生产者（如OpenGL ES、Canvas 2D等）和图形消费者（如SurfaceFlinger）之间传递图形缓冲区。
+
+图形缓冲区（Graphic Buffer）是一块存储图像数据的内存区域。当一个应用程序需要绘制图像时，它会将图像数据存储在图形缓冲区中。这些图形缓冲区由图形生产者生成，并通过BufferQueue传递给图形消费者。图形消费者使用这些图形缓冲区的内容将图像绘制到屏幕上。
+
+Surface和BufferQueue之间的关系如下：
+
+1. 当一个应用程序需要绘制图像时，它会使用Surface作为渲染目标。应用程序将图像数据绘制到Surface上。
+2. Surface内部包含一个BufferQueue实例，负责管理图形缓冲区。当应用程序绘制完图像后，图像数据被存储在图形缓冲区中。
+3. 图形生产者将生成的图形缓冲区提交给Surface关联的BufferQueue。
+4. 图形消费者（如SurfaceFlinger）从BufferQueue中获取图形缓冲区，并将图像数据绘制到屏幕上。
+5. 当图形消费者使用完图形缓冲区后，它会将缓冲区返还给BufferQueue，以便图形生产者可以重用它。
+
+总之，Surface是一个高级抽象，用于表示一个可绘制的矩形区域。BufferQueue是一个底层的数据结构，负责在图形生产者和图形消费者之间传递图形缓冲区。这两者之间的关系使得图形渲染流程在Android系统中得以高效地运行。
+
+### Android中Hardware Composer与SurfaceFlinger如何合成的?
+
+叠加层的数量（无论层是否可以旋转或混合）以及对定位和重叠的限制很难通过 API 表达。为了适应这些选项，HWC 会执行以下计算：
+
+* SurfaceFlinger 向 HWC 提供一个完整的层列表，并询问“您希望如何处理这些层？”
+* HWC 的响应方式是将每个层标记为设备或客户端合成。
+* SurfaceFlinger 会处理所有客户端，将输出缓冲区传送到 HWC，并让 HWC 处理其余部分。
+
+### 这句话该如何理解：Overlay planes may be less efficient than GL composition when nothing on the screen is changing. This is particularly true when overlay contents have transparent pixels and overlapping layers are blended. In such cases, the HWC can request GLES composition for some or all layers and retain the composited buffer
+
+这句话意思是：当屏幕上没有任何内容发生变化时，覆盖层面可能不如GL合成效率高。特别是当覆盖内容具有透明像素并且重叠层被混合时，这一点尤为明显。在这种情况下，HWC可以请求使用GLES合成来处理一些或所有层，并保留合成后的缓冲区。具体来说，当屏幕上没有任何内容发生变化时，使用GLES合成需要移动大量数据，这可能会降低效率。而当屏幕上的内容发生变化时，使用GLES合成可以提高效率。因此，HWC可以在需要的时候选择使用GLES合成或覆盖层面来进行屏幕渲染，以获得最佳的性能和效率。
+
+### GL是什么？
+
+GL是OpenGL（Open Graphics Library）的缩写，它是一个跨平台的图形编程接口，用于渲染2D和3D矢量图形。OpenGL在游戏、CAD、虚拟现实、科学可视化和其他领域都得到广泛应用。它提供了一组函数，用于定义几何形状、贴图、照明和其他渲染相关的操作，并通过编写GLSL（OpenGL Shading Language）着色器程序来自定义渲染过程。由于其跨平台性，OpenGL可在多种操作系统和硬件上运行，包括Windows、macOS、Linux和Android等。
+
+### Overlay planes和GL是什么意思？
+
+在 Android 中，Overlay planes 是一种在硬件上加速合成的方法，它是由硬件合成器（HWC）实现的。Overlay planes 可以用于显示固定的 UI 元素，例如状态栏和导航栏，以及视频、相机预览等。Overlay planes 是由显示硬件（如显示器和显卡）上的专用硬件组件实现的，因此它们可以非常高效地合成图形内容，因为它们不需要调用 CPU 或 GPU 进行计算。
+
+GL 是 OpenGL 的缩写，它是一种跨平台的图形渲染 API，用于渲染 2D 和 3D 图形。在 Android 中，GL ES（OpenGL ES）是一个轻量级的版本，专门为嵌入式设备设计。它允许开发人员通过 GPU 硬件加速进行图形渲染，从而提高渲染性能和效率。GL ES 可以与 Overlay planes 一起使用，以提高图形渲染和显示性能。
+
+### Android 设备都支持哪 4 个叠加平面？
+
+HWC 实现应该支持：
+
+至少 4 个叠加层：
+    状态栏
+    系统栏
+    应用
+    壁纸/背景
+大于屏幕的图层（例如壁纸）
+同时预乘的每像素 Alpha 混合和每平面 Alpha 混合
+受保护视频播放的硬件路径
+RGBA 打包顺序、YUV 格式以及平铺、重排和步幅属性
+
+<https://source.android.com/docs/core/graphics/implement-hwc?hl=zh-cn>
+
+### 该如何理解：HWC primitives
+
+HWC primitives是指HWC的基本操作，也称为HWC原语。这些原语是HWC对屏幕合成操作的基本处理方式，包括将多个图层的内容合成到屏幕上、进行缩放、旋转、翻转等变换操作，以及应用颜色矩阵等滤镜效果等。HWC primitives被认为是一种低级别的图形处理操作，可以直接在硬件上执行，因此能够快速、高效地完成屏幕合成。
+
+层和屏幕是两个基元，用于表示合成工作以及与屏幕硬件的交互。
+
+### 该如何理解：The HWC provides two primitives, layers and displays, to represent composition work and its interaction with the display hardware.
+
+这句话的意思是HWC提供了两个基本的构造块：layers和displays，用于表示合成工作及其与显示硬件的交互。其中，layers表示要合成的层，displays表示显示设备。通过这两个构造块，HWC可以对图层进行组合、混合、变换等操作，最终将结果显示在显示设备上。
+
 ## Reference
 
-- <https://source.android.google.cn/docs/core/graphics?authuser=0#android-graphics-components>
-- <https://source.android.com/docs/core/graphics?hl=zh-cn>
+* <https://source.android.google.cn/docs/core/graphics?authuser=0#android-graphics-components>
+* <https://source.android.com/docs/core/graphics?hl=zh-cn>
