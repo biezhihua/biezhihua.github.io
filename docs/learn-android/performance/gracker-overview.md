@@ -69,7 +69,8 @@ system\_server进程是Android系统中的一个核心进程，它负责管理�
 
 再逐步拆分细节。
 
-### vsync offset 
+### vsync offset
+
 $ adb shell dumpsys SurfaceFlinger
 Build configuration: [sf PRESENT_TIME_OFFSET=0 FORCE_HWC_FOR_RBG_TO_YUV=1 MAX_VIRT_DISPLAY_DIM=4096 RUNNING_WITHOUT_SYNC_FRAMEWORK=0 NUM_FRAMEBUFFER_SURFACE_BUFFERS=3] [libui] [libgui]
 
@@ -87,9 +88,19 @@ Display 0 color modes:
 Sync configuration: [using: EGL_ANDROID_native_fence_sync EGL_KHR_wait_sync]
 
 VSYNC configuration:
-         app phase:   1000000 ns	         SF phase:   1000000 ns
-   early app phase:   1000000 ns	   early SF phase:   1000000 ns
-GL early app phase:   1000000 ns	GL early SF phase:   1000000 ns
-    present offset:         0 ns	     VSYNC period:  16666666 ns
+         app phase:   1000000 ns          SF phase:   1000000 ns
+   early app phase:   1000000 ns    early SF phase:   1000000 ns
+GL early app phase:   1000000 ns GL early SF phase:   1000000 ns
+    present offset:         0 ns      VSYNC period:  16666666 ns
 
 Scheduler enabled.+  Smart 90 for video detection: off
+
+### Android中Triple Buffer的作用
+
+在 Android 中，Triple Buffer 是一种用于优化渲染性能的技术。它通常用于 GPU 渲染和显示操作，用来减少渲染延迟和屏幕撕裂现象。
+
+Triple Buffer 具有三个缓冲区：前台缓冲区、后台缓冲区和显示缓冲区。前台缓冲区用于存储当前帧的渲染结果，后台缓冲区用于存储下一帧的渲染结果，显示缓冲区用于存储正在显示的帧的内容。
+
+当前台缓冲区完成渲染后，它将其内容复制到后台缓冲区中。然后，后台缓冲区成为当前帧，开始进行下一帧的渲染。当后台缓冲区渲染完成后，它将其内容复制到显示缓冲区中，以供屏幕显示。
+
+通过 Triple Buffer 技术，可以将渲染延迟降到最低，并减少因渲染和显示之间的时间差异而产生的屏幕撕裂现象
