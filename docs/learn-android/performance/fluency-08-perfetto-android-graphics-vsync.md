@@ -168,6 +168,8 @@ void SurfaceFlinger::onComposerHalVsync(hal::HWDisplayId hwcDisplayId, int64_t t
 
 在 display_0_vsync 线程中通过 ComposerClient.h 中 onVsync_2_4 方法对 VSYNC 事件回调 ，回调给 HAL 的实现类 HidlComposerHal.cpp 的 onVsync_2_4 方法，然后转发给 SurfaceFlinger 的 onComposerHalVsync 方法。
 
+### SurfaceFlinger 中 VSYNC (VSYNC_APP) 和 SF_VSYNC (VSYNC_SF) 的产生和分发
+
 ### yrdy
 
 在 SurfaceFlinger 中 DispSync 它使用硬件VSYNC信号 - HW_VSYNC_0 作为参考，并生成VSYNC和SF_VSYNC信号。同时，DispSync还利用来自Hardware Composer的Retire fence signal时间戳作为反馈，以确保生成的信号与硬件VSYNC信号保持同步。
@@ -326,3 +328,4 @@ Vsync Offset 我们指的是 VSYNC_APP 和 VSYNC_SF 之间有一个 Offset，即
 - <https://source.android.google.cn/docs/core/graphics?authuser=0#android-graphics-components>
 - <https://source.android.com/docs/core/graphics/implement-vsync?hl=zh-cn>
 - <https://juejin.cn/post/7081614840606785550>
+- <https://www.jianshu.com/p/304f56f5d486>
