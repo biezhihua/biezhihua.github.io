@@ -329,31 +329,33 @@ Vsync Offset 我们指的是 VSYNC_APP 和 VSYNC_SF 之间有一个 Offset，即
 - <https://source.android.com/docs/core/graphics/implement-vsync?hl=zh-cn>
 - <https://juejin.cn/post/7081614840606785550>
 - <https://www.jianshu.com/p/304f56f5d486>
+- <https://blog.csdn.net/Android062005/article/details/123090139>
 
-https://cs.android.com/android/platform/superproject/+/master:frameworks/base/core/jni/android_view_DisplayEventReceiver.cpp?q=android_view_DisplayEventReceiver&hl=zh-cn
+<https://cs.android.com/android/platform/superproject/+/master:frameworks/base/core/jni/android_view_DisplayEventReceiver.cpp?q=android_view_DisplayEventReceiver&hl=zh-cn>
 
-https://cs.android.com/android/platform/superproject/+/refs/heads/master:frameworks/base/core/jni/android_view_DisplayEventReceiver.cpp;drc=7346c436e5a11ce08f6a80dcfeb8ef941ca30176;l=215?q=android_view_DisplayEventReceiver&hl=zh-cn
+<https://cs.android.com/android/platform/superproject/+/refs/heads/master:frameworks/base/core/jni/android_view_DisplayEventReceiver.cpp;drc=7346c436e5a11ce08f6a80dcfeb8ef941ca30176;l=215?q=android_view_DisplayEventReceiver&hl=zh-cn>
 
-https://cs.android.com/android/platform/superproject/+/refs/heads/master:frameworks/native/libs/gui/DisplayEventDispatcher.cpp;drc=7346c436e5a11ce08f6a80dcfeb8ef941ca30176;l=63?hl=zh-cn
+<https://cs.android.com/android/platform/superproject/+/refs/heads/master:frameworks/native/libs/gui/DisplayEventDispatcher.cpp;drc=7346c436e5a11ce08f6a80dcfeb8ef941ca30176;l=63?hl=zh-cn>
 
-https://cs.android.com/android/platform/superproject/+/refs/heads/master:frameworks/native/libs/gui/DisplayEventReceiver.cpp;l=35;drc=7346c436e5a11ce08f6a80dcfeb8ef941ca30176?hl=zh-cn
+<https://cs.android.com/android/platform/superproject/+/refs/heads/master:frameworks/native/libs/gui/DisplayEventReceiver.cpp;l=35;drc=7346c436e5a11ce08f6a80dcfeb8ef941ca30176?hl=zh-cn>
 
-https://cs.android.com/android/platform/superproject/+/refs/heads/master:frameworks/native/libs/gui/include/gui/DisplayEventReceiver.h;l=114;drc=7346c436e5a11ce08f6a80dcfeb8ef941ca30176;bpv=1;bpt=1?hl=zh-cn
+<https://cs.android.com/android/platform/superproject/+/refs/heads/master:frameworks/native/libs/gui/include/gui/DisplayEventReceiver.h;l=114;drc=7346c436e5a11ce08f6a80dcfeb8ef941ca30176;bpv=1;bpt=1?hl=zh-cn>
 
-https://cs.android.com/android/platform/superproject/+/refs/heads/master:frameworks/native/libs/gui/include/gui/DisplayEventReceiver.h;l=114;drc=7346c436e5a11ce08f6a80dcfeb8ef941ca30176;bpv=1;bpt=1?hl=zh-cn
+<https://cs.android.com/android/platform/superproject/+/refs/heads/master:frameworks/native/libs/gui/include/gui/DisplayEventReceiver.h;l=114;drc=7346c436e5a11ce08f6a80dcfeb8ef941ca30176;bpv=1;bpt=1?hl=zh-cn>
 
 /native/libs/gui/DisplayEventReceiver.cpp;l=35;drc=7346c436e5a11ce08f6a80dcfeb8ef941ca30176;bpv=1;bpt=1?hl=zh-cn
 
-https://cs.android.com/android/platform/superproject/+/refs/heads/master:frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp;l=1818;drc=7346c436e5a11ce08f6a80dcfeb8ef941ca30176;bpv=1;bpt=1?hl=zh-cn
+<https://cs.android.com/android/platform/superproject/+/refs/heads/master:frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp;l=1818;drc=7346c436e5a11ce08f6a80dcfeb8ef941ca30176;bpv=1;bpt=1?hl=zh-cn>
 
-https://cs.android.com/android/platform/superproject/+/refs/heads/master:frameworks/native/services/surfaceflinger/Scheduler/Scheduler.cpp;l=221;drc=7346c436e5a11ce08f6a80dcfeb8ef941ca30176;bpv=1;bpt=1?hl=zh-cn
+<https://cs.android.com/android/platform/superproject/+/refs/heads/master:frameworks/native/services/surfaceflinger/Scheduler/Scheduler.cpp;l=221;drc=7346c436e5a11ce08f6a80dcfeb8ef941ca30176;bpv=1;bpt=1?hl=zh-cn>
 
-https://cs.android.com/android/platform/superproject/+/refs/heads/master:frameworks/native/services/surfaceflinger/Scheduler/EventThread.cpp;l=290;drc=7346c436e5a11ce08f6a80dcfeb8ef941ca30176;bpv=1;bpt=1?hl=zh-cn
+<https://cs.android.com/android/platform/superproject/+/refs/heads/master:frameworks/native/services/surfaceflinger/Scheduler/EventThread.cpp;l=290;drc=7346c436e5a11ce08f6a80dcfeb8ef941ca30176;bpv=1;bpt=1?hl=zh-cn>
 
-https://cs.android.com/android/platform/superproject/+/refs/heads/master:frameworks/native/services/surfaceflinger/Scheduler/EventThread.cpp;l=397;drc=7346c436e5a11ce08f6a80dcfeb8ef941ca30176;bpv=1;bpt=1?hl=zh-cn
+<https://cs.android.com/android/platform/superproject/+/refs/heads/master:frameworks/native/services/surfaceflinger/Scheduler/EventThread.cpp;l=397;drc=7346c436e5a11ce08f6a80dcfeb8ef941ca30176;bpv=1;bpt=1?hl=zh-cn>
+
+<https://cs.android.com/android/platform/superproject/+/master:frameworks/native/libs/gui/include/private/gui/BitTube.h;l=38;drc=7346c436e5a11ce08f6a80dcfeb8ef941ca30176?q=gui::BitTube::DefaultSize&ss=android%2Fplatform%2Fsuperproject&hl=zh-cn>
 
 frameworks/native/services/surfaceflinger/Scheduler/DispSyncSource.cpp
-
 
 frameworks/base/core/jni/android_view_DisplayEventReceiver.nativeInit
     -> android_view_DisplayEventReceiver.NativeDisplayEventReceiver
@@ -366,6 +368,21 @@ frameworks/base/core/jni/android_view_DisplayEventReceiver.nativeInit
                                 -> EventThread::createEventConnection
                                     -> EventThreadConnection::EventThreadConnection()
 
+Bittube::sendObjects
+  <-  DisplayEventReceiver::sendEvents
+    <-  EventThreadConnection::postEvent
+      <-  EventThread::dispatchEvent
+        <- EventThread::threadMain
+
+mPendingEvents.push_back
+  <- EventThread::onVSyncEvent
+    <-  DispSyncSource::onVsyncCallback
+      <- DispSyncSource::DispSyncSource
+        <-  DispSyncSource::CallbackRepeater
+          <- CallbackRepeater:: callback
+            <-  Scheduler::makePrimaryDispSyncSourc
+              <- VsyncSchedule::createDispatch
+                <- Scheduler::createConnection
 
 ```c++
 DisplayEventReceiver::DisplayEventReceiver(
