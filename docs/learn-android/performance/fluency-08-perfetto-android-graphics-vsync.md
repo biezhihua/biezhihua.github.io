@@ -329,3 +329,112 @@ Vsync Offset 我们指的是 VSYNC_APP 和 VSYNC_SF 之间有一个 Offset，即
 - <https://source.android.com/docs/core/graphics/implement-vsync?hl=zh-cn>
 - <https://juejin.cn/post/7081614840606785550>
 - <https://www.jianshu.com/p/304f56f5d486>
+
+https://cs.android.com/android/platform/superproject/+/master:frameworks/base/core/jni/android_view_DisplayEventReceiver.cpp?q=android_view_DisplayEventReceiver&hl=zh-cn
+
+https://cs.android.com/android/platform/superproject/+/refs/heads/master:frameworks/base/core/jni/android_view_DisplayEventReceiver.cpp;drc=7346c436e5a11ce08f6a80dcfeb8ef941ca30176;l=215?q=android_view_DisplayEventReceiver&hl=zh-cn
+
+https://cs.android.com/android/platform/superproject/+/refs/heads/master:frameworks/native/libs/gui/DisplayEventDispatcher.cpp;drc=7346c436e5a11ce08f6a80dcfeb8ef941ca30176;l=63?hl=zh-cn
+
+https://cs.android.com/android/platform/superproject/+/refs/heads/master:frameworks/native/libs/gui/DisplayEventReceiver.cpp;l=35;drc=7346c436e5a11ce08f6a80dcfeb8ef941ca30176?hl=zh-cn
+
+https://cs.android.com/android/platform/superproject/+/refs/heads/master:frameworks/native/libs/gui/include/gui/DisplayEventReceiver.h;l=114;drc=7346c436e5a11ce08f6a80dcfeb8ef941ca30176;bpv=1;bpt=1?hl=zh-cn
+
+https://cs.android.com/android/platform/superproject/+/refs/heads/master:frameworks/native/libs/gui/include/gui/DisplayEventReceiver.h;l=114;drc=7346c436e5a11ce08f6a80dcfeb8ef941ca30176;bpv=1;bpt=1?hl=zh-cn
+
+/native/libs/gui/DisplayEventReceiver.cpp;l=35;drc=7346c436e5a11ce08f6a80dcfeb8ef941ca30176;bpv=1;bpt=1?hl=zh-cn
+
+https://cs.android.com/android/platform/superproject/+/refs/heads/master:frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp;l=1818;drc=7346c436e5a11ce08f6a80dcfeb8ef941ca30176;bpv=1;bpt=1?hl=zh-cn
+
+https://cs.android.com/android/platform/superproject/+/refs/heads/master:frameworks/native/services/surfaceflinger/Scheduler/Scheduler.cpp;l=221;drc=7346c436e5a11ce08f6a80dcfeb8ef941ca30176;bpv=1;bpt=1?hl=zh-cn
+
+https://cs.android.com/android/platform/superproject/+/refs/heads/master:frameworks/native/services/surfaceflinger/Scheduler/EventThread.cpp;l=290;drc=7346c436e5a11ce08f6a80dcfeb8ef941ca30176;bpv=1;bpt=1?hl=zh-cn
+
+https://cs.android.com/android/platform/superproject/+/refs/heads/master:frameworks/native/services/surfaceflinger/Scheduler/EventThread.cpp;l=397;drc=7346c436e5a11ce08f6a80dcfeb8ef941ca30176;bpv=1;bpt=1?hl=zh-cn
+
+frameworks/native/services/surfaceflinger/Scheduler/DispSyncSource.cpp
+
+
+frameworks/base/core/jni/android_view_DisplayEventReceiver.nativeInit
+    -> android_view_DisplayEventReceiver.NativeDisplayEventReceiver
+        -> frameworks/native/libs/gui/DisplayEventDispatcher::DisplayEventReceiver::mReceiver(vsyncSource, eventRegistration)
+            ->  frameworks/native/libs/gui/include/gui/DisplayEventReceiver::DisplayEventReceiver
+                -> frameworks/native/libs/gui/DisplayEventReceiver.cpp
+                    -> ISurfaceComposer.cpp：case CREATE_DISPLAY_EVENT_CONNECTION:
+                        -> SurfaceFlinger::createDisplayEventConnection
+                            -> Scheduler::createDisplayEventConnection
+                                -> EventThread::createEventConnection
+                                    -> EventThreadConnection::EventThreadConnection()
+
+
+```c++
+DisplayEventReceiver::DisplayEventReceiver(
+        ISurfaceComposer::VsyncSource vsyncSource,
+        ISurfaceComposer::EventRegistrationFlags eventRegistration) {
+    sp<ISurfaceComposer> sf(ComposerService::getComposerService());
+    if (sf != nullptr) {
+        mEventConnection = sf->createDisplayEventConnection(vsyncSource, eventRegistration);
+        if (mEventConnection != nullptr) {
+            mDataChannel = std::make_unique<gui::BitTube>();
+            const auto status = mEventConnection->stealReceiveChannel(mDataChannel.get());
+            if (!status.isOk()) {
+                ALOGE("stealReceiveChannel failed: %s", status.toString8().c_str());
+                mInitError = std::make_optional<status_t>(status.transactionError());
+                mDataChannel.reset();
+                mEventConnection.clear();
+            }
+        }
+    }
+}
+```
+
+```c++
+status_t DisplayEventDispatcher::initialize() {
+    status_t result = mReceiver.initCheck();
+    if (result) {
+        ALOGW("Failed to initialize display event receiver, status=%d", result);
+        return result;
+    }
+
+    if (mLooper != nullptr) {
+        int rc = mLooper->addFd(mReceiver.getFd(), 0, Looper::EVENT_INPUT, this, NULL);
+        if (rc < 0) {
+            return UNKNOWN_ERROR;
+        }
+    }
+
+    return OK;
+}
+
+void DisplayEventDispatcher::dispose() {
+    ALOGV("dispatcher %p ~ Disposing display event dispatcher.", this);
+
+    if (!mReceiver.initCheck() && mLooper != nullptr) {
+        mLooper->removeFd(mReceiver.getFd());
+    }
+}
+```
+
+```c++
+EventThreadConnection::EventThreadConnection(
+        EventThread* eventThread, uid_t callingUid, ResyncCallback resyncCallback,
+        ISurfaceComposer::EventRegistrationFlags eventRegistration)
+      : resyncCallback(std::move(resyncCallback)),
+        mOwnerUid(callingUid),
+        mEventRegistration(eventRegistration),
+        mEventThread(eventThread),
+        mChannel(gui::BitTube::DefaultSize) {}
+```
+
+```c++
+binder::Status EventThreadConnection::stealReceiveChannel(gui::BitTube* outChannel) {
+    std::scoped_lock lock(mLock);
+    if (mChannel.initCheck() != NO_ERROR) {
+        return binder::Status::fromStatusT(NAME_NOT_FOUND);
+    }
+
+    outChannel->setReceiveFd(mChannel.moveReceiveFd());
+    outChannel->setSendFd(base::unique_fd(dup(mChannel.getSendFd())));
+    return binder::Status::ok();
+}
+```
