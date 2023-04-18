@@ -357,6 +357,7 @@ Vsync Offset 我们指的是 VSYNC_APP 和 VSYNC_SF 之间有一个 Offset，即
 
 frameworks/native/services/surfaceflinger/Scheduler/DispSyncSource.cpp
 
+// App初始化VSYNC事件接收器过程
 frameworks/base/core/jni/android_view_DisplayEventReceiver.nativeInit
     -> android_view_DisplayEventReceiver.NativeDisplayEventReceiver
         -> frameworks/native/libs/gui/DisplayEventDispatcher::DisplayEventReceiver::mReceiver(vsyncSource, eventRegistration)
@@ -368,6 +369,7 @@ frameworks/base/core/jni/android_view_DisplayEventReceiver.nativeInit
                                 -> EventThread::createEventConnection
                                     -> EventThreadConnection::EventThreadConnection()
 
+发送VSYNC给App层
 Bittube::sendObjects
   <-  DisplayEventReceiver::sendEvents
     <-  EventThreadConnection::postEvent
@@ -383,6 +385,38 @@ mPendingEvents.push_back
             <-  Scheduler::makePrimaryDispSyncSourc
               <- VsyncSchedule::createDispatch
                 <- Scheduler::createConnection
+
+SurfaceFlinger初始化逻辑
+    SurfaceFlinger::processDisplayAdded
+         SurfaceFlinger::initScheduler
+             Scheduler::createVsyncSchedule
+                VsyncSchedule::VsyncSchedule
+                    VsyncSchedule::createTracker
+                    VsyncSchedule::createDispatch
+                    VsyncSchedule::createController
+                         VSyncDispatchTimerQueue::VSyncDispatchTimerQueue
+                         VSyncReactor::VSyncReactor 
+             Scheduler::createConnection
+             MessageQueue::initVsync
+
+调度注册逻辑
+VSyncDispatchTimerQueue::registerCallback
+    VSyncCallbackRegistration::VSyncCallbackRegistration
+        CallbackRepeater   
+            DispSyncSource::DispSyncSource
+                Scheduler::makePrimaryDispSyncSource
+                    Scheduler::createConnection
+        MessageQueue::initVsync
+
+调度逻辑：
+VSyncDispatchTimerQueue::schedule
+     VSyncCallbackRegistration::schedule
+        CallbackRepeater::start
+        MessageQueue::scheduleFrame
+            SurfaceFlinger::scheduleCommit
+        VsyncSchedule::schedule
+
+                                                
 
 ```c++
 DisplayEventReceiver::DisplayEventReceiver(
