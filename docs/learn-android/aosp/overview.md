@@ -15,7 +15,7 @@ repo init -b <branch-name>
 repo sync
 ```
 
-其中`<branch-name>`指定你要切换到的分支名，例如切换到Android 12的分支，则可以使用以下命令：
+其中`<branch-name>`指定你要切换到的分支名，例如切换到Android 13的分支，则可以使用以下命令：
 
 bash
 
