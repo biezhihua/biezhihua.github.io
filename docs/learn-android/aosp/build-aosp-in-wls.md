@@ -2,9 +2,70 @@
 article: false
 ---
 
-# AOSP
+# build aosp in wls
 
-## aosp下载
+## Content
+
+### 迁移WLS2到别的硬盘
+
+可以通过以下步骤将 WSL2 迁移至其他硬盘：
+
+1.  关闭 WSL2
+
+首先需要关闭正在运行的 WSL2，可以在 PowerShell 或 CMD 中输入以下命令：
+
+
+```bash
+wsl --shutdown
+```
+
+2.  导出 WSL2 镜像
+
+使用以下命令导出 WSL2 镜像，其中 `<distribution>` 是要导出的发行版的名称，`<file>` 是导出的文件名和路径：
+
+```bash
+wsl --export <distribution> <file>
+```
+
+3.  删除旧的 WSL2 镜像
+
+在导出镜像之前，需要删除原来的 WSL2 镜像。可以通过以下命令列出已安装的 WSL2 发行版：
+
+
+```bash
+wsl --list --verbose
+```
+
+然后通过以下命令删除指定的 WSL2 发行版：
+
+```bash
+wsl --unregister <distribution>
+```
+
+4.  导入 WSL2 镜像
+
+使用以下命令导入 WSL2 镜像，其中 `<distribution>` 是要导入的发行版的名称，`<file>` 是导出的文件名和路径：
+
+```bash
+wsl --import <distribution> <directory> <file>
+```
+
+其中 `<directory>` 是新的 WSL2 镜像目录的路径。
+
+5.  启动新的 WSL2
+
+通过以下命令启动新的 WSL2：
+
+```bash
+wsl -d <distribution>
+```
+
+其中 `<distribution>` 是要启动的发行版的名称。
+
+注意：在进行上述操作时，请确保备份重要数据并了解风险。
+
+
+### aosp下载
 
 
 要下载AOSP（Android Open Source Project），请按照以下步骤操作：
@@ -47,7 +108,7 @@ make -j4
 
 以上是下载AOSP的基本步骤。您可以在AOSP官方网站上找到更多详细的文档和指南，以帮助您进一步了解和开发AOSP。
 
-## aosp 切换分支
+### aosp 切换分支
 
 切换分支需要先进入到你本地的AOSP代码目录中，然后使用以下命令：
 
@@ -65,7 +126,7 @@ repo sync
 
 执行完以上命令后，AOSP代码就会被同步到对应的分支。注意，切换分支可能会导致一些代码库的版本变化，需要谨慎操作。
 
-## repo 清除未保存的文件
+### repo 清除未保存的文件
 
 Repo工具是Git工具的扩展，用于管理多个Git代码仓库。与Git类似，Repo也不会在本地仓库中保存未提交的更改。因此，您需要使用文本编辑器或其他适当的工具来保存您的更改。如果您已经对某些文件进行了更改，但还没有提交它们，您可以使用以下方法来清除这些更改：
 
@@ -86,3 +147,58 @@ repo forall -c "git reset --hard"
 该命令将重置所有Git仓库的本地仓库到最后一次提交的状态，并清除所有未提交的更改。请注意，这将不可逆地删除所有未提交的更改，因此请谨慎使用。
 
 无论您使用哪种方法，都要确保在清除更改之前，将重要的更改保存到其他文件或备份中。
+
+### install repo
+
+https://source.android.com/docs/setup/download
+
+```bash
+sudo apt update
+sudo apt install repo
+sudo apt upgrade repo
+cd .repo/repo/
+git pull
+cp /home/biezhihua/projects/aosp/.repo/repo/repo /usr/bin/repo
+chmod a+rx /usr/bin/repo
+repo sync -c -j8
+```
+
+https://gerrit.googlesource.com/git-repo/+/refs/heads/master/README.md
+
+### check branch
+
+repo init -b android-13.0.0_r41
+repo sync -c -j8
+
+### 替换源
+
+https://mirrors.tuna.tsinghua.edu.cn/help/AOSP/
+
+如果你之前已经通过某种途径获得了 AOSP 的源码(或者你只是 init 这一步完成后)， 你希望以后通过 TUNA 同步 AOSP 部分的代码，只需要修改 .repo/manifests.git/config，将
+```
+url = https://android.googlesource.com/platform/manifest
+```
+更改为
+
+```
+url = https://mirrors.tuna.tsinghua.edu.cn/git/AOSP/platform/manifest
+```
+
+或者可以不修改文件，而执行
+
+```
+git config --global url.https://mirrors.tuna.tsinghua.edu.cn/git/AOSP/.insteadof https://android.googlesource.com
+```
+
+### 准备构建环境
+
+https://source.android.com/docs/setup/start/initializing#installing-required-packages-ubuntu-1804
+
+## Reference
+
+- https://mirrors.tuna.tsinghua.edu.cn/help/AOSP/
+- https://stackoverflow.com/questions/51591091/apply-setcasesensitiveinfo-recursively-to-all-folders-and-subfolders/71779787#71779787
+- https://blog.csdn.net/w690333243/article/details/121712454
+- https://blog.csdn.net/zyb418/article/details/124114683
+- https://luyaoming.com/2021/06/23/wsl2%E4%B8%8B%E4%B8%8B%E8%BD%BD%E4%B8%8E%E7%BC%96%E8%AF%91AOSP/
+- https://mirrors.tuna.tsinghua.edu.cn/help/AOSP/
