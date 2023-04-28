@@ -19,13 +19,104 @@ VSYNC 信号与屏幕的刷新率密切相关。例如，一个刷新率为60Hz�
 
 ![dispsync](https://source.android.com/static/docs/core/graphics/images/dispsync.png?hl=zh-cn)
 
-先对 VSYNC 信号有个总体的概念，它包含了三个事件，HW_VSYNC_0、VSYNC、SF_VSYNC，其中：
+先对 VSYNC 信号有个总体的概念，它包含了三个部分，HW_VSYNC_0、VSYNC、SF_VSYNC，其中：
 
 - HW_VSYNC_0 代表 屏幕开始显示下一帧，被 DispSync 使用转换为 VSYNC 和 SF_VSYNC。
 - VSYNC 代表 应用读取输入内容并生成下一帧，也叫做 VSYNC_APP，被 Choreographer 消耗。
 - SF_VSYNC 代表 SurfaceFlinger 开始为下一帧进行合成，也叫做 VSYNC_SF，被 SurfaceFlinger 消耗。
 
 ## VSYNC 信号的产生与分发
+
+### vsync events source
+
+```c++
+SurfaceFlinger::SurfaceFlinger(Factory& factory, SkipInitializationTag)
+      : ...
+        mCompositionEngine(mFactory.createCompositionEngine()),
+        ...) {
+    ALOGI("Using HWComposer service: %s", mHwcServiceName.c_str());
+}
+
+// https://cs.android.com/android/platform/superproject/+/refs/heads/master:frameworks/native/services/surfaceflinger/CompositionEngine/include/compositionengine/CompositionEngine.h
+```
+
+```c++
+
+// Do not call property_set on main thread which will be blocked by init
+// Use StartPropertySetThread instead.
+void SurfaceFlinger::init() {
+    ...
+    mCompositionEngine->setHwComposer(getFactory().createHWComposer(mHwcServiceName));
+
+    mCompositionEngine->getHwComposer().setCallback(*this);
+    ...
+}
+```
+
+```c++
+// Implement this interface to receive hardware composer events.
+//
+// These callback functions will generally be called on a hwbinder thread, but
+// when first registering the callback the onComposerHalHotplug() function will
+// immediately be called on the thread calling registerCallback().
+struct ComposerCallback {
+    virtual void onComposerHalHotplug(hal::HWDisplayId, hal::Connection) = 0;
+    virtual void onComposerHalRefresh(hal::HWDisplayId) = 0;
+    virtual void onComposerHalVsync(hal::HWDisplayId, int64_t timestamp,
+                                    std::optional<hal::VsyncPeriodNanos>) = 0;
+    virtual void onComposerHalVsyncPeriodTimingChanged(hal::HWDisplayId,
+                                                       const hal::VsyncPeriodChangeTimeline&) = 0;
+    virtual void onComposerHalSeamlessPossible(hal::HWDisplayId) = 0;
+    virtual void onComposerHalVsyncIdle(hal::HWDisplayId) = 0;
+
+protected:
+    ~ComposerCallback() = default;
+};
+```
+
+```c++
+void HWComposer::setCallback(HWC2::ComposerCallback& callback) {
+    ...
+
+    mComposer->registerCallback(callback);
+}
+
+```
+
+```c++
+void SurfaceFlinger::onComposerHalVsync(hal::HWDisplayId hwcDisplayId, int64_t timestamp,
+                                        std::optional<hal::VsyncPeriodNanos> vsyncPeriod) {
+    ...
+
+    Mutex::Autolock lock(mStateLock);
+    const auto displayId = getHwComposer().toPhysicalDisplayId(hwcDisplayId);
+    if (displayId) {
+        const auto token = getPhysicalDisplayTokenLocked(*displayId);
+        const auto display = getDisplayDeviceLocked(token);
+        display->onVsync(timestamp);
+    }
+
+    if (!getHwComposer().onVsync(hwcDisplayId, timestamp)) {
+        return;
+    }
+
+    const bool isActiveDisplay =
+            displayId && getPhysicalDisplayTokenLocked(*displayId) == mActiveDisplayToken;
+    if (!isActiveDisplay) {
+        // For now, we don't do anything with non active display vsyncs.
+        return;
+    }
+
+    bool periodFlushed = false;
+    mScheduler->addResyncSample(timestamp, vsyncPeriod, &periodFlushed);
+    if (periodFlushed) {
+        modulateVsync(&VsyncModulator::onRefreshRateChangeCompleted);
+    }
+}
+```
+
+- <https://utzcoz.github.io/2020/05/02/Analyze-AOSP-vsync-model.html>
+- <https://cs.android.com/android/platform/superproject/+/master:frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp;l=802?q=SurfaceFlinger&hl=zh-cn>
 
 ### HWC 中 HW_VSYNC_0 的产生与回调
 
@@ -193,6 +284,179 @@ DispSync具有以下特性：
 
 综上所述，DispSync是一个软件实现的相位锁定环，它使用硬件VSYNC信号作为参考，并生成VSYNC和SF_VSYNC信号。同时，DispSync还利用来自Hardware Composer的Retire fence signal时间戳作为反馈，以确保生成的信号与硬件VSYNC信号保持同步。
 
+## 分析过程
+
+- <https://cs.android.com/android/platform/superproject/+/master:frameworks/base/core/jni/android_view_DisplayEventReceiver.cpp?q=android_view_DisplayEventReceiver&hl=zh-cn>
+
+- <https://cs.android.com/android/platform/superproject/+/refs/heads/master:frameworks/base/core/jni/android_view_DisplayEventReceiver.cpp;drc=7346c436e5a11ce08f6a80dcfeb8ef941ca30176;l=215?q=android_view_DisplayEventReceiver&hl=zh-cn>
+
+<https://cs.android.com/android/platform/superproject/+/refs/heads/master:frameworks/native/libs/gui/DisplayEventDispatcher.cpp;drc=7346c436e5a11ce08f6a80dcfeb8ef941ca30176;l=63?hl=zh-cn>
+
+<https://cs.android.com/android/platform/superproject/+/refs/heads/master:frameworks/native/libs/gui/DisplayEventReceiver.cpp;l=35;drc=7346c436e5a11ce08f6a80dcfeb8ef941ca30176?hl=zh-cn>
+
+<https://cs.android.com/android/platform/superproject/+/refs/heads/master:frameworks/native/libs/gui/include/gui/DisplayEventReceiver.h;l=114;drc=7346c436e5a11ce08f6a80dcfeb8ef941ca30176;bpv=1;bpt=1?hl=zh-cn>
+
+<https://cs.android.com/android/platform/superproject/+/refs/heads/master:frameworks/native/libs/gui/include/gui/DisplayEventReceiver.h;l=114;drc=7346c436e5a11ce08f6a80dcfeb8ef941ca30176;bpv=1;bpt=1?hl=zh-cn>
+
+/native/libs/gui/DisplayEventReceiver.cpp;l=35;drc=7346c436e5a11ce08f6a80dcfeb8ef941ca30176;bpv=1;bpt=1?hl=zh-cn
+
+<https://cs.android.com/android/platform/superproject/+/refs/heads/master:frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp;l=1818;drc=7346c436e5a11ce08f6a80dcfeb8ef941ca30176;bpv=1;bpt=1?hl=zh-cn>
+
+<https://cs.android.com/android/platform/superproject/+/refs/heads/master:frameworks/native/services/surfaceflinger/Scheduler/Scheduler.cpp;l=221;drc=7346c436e5a11ce08f6a80dcfeb8ef941ca30176;bpv=1;bpt=1?hl=zh-cn>
+
+<https://cs.android.com/android/platform/superproject/+/refs/heads/master:frameworks/native/services/surfaceflinger/Scheduler/EventThread.cpp;l=290;drc=7346c436e5a11ce08f6a80dcfeb8ef941ca30176;bpv=1;bpt=1?hl=zh-cn>
+
+<https://cs.android.com/android/platform/superproject/+/refs/heads/master:frameworks/native/services/surfaceflinger/Scheduler/EventThread.cpp;l=397;drc=7346c436e5a11ce08f6a80dcfeb8ef941ca30176;bpv=1;bpt=1?hl=zh-cn>
+
+<https://cs.android.com/android/platform/superproject/+/master:frameworks/native/libs/gui/include/private/gui/BitTube.h;l=38;drc=7346c436e5a11ce08f6a80dcfeb8ef941ca30176?q=gui::BitTube::DefaultSize&ss=android%2Fplatform%2Fsuperproject&hl=zh-cn>
+
+frameworks/native/services/surfaceflinger/Scheduler/DispSyncSource.cpp
+
+```
+// App初始化VSYNC事件接收器过程
+frameworks/base/core/jni/android_view_DisplayEventReceiver.nativeInit
+    -> android_view_DisplayEventReceiver.NativeDisplayEventReceiver
+        -> frameworks/native/libs/gui/DisplayEventDispatcher::DisplayEventReceiver::mReceiver(vsyncSource, eventRegistration)
+            ->  frameworks/native/libs/gui/include/gui/DisplayEventReceiver::DisplayEventReceiver
+                -> frameworks/native/libs/gui/DisplayEventReceiver.cpp
+                    -> ISurfaceComposer.cpp：case CREATE_DISPLAY_EVENT_CONNECTION:
+                        -> SurfaceFlinger::createDisplayEventConnection
+                            -> Scheduler::createDisplayEventConnection
+                                -> EventThread::createEventConnection
+                                    -> EventThreadConnection::EventThreadConnection()
+```
+
+```
+发送VSYNC给App层
+Bittube::sendObjects
+  <-  DisplayEventReceiver::sendEvents
+    <-  EventThreadConnection::postEvent
+      <-  EventThread::dispatchEvent
+        <- EventThread::threadMain
+```
+
+```
+mPendingEvents.push_back
+  <- EventThread::onVSyncEvent
+    <-  DispSyncSource::onVsyncCallback
+      <- DispSyncSource::DispSyncSource
+        <-  DispSyncSource::CallbackRepeater
+          <- CallbackRepeater:: callback
+            <-  Scheduler::makePrimaryDispSyncSourc
+              <- VsyncSchedule::createDispatch
+                <- Scheduler::createConnection
+```
+
+```
+SurfaceFlinger初始化逻辑
+    SurfaceFlinger::processDisplayAdded
+         SurfaceFlinger::initScheduler
+             Scheduler::createVsyncSchedule
+                VsyncSchedule::VsyncSchedule
+                    VsyncSchedule::createTracker
+                    VsyncSchedule::createDispatch
+                    VsyncSchedule::createController
+                         VSyncDispatchTimerQueue::VSyncDispatchTimerQueue
+                         VSyncReactor::VSyncReactor 
+             Scheduler::createConnection
+             MessageQueue::initVsync
+```
+
+```
+调度注册逻辑
+VSyncDispatchTimerQueue::registerCallback
+    VSyncCallbackRegistration::VSyncCallbackRegistration
+        CallbackRepeater
+            DispSyncSource::DispSyncSource
+                Scheduler::makePrimaryDispSyncSource
+                    Scheduler::createConnection
+        MessageQueue::initVsync
+
+```
+
+```
+调度逻辑：
+VSyncDispatchTimerQueue::schedule
+     VSyncCallbackRegistration::schedule
+        CallbackRepeater::start
+        MessageQueue::scheduleFrame
+            SurfaceFlinger::scheduleCommit
+        VsyncSchedule::schedule
+
+```
+
+```c++
+DisplayEventReceiver::DisplayEventReceiver(
+        ISurfaceComposer::VsyncSource vsyncSource,
+        ISurfaceComposer::EventRegistrationFlags eventRegistration) {
+    sp<ISurfaceComposer> sf(ComposerService::getComposerService());
+    if (sf != nullptr) {
+        mEventConnection = sf->createDisplayEventConnection(vsyncSource, eventRegistration);
+        if (mEventConnection != nullptr) {
+            mDataChannel = std::make_unique<gui::BitTube>();
+            const auto status = mEventConnection->stealReceiveChannel(mDataChannel.get());
+            if (!status.isOk()) {
+                ALOGE("stealReceiveChannel failed: %s", status.toString8().c_str());
+                mInitError = std::make_optional<status_t>(status.transactionError());
+                mDataChannel.reset();
+                mEventConnection.clear();
+            }
+        }
+    }
+}
+```
+
+```c++
+status_t DisplayEventDispatcher::initialize() {
+    status_t result = mReceiver.initCheck();
+    if (result) {
+        ALOGW("Failed to initialize display event receiver, status=%d", result);
+        return result;
+    }
+
+    if (mLooper != nullptr) {
+        int rc = mLooper->addFd(mReceiver.getFd(), 0, Looper::EVENT_INPUT, this, NULL);
+        if (rc < 0) {
+            return UNKNOWN_ERROR;
+        }
+    }
+
+    return OK;
+}
+
+void DisplayEventDispatcher::dispose() {
+    ALOGV("dispatcher %p ~ Disposing display event dispatcher.", this);
+
+    if (!mReceiver.initCheck() && mLooper != nullptr) {
+        mLooper->removeFd(mReceiver.getFd());
+    }
+}
+```
+
+```c++
+EventThreadConnection::EventThreadConnection(
+        EventThread* eventThread, uid_t callingUid, ResyncCallback resyncCallback,
+        ISurfaceComposer::EventRegistrationFlags eventRegistration)
+      : resyncCallback(std::move(resyncCallback)),
+        mOwnerUid(callingUid),
+        mEventRegistration(eventRegistration),
+        mEventThread(eventThread),
+        mChannel(gui::BitTube::DefaultSize) {}
+```
+
+```c++
+binder::Status EventThreadConnection::stealReceiveChannel(gui::BitTube* outChannel) {
+    std::scoped_lock lock(mLock);
+    if (mChannel.initCheck() != NO_ERROR) {
+        return binder::Status::fromStatusT(NAME_NOT_FOUND);
+    }
+
+    outChannel->setReceiveFd(mChannel.moveReceiveFd());
+    outChannel->setSendFd(base::unique_fd(dup(mChannel.getSendFd())));
+    return binder::Status::ok();
+}
+```
+
 ## VSYNC 如何与图形数据流方向结合的，以及各个阶段的作用
 
 首先我们要大概了解 Android 中的图形数据流的方向，从下面这张图，结合 Android 的图像流，我们大概把从 App 绘制到屏幕显示，分为下面几个阶段
@@ -330,162 +594,5 @@ Vsync Offset 我们指的是 VSYNC_APP 和 VSYNC_SF 之间有一个 Offset，即
 - <https://juejin.cn/post/7081614840606785550>
 - <https://www.jianshu.com/p/304f56f5d486>
 - <https://blog.csdn.net/Android062005/article/details/123090139>
-
-<https://cs.android.com/android/platform/superproject/+/master:frameworks/base/core/jni/android_view_DisplayEventReceiver.cpp?q=android_view_DisplayEventReceiver&hl=zh-cn>
-
-<https://cs.android.com/android/platform/superproject/+/refs/heads/master:frameworks/base/core/jni/android_view_DisplayEventReceiver.cpp;drc=7346c436e5a11ce08f6a80dcfeb8ef941ca30176;l=215?q=android_view_DisplayEventReceiver&hl=zh-cn>
-
-<https://cs.android.com/android/platform/superproject/+/refs/heads/master:frameworks/native/libs/gui/DisplayEventDispatcher.cpp;drc=7346c436e5a11ce08f6a80dcfeb8ef941ca30176;l=63?hl=zh-cn>
-
-<https://cs.android.com/android/platform/superproject/+/refs/heads/master:frameworks/native/libs/gui/DisplayEventReceiver.cpp;l=35;drc=7346c436e5a11ce08f6a80dcfeb8ef941ca30176?hl=zh-cn>
-
-<https://cs.android.com/android/platform/superproject/+/refs/heads/master:frameworks/native/libs/gui/include/gui/DisplayEventReceiver.h;l=114;drc=7346c436e5a11ce08f6a80dcfeb8ef941ca30176;bpv=1;bpt=1?hl=zh-cn>
-
-<https://cs.android.com/android/platform/superproject/+/refs/heads/master:frameworks/native/libs/gui/include/gui/DisplayEventReceiver.h;l=114;drc=7346c436e5a11ce08f6a80dcfeb8ef941ca30176;bpv=1;bpt=1?hl=zh-cn>
-
-/native/libs/gui/DisplayEventReceiver.cpp;l=35;drc=7346c436e5a11ce08f6a80dcfeb8ef941ca30176;bpv=1;bpt=1?hl=zh-cn
-
-<https://cs.android.com/android/platform/superproject/+/refs/heads/master:frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp;l=1818;drc=7346c436e5a11ce08f6a80dcfeb8ef941ca30176;bpv=1;bpt=1?hl=zh-cn>
-
-<https://cs.android.com/android/platform/superproject/+/refs/heads/master:frameworks/native/services/surfaceflinger/Scheduler/Scheduler.cpp;l=221;drc=7346c436e5a11ce08f6a80dcfeb8ef941ca30176;bpv=1;bpt=1?hl=zh-cn>
-
-<https://cs.android.com/android/platform/superproject/+/refs/heads/master:frameworks/native/services/surfaceflinger/Scheduler/EventThread.cpp;l=290;drc=7346c436e5a11ce08f6a80dcfeb8ef941ca30176;bpv=1;bpt=1?hl=zh-cn>
-
-<https://cs.android.com/android/platform/superproject/+/refs/heads/master:frameworks/native/services/surfaceflinger/Scheduler/EventThread.cpp;l=397;drc=7346c436e5a11ce08f6a80dcfeb8ef941ca30176;bpv=1;bpt=1?hl=zh-cn>
-
-<https://cs.android.com/android/platform/superproject/+/master:frameworks/native/libs/gui/include/private/gui/BitTube.h;l=38;drc=7346c436e5a11ce08f6a80dcfeb8ef941ca30176?q=gui::BitTube::DefaultSize&ss=android%2Fplatform%2Fsuperproject&hl=zh-cn>
-
-frameworks/native/services/surfaceflinger/Scheduler/DispSyncSource.cpp
-
-// App初始化VSYNC事件接收器过程
-frameworks/base/core/jni/android_view_DisplayEventReceiver.nativeInit
-    -> android_view_DisplayEventReceiver.NativeDisplayEventReceiver
-        -> frameworks/native/libs/gui/DisplayEventDispatcher::DisplayEventReceiver::mReceiver(vsyncSource, eventRegistration)
-            ->  frameworks/native/libs/gui/include/gui/DisplayEventReceiver::DisplayEventReceiver
-                -> frameworks/native/libs/gui/DisplayEventReceiver.cpp
-                    -> ISurfaceComposer.cpp：case CREATE_DISPLAY_EVENT_CONNECTION:
-                        -> SurfaceFlinger::createDisplayEventConnection
-                            -> Scheduler::createDisplayEventConnection
-                                -> EventThread::createEventConnection
-                                    -> EventThreadConnection::EventThreadConnection()
-
-发送VSYNC给App层
-Bittube::sendObjects
-  <-  DisplayEventReceiver::sendEvents
-    <-  EventThreadConnection::postEvent
-      <-  EventThread::dispatchEvent
-        <- EventThread::threadMain
-
-mPendingEvents.push_back
-  <- EventThread::onVSyncEvent
-    <-  DispSyncSource::onVsyncCallback
-      <- DispSyncSource::DispSyncSource
-        <-  DispSyncSource::CallbackRepeater
-          <- CallbackRepeater:: callback
-            <-  Scheduler::makePrimaryDispSyncSourc
-              <- VsyncSchedule::createDispatch
-                <- Scheduler::createConnection
-
-SurfaceFlinger初始化逻辑
-    SurfaceFlinger::processDisplayAdded
-         SurfaceFlinger::initScheduler
-             Scheduler::createVsyncSchedule
-                VsyncSchedule::VsyncSchedule
-                    VsyncSchedule::createTracker
-                    VsyncSchedule::createDispatch
-                    VsyncSchedule::createController
-                         VSyncDispatchTimerQueue::VSyncDispatchTimerQueue
-                         VSyncReactor::VSyncReactor 
-             Scheduler::createConnection
-             MessageQueue::initVsync
-
-调度注册逻辑
-VSyncDispatchTimerQueue::registerCallback
-    VSyncCallbackRegistration::VSyncCallbackRegistration
-        CallbackRepeater   
-            DispSyncSource::DispSyncSource
-                Scheduler::makePrimaryDispSyncSource
-                    Scheduler::createConnection
-        MessageQueue::initVsync
-
-调度逻辑：
-VSyncDispatchTimerQueue::schedule
-     VSyncCallbackRegistration::schedule
-        CallbackRepeater::start
-        MessageQueue::scheduleFrame
-            SurfaceFlinger::scheduleCommit
-        VsyncSchedule::schedule
-
-                                                
-
-```c++
-DisplayEventReceiver::DisplayEventReceiver(
-        ISurfaceComposer::VsyncSource vsyncSource,
-        ISurfaceComposer::EventRegistrationFlags eventRegistration) {
-    sp<ISurfaceComposer> sf(ComposerService::getComposerService());
-    if (sf != nullptr) {
-        mEventConnection = sf->createDisplayEventConnection(vsyncSource, eventRegistration);
-        if (mEventConnection != nullptr) {
-            mDataChannel = std::make_unique<gui::BitTube>();
-            const auto status = mEventConnection->stealReceiveChannel(mDataChannel.get());
-            if (!status.isOk()) {
-                ALOGE("stealReceiveChannel failed: %s", status.toString8().c_str());
-                mInitError = std::make_optional<status_t>(status.transactionError());
-                mDataChannel.reset();
-                mEventConnection.clear();
-            }
-        }
-    }
-}
-```
-
-```c++
-status_t DisplayEventDispatcher::initialize() {
-    status_t result = mReceiver.initCheck();
-    if (result) {
-        ALOGW("Failed to initialize display event receiver, status=%d", result);
-        return result;
-    }
-
-    if (mLooper != nullptr) {
-        int rc = mLooper->addFd(mReceiver.getFd(), 0, Looper::EVENT_INPUT, this, NULL);
-        if (rc < 0) {
-            return UNKNOWN_ERROR;
-        }
-    }
-
-    return OK;
-}
-
-void DisplayEventDispatcher::dispose() {
-    ALOGV("dispatcher %p ~ Disposing display event dispatcher.", this);
-
-    if (!mReceiver.initCheck() && mLooper != nullptr) {
-        mLooper->removeFd(mReceiver.getFd());
-    }
-}
-```
-
-```c++
-EventThreadConnection::EventThreadConnection(
-        EventThread* eventThread, uid_t callingUid, ResyncCallback resyncCallback,
-        ISurfaceComposer::EventRegistrationFlags eventRegistration)
-      : resyncCallback(std::move(resyncCallback)),
-        mOwnerUid(callingUid),
-        mEventRegistration(eventRegistration),
-        mEventThread(eventThread),
-        mChannel(gui::BitTube::DefaultSize) {}
-```
-
-```c++
-binder::Status EventThreadConnection::stealReceiveChannel(gui::BitTube* outChannel) {
-    std::scoped_lock lock(mLock);
-    if (mChannel.initCheck() != NO_ERROR) {
-        return binder::Status::fromStatusT(NAME_NOT_FOUND);
-    }
-
-    outChannel->setReceiveFd(mChannel.moveReceiveFd());
-    outChannel->setSendFd(base::unique_fd(dup(mChannel.getSendFd())));
-    return binder::Status::ok();
-}
-```
+- <https://android-developers.googleblog.com/2020/04/high-refresh-rate-rendering-on-android.html>
+- <https://utzcoz.github.io/2020/05/02/Analyze-AOSP-vsync-model.html>

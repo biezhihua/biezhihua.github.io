@@ -10,16 +10,15 @@ article: false
 
 可以通过以下步骤将 WSL2 迁移至其他硬盘：
 
-1.  关闭 WSL2
+1. 关闭 WSL2
 
 首先需要关闭正在运行的 WSL2，可以在 PowerShell 或 CMD 中输入以下命令：
-
 
 ```bash
 wsl --shutdown
 ```
 
-2.  导出 WSL2 镜像
+2. 导出 WSL2 镜像
 
 使用以下命令导出 WSL2 镜像，其中 `<distribution>` 是要导出的发行版的名称，`<file>` 是导出的文件名和路径：
 
@@ -27,10 +26,9 @@ wsl --shutdown
 wsl --export <distribution> <file>
 ```
 
-3.  删除旧的 WSL2 镜像
+3. 删除旧的 WSL2 镜像
 
 在导出镜像之前，需要删除原来的 WSL2 镜像。可以通过以下命令列出已安装的 WSL2 发行版：
-
 
 ```bash
 wsl --list --verbose
@@ -42,7 +40,7 @@ wsl --list --verbose
 wsl --unregister <distribution>
 ```
 
-4.  导入 WSL2 镜像
+4. 导入 WSL2 镜像
 
 使用以下命令导入 WSL2 镜像，其中 `<distribution>` 是要导入的发行版的名称，`<file>` 是导出的文件名和路径：
 
@@ -52,7 +50,7 @@ wsl --import <distribution> <directory> <file>
 
 其中 `<directory>` 是新的 WSL2 镜像目录的路径。
 
-5.  启动新的 WSL2
+5. 启动新的 WSL2
 
 通过以下命令启动新的 WSL2：
 
@@ -64,15 +62,13 @@ wsl -d <distribution>
 
 注意：在进行上述操作时，请确保备份重要数据并了解风险。
 
-
 ### aosp下载
-
 
 要下载AOSP（Android Open Source Project），请按照以下步骤操作：
 
-1.  安装Git：要从AOSP代码仓库中下载源代码，您需要先在计算机上安装Git。您可以从Git官网下载安装程序并按照说明进行安装。
-    
-2.  获取AOSP代码：打开终端或命令行窗口，在命令行中输入以下命令，以下载AOSP代码：
+1. 安装Git：要从AOSP代码仓库中下载源代码，您需要先在计算机上安装Git。您可以从Git官网下载安装程序并按照说明进行安装。
+
+2. 获取AOSP代码：打开终端或命令行窗口，在命令行中输入以下命令，以下载AOSP代码：
 
 ```bash
 mkdir aosp
@@ -83,14 +79,13 @@ repo sync
 
 其中，`<branch>` 表示您要下载的AOSP版本的分支名称。例如，要下载Android 12（代码名称为S），请使用以下命令：
 
-
 ```bash
 repo init -u https://android.googlesource.com/platform/manifest -b android-12.0.0_r1
 ```
 
 此命令将初始化repo工具，并使用指定的分支从AOSP代码仓库中获取源代码。然后，使用 `repo sync` 命令将所有源代码下载到本地计算机上。
 
-3.  构建AOSP：下载完AOSP源代码后，可以使用以下命令构建AOSP：
+3. 构建AOSP：下载完AOSP源代码后，可以使用以下命令构建AOSP：
 
 ```bash
 source build/envsetup.sh
@@ -100,7 +95,7 @@ make -j4
 
 其中，`source build/envsetup.sh` 命令将设置必要的环境变量，`lunch` 命令将提示您选择要构建的目标设备类型和版本，而 `make -j4` 命令将开始构建过程。请注意，这个过程可能需要一些时间和大量的磁盘空间。
 
-4.  运行AOSP：构建完成后，您可以在模拟器或实际设备上运行AOSP。要在模拟器上运行，请使用以下命令：
+4. 运行AOSP：构建完成后，您可以在模拟器或实际设备上运行AOSP。要在模拟器上运行，请使用以下命令：
 
 `emulator`
 
@@ -130,7 +125,7 @@ repo sync
 
 Repo工具是Git工具的扩展，用于管理多个Git代码仓库。与Git类似，Repo也不会在本地仓库中保存未提交的更改。因此，您需要使用文本编辑器或其他适当的工具来保存您的更改。如果您已经对某些文件进行了更改，但还没有提交它们，您可以使用以下方法来清除这些更改：
 
-1.  如果您只想清除单个Git仓库中的文件更改，请使用以下命令：
+1. 如果您只想清除单个Git仓库中的文件更改，请使用以下命令：
 
 ```bash
 repo forall <project> -c "git checkout -- file-name"
@@ -138,7 +133,7 @@ repo forall <project> -c "git checkout -- file-name"
 
 其中 `<project>` 是您要清除更改的Git仓库的名称，`file-name` 是要清除更改的文件名。该命令将覆盖本地的更改，并还原文件为最后一次提交的状态。
 
-2.  如果您想清除所有Git仓库中的未提交更改，请使用以下命令：
+2. 如果您想清除所有Git仓库中的未提交更改，请使用以下命令：
 
 ```bash
 repo forall -c "git reset --hard"
@@ -150,7 +145,7 @@ repo forall -c "git reset --hard"
 
 ### install repo
 
-https://source.android.com/docs/setup/download
+<https://source.android.com/docs/setup/download>
 
 ```bash
 sudo apt update
@@ -163,7 +158,7 @@ chmod a+rx /usr/bin/repo
 repo sync -c -j8
 ```
 
-https://gerrit.googlesource.com/git-repo/+/refs/heads/master/README.md
+<https://gerrit.googlesource.com/git-repo/+/refs/heads/master/README.md>
 
 ### check branch
 
@@ -172,12 +167,14 @@ repo sync -c -j8
 
 ### 替换源
 
-https://mirrors.tuna.tsinghua.edu.cn/help/AOSP/
+<https://mirrors.tuna.tsinghua.edu.cn/help/AOSP/>
 
 如果你之前已经通过某种途径获得了 AOSP 的源码(或者你只是 init 这一步完成后)， 你希望以后通过 TUNA 同步 AOSP 部分的代码，只需要修改 .repo/manifests.git/config，将
+
 ```
 url = https://android.googlesource.com/platform/manifest
 ```
+
 更改为
 
 ```
@@ -192,13 +189,53 @@ git config --global url.https://mirrors.tuna.tsinghua.edu.cn/git/AOSP/.insteadof
 
 ### 准备构建环境
 
-https://source.android.com/docs/setup/start/initializing#installing-required-packages-ubuntu-1804
+<https://source.android.com/docs/setup/start/initializing#installing-required-packages-ubuntu-1804>
+
+### 编译AOSP
+
+grep 'core id' /proc/cpuinfo | sort -u | wc -l
+
+
+- <https://juejin.cn/post/7043063280704684063>
+- <https://blog.csdn.net/nei504293736/article/details/109628378>
+
+### 使用编译好的镜像
+
+```
+#擦除已有的avd数据
+D:\Android\sdk\emulator\emulator.exe -avd biezhihua_aosp  -wipe-data
+
+
+#模拟器重新加载android image
+D:\Android\sdk\emulator\emulator.exe -avd biezhihua_aosp  -system "your_android_path\out\target\product\generic_x86_64\system.img" -data "your_android_path\out\target\product\generic_x86_64\userdata.img"
+
+```
+
+- <https://blog.csdn.net/dangelzjj/article/details/109267411>
+- <https://blog.csdn.net/dangelzjj/article/details/109267411>
+
+- <https://blog.csdn.net/yongwn/article/details/121009506>
+### WLS设置固定IP
+
+```bash
+[share]
+   comment = share
+   path = /home/biezhihua/projects/aosp
+   writable = yes
+   guest ok = yes
+```
+
+- <https://zhuanlan.zhihu.com/p/380779630>
+- <https://github.com/MicrosoftDocs/WSL/issues/418#issuecomment-648570865>
+- <https://blog.csdn.net/weixin_41301508/article/details/108939520>
 
 ## Reference
 
-- https://mirrors.tuna.tsinghua.edu.cn/help/AOSP/
-- https://stackoverflow.com/questions/51591091/apply-setcasesensitiveinfo-recursively-to-all-folders-and-subfolders/71779787#71779787
-- https://blog.csdn.net/w690333243/article/details/121712454
-- https://blog.csdn.net/zyb418/article/details/124114683
-- https://luyaoming.com/2021/06/23/wsl2%E4%B8%8B%E4%B8%8B%E8%BD%BD%E4%B8%8E%E7%BC%96%E8%AF%91AOSP/
-- https://mirrors.tuna.tsinghua.edu.cn/help/AOSP/
+- <https://mirrors.tuna.tsinghua.edu.cn/help/AOSP/>
+- <https://stackoverflow.com/questions/51591091/apply-setcasesensitiveinfo-recursively-to-all-folders-and-subfolders/71779787#71779787>
+- <https://blog.csdn.net/w690333243/article/details/121712454>
+- <https://blog.csdn.net/zyb418/article/details/124114683>
+- <https://luyaoming.com/2021/06/23/wsl2%E4%B8%8B%E4%B8%8B%E8%BD%BD%E4%B8%8E%E7%BC%96%E8%AF%91AOSP/>
+- <https://mirrors.tuna.tsinghua.edu.cn/help/AOSP/>
+- <https://juejin.cn/post/7038543675109933070>
+- <https://developers.google.com/android/drivers>
