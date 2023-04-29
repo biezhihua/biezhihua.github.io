@@ -115,6 +115,8 @@ void SurfaceFlinger::onComposerHalVsync(hal::HWDisplayId hwcDisplayId, int64_t t
 }
 ```
 
+![](/learn-android/performance/fluency-vsync-oncomposerhalvsync-callstack.png)
+
 - <https://utzcoz.github.io/2020/05/02/Analyze-AOSP-vsync-model.html>
 - <https://cs.android.com/android/platform/superproject/+/master:frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp;l=802?q=SurfaceFlinger&hl=zh-cn>
 
@@ -596,3 +598,8 @@ Vsync Offset 我们指的是 VSYNC_APP 和 VSYNC_SF 之间有一个 Offset，即
 - <https://blog.csdn.net/Android062005/article/details/123090139>
 - <https://android-developers.googleblog.com/2020/04/high-refresh-rate-rendering-on-android.html>
 - <https://utzcoz.github.io/2020/05/02/Analyze-AOSP-vsync-model.html>
+- <https://www.cnblogs.com/roger-yu/p/16230337.html>
+- <https://www.cnblogs.com/roger-yu/p/16162940.html>
+- <https://www.cnblogs.com/roger-yu/p/16162940.html>
+- <https://www.cnblogs.com/roger-yu/p/15761646.html>
+- <https://utzcoz.github.io/2020/04/29/Print-call-stack-in-AOSP-native-code.html>

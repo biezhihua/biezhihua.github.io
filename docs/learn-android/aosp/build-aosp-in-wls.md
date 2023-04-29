@@ -195,9 +195,31 @@ git config --global url.https://mirrors.tuna.tsinghua.edu.cn/git/AOSP/.insteadof
 
 grep 'core id' /proc/cpuinfo | sort -u | wc -l
 
-
 - <https://juejin.cn/post/7043063280704684063>
 - <https://blog.csdn.net/nei504293736/article/details/109628378>
+
+### WLS设置固定IP & 设定SMB目录可读可写
+
+```bash
+[share]
+   comment = share
+   path = /home/biezhihua/projects/aosp
+   force user = root
+   writeable = yes
+   browseable = yes
+   public = yes
+   create mask = 0644
+   directory mask = 0755
+```
+
+```
+sudo service smbd restart
+```
+
+- <https://zhuanlan.zhihu.com/p/380779630>
+- <https://github.com/MicrosoftDocs/WSL/issues/418#issuecomment-648570865>
+- <https://blog.csdn.net/weixin_41301508/article/details/108939520>
+- <https://unix.stackexchange.com/questions/206309/how-to-create-a-samba-share-that-is-writable-from-windows-without-777-permission>
 
 ### 使用编译好的镜像
 
@@ -213,21 +235,8 @@ D:\Android\sdk\emulator\emulator.exe -avd biezhihua_aosp  -system "your_android_
 
 - <https://blog.csdn.net/dangelzjj/article/details/109267411>
 - <https://blog.csdn.net/dangelzjj/article/details/109267411>
-
 - <https://blog.csdn.net/yongwn/article/details/121009506>
-### WLS设置固定IP
-
-```bash
-[share]
-   comment = share
-   path = /home/biezhihua/projects/aosp
-   writable = yes
-   guest ok = yes
-```
-
-- <https://zhuanlan.zhihu.com/p/380779630>
-- <https://github.com/MicrosoftDocs/WSL/issues/418#issuecomment-648570865>
-- <https://blog.csdn.net/weixin_41301508/article/details/108939520>
+- <https://groups.google.com/g/android-building/c/O9a6Ohnb5hI?pli=1>
 
 ## Reference
 
