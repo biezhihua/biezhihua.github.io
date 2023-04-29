@@ -1,12 +1,29 @@
 ---
-article: false
+tag:
+  - android
+  - aosp
 ---
 
-# build aosp in wls
+# Android | build aosp and run image to emulator in windows11
 
-## Content
+## environment
 
-### 迁移WLS2到别的硬盘
+```text
+// 宿主系统
+Windows11
+
+// 编译aosp系统
+WSL2 - Ubuntu-18.04
+
+// aosp分支
+android-13.0.0_r41
+```
+
+::: danger
+注意：AOSP代码必须存放在WLS2内部，否则在Windows上会产生很多未保存文件，影响分支切换，代码更新。
+:::
+
+## wsl2 is migrated to another hard disk
 
 可以通过以下步骤将 WSL2 迁移至其他硬盘：
 
@@ -62,7 +79,31 @@ wsl -d <distribution>
 
 注意：在进行上述操作时，请确保备份重要数据并了解风险。
 
-### aosp下载
+- <https://blog.csdn.net/zyb418/article/details/124114683>
+
+## wls2 expand the capacity of ubuntu-18.04
+
+- <https://learn.microsoft.com/zh-cn/windows/wsl/disk-space>
+- <https://www.jianshu.com/p/2348dc7e9aef>
+- <https://learn.microsoft.com/zh-cn/windows-server/administration/windows-commands/expand-vdisk>
+
+## aosp install repo
+
+```bash
+sudo apt update
+sudo apt install repo
+sudo apt upgrade repo
+cd .repo/repo/
+git pull
+cp /home/biezhihua/projects/aosp/.repo/repo/repo /usr/bin/repo
+chmod a+rx /usr/bin/repo
+repo sync -c -j8
+```
+
+- <https://source.android.com/docs/setup/download>
+- <https://gerrit.googlesource.com/git-repo/+/refs/heads/master/README.md>
+
+## aosp simple download and build
 
 要下载AOSP（Android Open Source Project），请按照以下步骤操作：
 
@@ -95,15 +136,10 @@ make -j4
 
 其中，`source build/envsetup.sh` 命令将设置必要的环境变量，`lunch` 命令将提示您选择要构建的目标设备类型和版本，而 `make -j4` 命令将开始构建过程。请注意，这个过程可能需要一些时间和大量的磁盘空间。
 
-4. 运行AOSP：构建完成后，您可以在模拟器或实际设备上运行AOSP。要在模拟器上运行，请使用以下命令：
+- <https://mirrors.tuna.tsinghua.edu.cn/help/AOSP/>
+- <https://juejin.cn/post/7038543675109933070>
 
-`emulator`
-
-要在实际设备上运行，请将AOSP映像烧录到设备中，并按照设备的说明进行操作。
-
-以上是下载AOSP的基本步骤。您可以在AOSP官方网站上找到更多详细的文档和指南，以帮助您进一步了解和开发AOSP。
-
-### aosp 切换分支
+## aosp checkout branch
 
 切换分支需要先进入到你本地的AOSP代码目录中，然后使用以下命令：
 
@@ -121,7 +157,7 @@ repo sync
 
 执行完以上命令后，AOSP代码就会被同步到对应的分支。注意，切换分支可能会导致一些代码库的版本变化，需要谨慎操作。
 
-### repo 清除未保存的文件
+## repo clean all unsaved files
 
 Repo工具是Git工具的扩展，用于管理多个Git代码仓库。与Git类似，Repo也不会在本地仓库中保存未提交的更改。因此，您需要使用文本编辑器或其他适当的工具来保存您的更改。如果您已经对某些文件进行了更改，但还没有提交它们，您可以使用以下方法来清除这些更改：
 
@@ -143,62 +179,45 @@ repo forall -c "git reset --hard"
 
 无论您使用哪种方法，都要确保在清除更改之前，将重要的更改保存到其他文件或备份中。
 
-### install repo
-
-<https://source.android.com/docs/setup/download>
-
-```bash
-sudo apt update
-sudo apt install repo
-sudo apt upgrade repo
-cd .repo/repo/
-git pull
-cp /home/biezhihua/projects/aosp/.repo/repo/repo /usr/bin/repo
-chmod a+rx /usr/bin/repo
-repo sync -c -j8
-```
-
-<https://gerrit.googlesource.com/git-repo/+/refs/heads/master/README.md>
-
-### check branch
-
-repo init -b android-13.0.0_r41
-repo sync -c -j8
-
-### 替换源
-
-<https://mirrors.tuna.tsinghua.edu.cn/help/AOSP/>
+## replace source
 
 如果你之前已经通过某种途径获得了 AOSP 的源码(或者你只是 init 这一步完成后)， 你希望以后通过 TUNA 同步 AOSP 部分的代码，只需要修改 .repo/manifests.git/config，将
 
-```
+```text
 url = https://android.googlesource.com/platform/manifest
 ```
 
 更改为
 
-```
+```text
 url = https://mirrors.tuna.tsinghua.edu.cn/git/AOSP/platform/manifest
 ```
 
 或者可以不修改文件，而执行
 
-```
+```text
 git config --global url.https://mirrors.tuna.tsinghua.edu.cn/git/AOSP/.insteadof https://android.googlesource.com
 ```
 
-### 准备构建环境
+- <https://mirrors.tuna.tsinghua.edu.cn/help/AOSP/>
+
+## prepare build environment of wls2 - Ubuntu-18.04
 
 <https://source.android.com/docs/setup/start/initializing#installing-required-packages-ubuntu-1804>
 
-### 编译AOSP
+## build aosp
 
+查看CPU核心数量：
+
+```shell
 grep 'core id' /proc/cpuinfo | sort -u | wc -l
+```
 
 - <https://juejin.cn/post/7043063280704684063>
 - <https://blog.csdn.net/nei504293736/article/details/109628378>
+- <https://luyaoming.com/2021/06/23/wsl2%E4%B8%8B%E4%B8%8B%E8%BD%BD%E4%B8%8E%E7%BC%96%E8%AF%91AOSP/>
 
-### WLS设置固定IP & 设定SMB目录可读可写
+## wls2 set the fixed IP address & set the read and write capability of the SMB directory
 
 ```bash
 [share]
@@ -212,7 +231,7 @@ grep 'core id' /proc/cpuinfo | sort -u | wc -l
    directory mask = 0755
 ```
 
-```
+```bash
 sudo service smbd restart
 ```
 
@@ -221,12 +240,12 @@ sudo service smbd restart
 - <https://blog.csdn.net/weixin_41301508/article/details/108939520>
 - <https://unix.stackexchange.com/questions/206309/how-to-create-a-samba-share-that-is-writable-from-windows-without-777-permission>
 
-### 使用编译好的镜像
+## run a compiled image to emulator
 
-```
+```bash
+
 #擦除已有的avd数据
 D:\Android\sdk\emulator\emulator.exe -avd biezhihua_aosp  -wipe-data
-
 
 #模拟器重新加载android image
 D:\Android\sdk\emulator\emulator.exe -avd biezhihua_aosp  -system "your_android_path\out\target\product\generic_x86_64\system.img" -data "your_android_path\out\target\product\generic_x86_64\userdata.img"
@@ -237,14 +256,3 @@ D:\Android\sdk\emulator\emulator.exe -avd biezhihua_aosp  -system "your_android_
 - <https://blog.csdn.net/dangelzjj/article/details/109267411>
 - <https://blog.csdn.net/yongwn/article/details/121009506>
 - <https://groups.google.com/g/android-building/c/O9a6Ohnb5hI?pli=1>
-
-## Reference
-
-- <https://mirrors.tuna.tsinghua.edu.cn/help/AOSP/>
-- <https://stackoverflow.com/questions/51591091/apply-setcasesensitiveinfo-recursively-to-all-folders-and-subfolders/71779787#71779787>
-- <https://blog.csdn.net/w690333243/article/details/121712454>
-- <https://blog.csdn.net/zyb418/article/details/124114683>
-- <https://luyaoming.com/2021/06/23/wsl2%E4%B8%8B%E4%B8%8B%E8%BD%BD%E4%B8%8E%E7%BC%96%E8%AF%91AOSP/>
-- <https://mirrors.tuna.tsinghua.edu.cn/help/AOSP/>
-- <https://juejin.cn/post/7038543675109933070>
-- <https://developers.google.com/android/drivers>
