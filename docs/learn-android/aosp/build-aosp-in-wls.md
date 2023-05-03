@@ -438,7 +438,7 @@ adb shell reboot
 
 请将 `<device>` 替换为实际的设备名称。这将在重新启动设备后立即应用新的模块。
 
-## 帮我分析在运行AOSP自己编译的镜像时出现的错误哦： ERROR | createRamdiskWithBootconfig: Can't open 'product\\emulator\_x86\_64\\initrd' for writing
+## ERROR | createRamdiskWithBootconfig: Can't open 'product\\emulator\_x86\_64\\initrd' for writing
 
 这个错误提示的是在创建 ramdisk 时出现问题，无法打开 "product\\emulator\_x86\_64\\initrd" 文件进行写入。这可能是由于以下原因之一导致的：
 
@@ -451,3 +451,45 @@ adb shell reboot
 4. **磁盘空间不足**：请确保您的系统上有足够的磁盘空间可供写入 "product\\emulator\_x86\_64\\initrd" 文件。如果磁盘空间不足，请清理一些不需要的文件，以释放足够的空间。
 
 检查以上各项，并根据需要进行相应的修复操作。这应该有助于解决在运行 AOSP 自己编译的镜像时出现的错误。
+
+## AOSP中打印函数调用栈，在surfaceflinger
+
+不可以使用下面的命令构建单个模块，因为无法指定工程构建架构，会产生编译错误：
+
+```bash
+mmm frameworks/native/services/surfaceflinger
+```
+
+```text
+ld.lld: error: undefined symbol: android::CallStack::CallStack()
+ld.lld: error: undefined symbol: android::CallStack::update(int, int)
+ld.lld: error: undefined symbol: android::CallStack::log(char const*, android_LogPriority, char const*) const
+ld.lld: error: undefined symbol: android::CallStack::~CallStack()
+```
+
+- https://www.cnblogs.com/roger-yu/p/15596840.html
+- https://utzcoz.github.io/2020/04/29/Print-call-stack-in-AOSP-native-code.html
+- https://blog.csdn.net/zhaojia92/article/details/97827285
+
+## 过滤调用栈日志
+
+`onComposerHalHotplug`的调用栈：
+```text
+ # adb logcat | findstr "bzh"
+05-03 23:34:47.773   443   443 D bzh     : #00 pc 00000000001ec91c  /system/bin/surfaceflinger (android::SurfaceFlinger::onComposerHalHotplug(unsigned long, android::hardware::graphics::composer::V2_1::IComposerCallback::Connection)+524)
+05-03 23:34:47.773   443   443 D bzh     : #01 pc 000000000017bd71  /system/bin/surfaceflinger (android::Hwc2::(anonymous namespace)::ComposerCallbackBridge::onHotplug(unsigned long, android::hardware::graphics::composer::V2_1::IComposerCallback::Connection)+17)
+05-03 23:34:47.773   443   443 D bzh     : #02 pc 00000000000293ef  /system/lib64/android.hardware.graphics.composer@2.1.so (android::hardware::graphics::composer::V2_1::BnHwComposerCallback::_hidl_onHotplug(android::hidl::base::V1_0::BnHwBase*, android::hardware::Parcel const&, android::hardware::Parcel*, std::__1::function<void (android::hardware::Parcel&)>)+239)
+05-03 23:34:47.773   443   443 D bzh     : #03 pc 000000000003859b  /system/lib64/android.hardware.graphics.composer@2.4.so (android::hardware::graphics::composer::V2_4::BnHwComposerCallback::onTransact(unsigned int, android::hardware::Parcel const&, android::hardware::Parcel*, unsigned int, std::__1::function<void (android::hardware::Parcel&)>)+603)
+05-03 23:34:47.773   443   443 D bzh     : #04 pc 000000000009ad49  /system/lib64/libhidlbase.so (android::hardware::BHwBinder::transact(unsigned int, android::hardware::Parcel const&, android::hardware::Parcel*, unsigned int, std::__1::function<void (android::hardware::Parcel&)>)+137)
+05-03 23:34:47.773   443   443 D bzh     : #05 pc 00000000000a035a  /system/lib64/libhidlbase.so (android::hardware::IPCThreadState::executeCommand(int)+3770)
+05-03 23:34:47.773   443   443 D bzh     : #06 pc 00000000000a11a7  /system/lib64/libhidlbase.so (android::hardware::IPCThreadState::waitForResponse(android::hardware::Parcel*, int*)+103)
+05-03 23:34:47.774   443   443 D bzh     : #07 pc 00000000000a0ceb  /system/lib64/libhidlbase.so (android::hardware::IPCThreadState::transact(int, unsigned int, android::hardware::Parcel const&, android::hardware::Parcel*, unsigned int)+171)
+05-03 23:34:47.774   443   443 D bzh     : #08 pc 000000000009bc95  /system/lib64/libhidlbase.so (android::hardware::BpHwBinder::transact(unsigned int, android::hardware::Parcel const&, android::hardware::Parcel*, unsigned int, std::__1::function<void (android::hardware::Parcel&)>)+69)
+05-03 23:34:47.774   443   443 D bzh     : #09 pc 000000000003eb72  /system/lib64/android.hardware.graphics.composer@2.4.so (android::hardware::graphics::composer::V2_4::BpHwComposerClient::_hidl_registerCallback_2_4(android::hardware::IInterface*, android::hardware::details::HidlInstrumentor*, android::sp<android::hardware::graphics::composer::V2_4::IComposerCallback> const&)+514)
+05-03 23:34:47.774   443   443 D bzh     : #10 pc 0000000000043298  /system/lib64/android.hardware.graphics.composer@2.4.so (android::hardware::graphics::composer::V2_4::BpHwComposerClient::registerCallback_2_4(android::sp<android::hardware::graphics::composer::V2_4::IComposerCallback> const&)+40)
+05-03 23:34:47.774   443   443 D bzh     : #11 pc 0000000000175be5  /system/bin/surfaceflinger (android::Hwc2::HidlComposer::registerCallback(android::HWC2::ComposerCallback&)+229)
+05-03 23:34:47.774   443   443 D bzh     : #12 pc 0000000000183c24  /system/bin/surfaceflinger (android::impl::HWComposer::setCallback(android::HWC2::ComposerCallback&)+4004)
+05-03 23:34:47.774   443   443 D bzh     : #13 pc 00000000001e4ded  /system/bin/surfaceflinger (android::SurfaceFlinger::init()+877)
+05-03 23:34:47.774   443   443 D bzh     : #14 pc 0000000000237994  /system/bin/surfaceflinger (main+1220)
+05-03 23:34:47.774   443   443 D bzh     : #15 pc 0000000000050cc9  /apex/com.android.runtime/lib64/bionic/libc.so (__libc_init+89)
+```
