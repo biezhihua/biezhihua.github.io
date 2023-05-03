@@ -471,7 +471,11 @@ ld.lld: error: undefined symbol: android::CallStack::~CallStack()
 - https://utzcoz.github.io/2020/04/29/Print-call-stack-in-AOSP-native-code.html
 - https://blog.csdn.net/zhaojia92/article/details/97827285
 
-## 过滤调用栈日志
+## AOSP 过滤调用栈日志
+
+```bash
+emulator.exe -avd biezhihua_aosp  -system "\\wsl.localhost\Ubuntu-18.04\home\biezhihua\projects\aosp\out\target\product\emulator_x86_64\system-qemu.img" -data "\\wsl.localhost\Ubuntu-18.04\home\biezhihua\projects\aosp\out\target\product\emulator_x86_64\userdata.img" -writable-system -show-kernel -skip-adb-auth -wipe-data
+```
 
 `onComposerHalHotplug`的调用栈：
 ```text
