@@ -87,6 +87,50 @@ wsl -d <distribution>
 - <https://www.jianshu.com/p/2348dc7e9aef>
 - <https://learn.microsoft.com/zh-cn/windows-server/administration/windows-commands/expand-vdisk>
 
+## 如何给WLS2-Ubuntu18.0.4 扩充磁盘容量
+
+在 WSL2 (Windows Subsystem for Linux 2) 中，Ubuntu 18.04 默认会将磁盘存储为一个 VHDX 文件。要扩展 WSL2 Ubuntu 18.04 的磁盘容量，请按照以下步骤操作：
+
+**步骤 1**：关闭 WSL2 实例。在 Windows PowerShell 或命令提示符中运行以下命令：
+
+```bash
+wsl --shutdown
+```
+
+**步骤 2**：找到 VHDX 文件。WSL2 实例的 VHDX 文件通常位于 `C:\Users\<YourUsername>\AppData\Local\Packages\` 目录下。然后进入一个名为 `CanonicalGroupLimited.Ubuntu18.04onWindows_79rhkp1fndgsc`（这个名字可能略有不同）的文件夹。接下来，进入 `LocalState` 文件夹。在此文件夹中，您应该可以找到名为 `ext4.vhdx` 的文件。
+
+**步骤 3**：扩展 VHDX 文件。首先，打开 Windows PowerShell 或命令提示符以管理员身份运行。然后，使用 `Resize-VHD` 命令扩展 VHDX 文件。将 `<YourPath>` 替换为实际的 VHDX 文件路径，并将 `<NewSize>` 替换为您要扩展到的新大小（以 GB 为单位）。
+
+```bash
+Resize-VHD -Path <YourPath>\ext4.vhdx -SizeBytes <NewSize>GB
+```
+
+例如，如果 VHDX 文件位于 `C:\Users\example\AppData\Local\Packages\CanonicalGroupLimited.Ubuntu18.04onWindows_79rhkp1fndgsc\LocalState\ext4.vhdx`，并且您希望将其扩展到 50GB，则应运行以下命令：
+
+```bash
+Resize-VHD -Path "C:\Users\example\AppData\Local\Packages\CanonicalGroupLimited.Ubuntu18.04onWindows_79rhkp1fndgsc\LocalState\ext4.vhdx" -SizeBytes 50GB
+```
+
+**步骤 4**：启动 WSL2 实例。在 Windows PowerShell 或命令提示符中运行以下命令：
+
+```bash
+wsl
+```
+
+**步骤 5**：现在，您需要在 WSL2 Ubuntu 18.04 内部调整文件系统。运行以下命令，将 `<NewSize>` 替换为实际的新大小（以 GB 为单位）：
+
+```bash
+sudo resize2fs /dev/sda <NewSize>G
+```
+
+例如，如果您将 VHDX 文件扩展到 50GB，则应运行以下命令：
+
+```bash
+sudo resize2fs /dev/sda 50G
+```
+
+完成这些步骤后，WSL2 Ubuntu 18.04 的磁盘容量应已成功扩展。您可以使用 `df -h` 命令检查新的磁盘空间。
+
 ## aosp install repo
 
 ```bash
@@ -239,8 +283,9 @@ sudo service smbd restart
 - <https://github.com/MicrosoftDocs/WSL/issues/418#issuecomment-648570865>
 - <https://blog.csdn.net/weixin_41301508/article/details/108939520>
 - <https://unix.stackexchange.com/questions/206309/how-to-create-a-samba-share-that-is-writable-from-windows-without-777-permission>
+- <https://blog.csdn.net/sinat_21011081/article/details/118404717?spm=1001.2101.3001.6661.1&utm_medium=distribute.pc_relevant_t0.none-task-blog-2%7Edefault%7ECTRLIST%7ERate-1-118404717-blog-108939520.235%5Ev32%5Epc_relevant_default_base3&depth_1-utm_source=distribute.pc_relevant_t0.none-task-blog-2%7Edefault%7ECTRLIST%7ERate-1-118404717-blog-108939520.235%5Ev32%5Epc_relevant_default_base3&utm_relevant_index=1>
 
-## run a compiled image to emulator
+## run a compiled image to emulator | method1
 
 ```bash
 
@@ -250,9 +295,159 @@ D:\Android\sdk\emulator\emulator.exe -avd biezhihua_aosp  -wipe-data
 #模拟器重新加载android image
 D:\Android\sdk\emulator\emulator.exe -avd biezhihua_aosp  -system "your_android_path\out\target\product\generic_x86_64\system.img" -data "your_android_path\out\target\product\generic_x86_64\userdata.img"
 
+ D:\Android\sdk\emulator\emulator.exe -avd biezhihua_aosp  -system "\\wsl.localhost\Ubuntu-18.04\home\biezhihua\projects\aosp\out\target\product\emulator_x86_64\system.img" -data "\\wsl.localhost\Ubuntu-18.04\home\biezhihua\projects\aosp\out\target\product\emulator_x86_64\userdata.img"
 ```
 
 - <https://blog.csdn.net/dangelzjj/article/details/109267411>
 - <https://blog.csdn.net/dangelzjj/article/details/109267411>
 - <https://blog.csdn.net/yongwn/article/details/121009506>
 - <https://groups.google.com/g/android-building/c/O9a6Ohnb5hI?pli=1>
+
+## run a compiled image to emulator | method2
+
+拷贝产物到windows镜像目录下；
+
+```bash
+cp out/target/product/emulator_x86_64/VerifiedBootParams.textproto /mnt/d/Android/sdk/system-images/android-33/google_apis/x86_64/
+cp out/target/product/emulator_x86_64/advancedFeatures.ini /mnt/d/Android/sdk/system-images/android-33/google_apis/x86_64/
+cp out/target/product/emulator_x86_64/encryptionkey.img /mnt/d/Android/sdk/system-images/android-33/google_apis/x86_64/
+cp out/target/product/emulator_x86_64/kernel-ranchu /mnt/d/Android/sdk/system-images/android-33/google_apis/x86_64/
+cp out/target/product/emulator_x86_64/ramdisk-qemu.img /mnt/d/Android/sdk/system-images/android-33/google_apis/x86_64/ramdisk.img
+cp out/target/product/emulator_x86_64/system-qemu.img /mnt/d/Android/sdk/system-images/android-33/google_apis/x86_64/system.img
+cp out/target/product/emulator_x86_64/userdata.img /mnt/d/Android/sdk/system-images/android-33/google_apis/x86_64/
+cp out/target/product/emulator_x86_64/vendor-qemu.img /mnt/d/Android/sdk/system-images/android-33/google_apis/x86_64/vendor.img
+cp out/target/product/emulator_x86_64/system/build.prop /mnt/d/Android/sdk/system-images/android-33/google_apis/x86_64/
+
+emulator -avd Pixel_3_Edited_API_30 -writable-system -wipe-data -show-kernel -skip-adb-auth -no-cache
+
+```
+
+```bash
+emulator.exe -avd biezhihua_aosp  -system "\\wsl.localhost\Ubuntu-18.04\home\biezhihua\projects\aosp\out\target\product\emulator_x86_64\system-qemu.img" -data "\\wsl.localhost\Ubuntu-18.04\home\biezhihua\projects\aosp\out\target\product\emulator_x86_64\userdata.img" -writable-system -wipe-data -show-kernel -skip-adb-auth -no-cache
+
+emulator.exe -avd biezhihua_aosp  -system "\\wsl.localhost\Ubuntu-18.04\home\biezhihua\projects\aosp\out\target\product\emulator_x86_64\system-qemu.img" -data "\\wsl.localhost\Ubuntu-18.04\home\biezhihua\projects\aosp\out\target\product\emulator_x86_64\userdata.img" -writable-system -show-kernel -skip-adb-auth
+```
+
+
+- <https://sidneyding.cn/posts/c64b5633/>
+
+## 对于AOSP，如何打包单个模块并更新system.img文件，请以framework/native为例
+
+在 AOSP 源代码中，若要仅构建 framework/native 模块并更新 system.img 文件，可按照以下步骤操作：
+
+**步骤 1**：启动一个终端并进入 AOSP 源代码的根目录。
+
+**步骤 2**：启动构建环境，运行以下命令：
+
+bash
+
+```bash
+source build/envsetup.sh
+```
+
+**步骤 3**：选择要构建的目标设备。例如，如果要为 `sdk_phone_x86_64-eng` 构建模块，请运行：
+
+bash
+
+```bash
+lunch sdk_phone_x86_64-eng
+```
+
+**步骤 4**：构建 framework/native 模块。`framework/native` 实际上包含许多模块。假设您要构建 `libui` 模块，可以执行以下命令：
+
+bash
+
+```bash
+mmm -j$(nproc) frameworks/native/libs/ui
+```
+
+这将仅构建 `libui` 模块。要构建整个 `framework/native`，您需要为每个子模块重复此步骤。
+
+**步骤 5**：现在，已经构建了所需的模块，需要将其安装到 system.img 中。为此，请运行以下命令：
+
+bash
+
+```bash
+make snod
+```
+
+此命令将根据已经生成的各个分区（包括已更新的模块）重新生成 system.img 文件。
+
+完成上述步骤后，您可以在 `out/target/product/<device>/` 目录下找到更新后的 system.img 文件。此时，您可以将更新后的 system.img 刷入设备或模拟器以进行测试。
+
+注意：如果您的目标是将新生成的模块（例如 .so 文件）推送到已运行的设备或模拟器上，那么在步骤 4 之后，您可以直接使用 `adb push` 命令将新生成的模块推送到相应的目录，而无需重新生成整个 system.img。例如：
+
+```bash
+adb root
+adb remount
+adb push out/target/product/<device>/system/lib64/libui.so /system/lib64/
+adb shell sync
+adb shell reboot
+```
+
+请将 `<device>` 替换为实际的设备名称。这将在重新启动设备后立即应用新的模块。
+
+## 对于AOSP，如何打包单个模块并更新system.img文件，请以framework/native/surfaceflinger为例
+
+在 AOSP 源代码中，若要仅构建 framework/native/surfaceflinger 模块并更新 system.img 文件，可按照以下步骤操作：
+
+**步骤 1**：启动一个终端并进入 AOSP 源代码的根目录。
+
+**步骤 2**：启动构建环境，运行以下命令：
+
+```bash
+source build/envsetup.sh
+```
+
+**步骤 3**：选择要构建的目标设备。例如，如果要为 `sdk_phone_x86_64-eng` 构建模块，请运行：
+
+```bash
+lunch sdk_phone_x86_64-eng
+```
+
+**步骤 4**：构建 framework/native/surfaceflinger 模块。要构建 SurfaceFlinger 模块，请执行以下命令：
+
+```bash
+mmm -j$(nproc) frameworks/native/services/surfaceflinger
+
+mmm -j32 frameworks/native/services/surfaceflinger
+```
+
+这将仅构建 SurfaceFlinger 模块。
+
+**步骤 5**：现在，已经构建了所需的模块，需要将其安装到 system.img 中。为此，请运行以下命令：
+
+```bash
+make snod
+```
+
+此命令将根据已经生成的各个分区（包括已更新的模块）重新生成 system.img 文件。
+
+完成上述步骤后，您可以在 `out/target/product/<device>/` 目录下找到更新后的 system.img 文件。此时，您可以将更新后的 system.img 刷入设备或模拟器以进行测试。
+
+注意：如果您的目标是将新生成的模块（例如 .so 文件）推送到已运行的设备或模拟器上，那么在步骤 4 之后，您可以直接使用 `adb push` 命令将新生成的模块推送到相应的目录，而无需重新生成整个 system.img。例如：
+
+```bash
+adb root
+adb remount
+adb push out/target/product/<device>/system/lib64/libsurfaceflinger.so /system/lib64/
+adb push \\wsl.localhost\Ubuntu-18.04\home\biezhihua\projects\aosp\out\target\product\emulator_x86_64\system\bin\NativeSFDemo /system/bin/
+adb shell sync
+adb shell reboot
+```
+
+请将 `<device>` 替换为实际的设备名称。这将在重新启动设备后立即应用新的模块。
+
+## 帮我分析在运行AOSP自己编译的镜像时出现的错误哦： ERROR | createRamdiskWithBootconfig: Can't open 'product\\emulator\_x86\_64\\initrd' for writing
+
+这个错误提示的是在创建 ramdisk 时出现问题，无法打开 "product\\emulator\_x86\_64\\initrd" 文件进行写入。这可能是由于以下原因之一导致的：
+
+1. **文件路径错误**：请确保 "product\\emulator\_x86\_64\\initrd" 文件的路径正确。注意在 Windows 系统中，文件路径中的分隔符应为反斜杠（`\`），而在类 Unix 系统（如 Linux 和 macOS）中，文件路径中的分隔符应为正斜杠（`/`）。根据您使用的操作系统，检查文件路径是否正确。
+
+2. **文件或文件夹权限问题**：确保您具有足够的权限访问 "product\\emulator\_x86\_64\\initrd" 文件。在 Unix 类系统中，您可以使用 `chmod` 和 `chown` 命令来更改文件或文件夹的权限。在 Windows 系统中，可以右键单击文件或文件夹，然后选择 "属性"，在 "安全" 选项卡中更改权限。
+
+3. **文件或文件夹不存在**：确保 "product\\emulator\_x86\_64" 文件夹存在，并且其中包含 "initrd" 文件。如果缺少该文件，请尝试重新构建项目以生成正确的文件。
+
+4. **磁盘空间不足**：请确保您的系统上有足够的磁盘空间可供写入 "product\\emulator\_x86\_64\\initrd" 文件。如果磁盘空间不足，请清理一些不需要的文件，以释放足够的空间。
+
+检查以上各项，并根据需要进行相应的修复操作。这应该有助于解决在运行 AOSP 自己编译的镜像时出现的错误。

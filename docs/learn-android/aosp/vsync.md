@@ -4,7 +4,10 @@ article: false
 
 # VSYNC
 
+
 ## SurfaceFlinger
+
+SurfaceFlinger的启动和消息队列处理机制（四）
 
 <https://www.cnblogs.com/roger-yu/p/15761646.html>
 
@@ -18,8 +21,12 @@ article: false
 - <https://blog.csdn.net/Android062005/article/details/123090139>
 - <https://android-developers.googleblog.com/2020/04/high-refresh-rate-rendering-on-android.html>
 - <https://utzcoz.github.io/2020/05/02/Analyze-AOSP-vsync-model.html>
+- <https://utzcoz.github.io/2020/04/29/Print-call-stack-in-AOSP-native-code.html>
 - <https://www.cnblogs.com/roger-yu/p/16230337.html>
 - <https://www.cnblogs.com/roger-yu/p/16162940.html>
 - <https://www.cnblogs.com/roger-yu/p/16162940.html>
 - <https://www.cnblogs.com/roger-yu/p/15761646.html>
-- <https://utzcoz.github.io/2020/04/29/Print-call-stack-in-AOSP-native-code.html>
+- <https://www.cnblogs.com/roger-yu/p/16075956.html>
+- <https://www.cnblogs.com/roger-yu/p/15641545.html>
+- <https://www.cnblogs.com/roger-yu/p/16122236.html>
+- <https://www.cnblogs.com/roger-yu/p/15596840.html>
