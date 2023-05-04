@@ -1,8 +1,10 @@
 ---
-article: false
+tag:
+  - android
+  - aosp
 ---
 
-# VSYNC
+# Android | VSYNC
 
 ## SurfaceFlinger
 
@@ -18,21 +20,21 @@ SurfaceFlinger的启动和消息队列处理机制（四）
 
 `surfaceflinger.rc` 是一个 Android init 脚本，用于定义 SurfaceFlinger 服务的配置。SurfaceFlinger 是 Android 系统的核心组件，负责合成和显示图形。该文件定义了 SurfaceFlinger 服务的启动方式和权限。现在让我们分析文件的每一行内容：
 
-1. `service surfaceflinger /system/bin/surfaceflinger`: 定义一个名为 "surfaceflinger" 的服务，它的可执行文件位于 `/system/bin/surfaceflinger`。
+1. `service surfaceflinger /system/bin/surfaceflinger`定义一个名为 "surfaceflinger" 的服务，它的可执行文件位于 `/system/bin/surfaceflinger`。
 
-2. `class core animation`: 将 SurfaceFlinger 服务分配到 "core" 和 "animation" 类别。这些类别用于在特定条件下控制服务的启动和关闭。
+2. `class core animation`将 SurfaceFlinger 服务分配到 "core" 和 "animation" 类别。这些类别用于在特定条件下控制服务的启动和关闭。
 
-3. `user system`: 设置 SurfaceFlinger 服务运行在 "system" 用户上下文中。
+3. `user system`设置 SurfaceFlinger 服务运行在 "system" 用户上下文中。
 
-4. `group graphics drmrpc readproc`: 将 SurfaceFlinger 服务的组设置为 "graphics"、"drmrpc" 和 "readproc"。这些组定义了服务的权限。
+4. `group graphics drmrpc readproc`将 SurfaceFlinger 服务的组设置为 "graphics"、"drmrpc" 和 "readproc"。这些组定义了服务的权限。
 
-5. `capabilities SYS_NICE`: 赋予 SurfaceFlinger 服务 SYS\_NICE 功能。这允许服务更改其调度优先级，以便在需要时获得更多 CPU 时间。
+5. `capabilities SYS_NICE`赋予 SurfaceFlinger 服务 SYS\_NICE 功能。这允许服务更改其调度优先级，以便在需要时获得更多 CPU 时间。
 
-6. `onrestart restart --only-if-running zygote`: 如果 SurfaceFlinger 服务重启，该行命令会尝试重启名为 "zygote" 的服务。`--only-if-running` 参数确保仅在 "zygote" 服务已运行时执行重启操作。
+6. `onrestart restart --only-if-running zygote`如果 SurfaceFlinger 服务重启，该行命令会尝试重启名为 "zygote" 的服务。`--only-if-running` 参数确保仅在 "zygote" 服务已运行时执行重启操作。
 
-7. `task_profiles HighPerformance`: 为 SurfaceFlinger 服务分配 "HighPerformance" 任务配置文件。这可能会调整服务的性能参数。
+7. `task_profiles HighPerformance`为 SurfaceFlinger 服务分配 "HighPerformance" 任务配置文件。这可能会调整服务的性能参数。
 
-8-10. `socket pdx/...`: 这三行定义了 SurfaceFlinger 服务用于与客户端通信的 UNIX 域套接字。套接字的权限、所有者和安全上下文在这些行中定义。
+8-10. `socket pdx/...`这三行定义了 SurfaceFlinger 服务用于与客户端通信的 UNIX 域套接字。套接字的权限、所有者和安全上下文在这些行中定义。
 
 总之，`surfaceflinger.rc` 文件定义了 SurfaceFlinger 服务的启动配置、权限和通信方式。这个文件在 Android 系统启动时被 init 进程读取，用于正确地启动和运行 SurfaceFlinger 服务。
 
@@ -76,7 +78,416 @@ Android init 脚本使用一种名为 `init` 的简单语言编写，该语言�
 
 总之，`Android.bp` 文件是 AOSP 中描述如何构建 Android 应用程序、库和模块的核心文件，它是 Soong 构建系统的核心组件之一。
 
-## 
+## SurfaceFlinger::onComposerHalHotplug
+
+```c++
+adb logcat | findstr "SurfaceFlinger::onComposerHalHotplug"
+- waiting for device -
+#00 pc 00000000001ec9bc  /system/bin/surfaceflinger (android::SurfaceFlinger::onComposerHalHotplug(unsigned long, android::hardware::graphics::composer::V2_1::IComposerCallback::Connection)+524)
+#01 pc 000000000017bdc1  /system/bin/surfaceflinger (android::Hwc2::(anonymous namespace)::ComposerCallbackBridge::onHotplug(unsigned long, android::hardware::graphics::composer::V2_1::IComposerCallback::Connection)+17)
+#02 pc 00000000000293ef  /system/lib64/android.hardware.graphics.composer@2.1.so (android::hardware::graphics::composer::V2_1::BnHwComposerCallback::_hidl_onHotplug(android::hidl::base::V1_0::BnHwBase*, android::hardware::Parcel const&, android::hardware::Parcel*, std::__1::function<void (android::hardware::Parcel&)>)+239)
+#03 pc 000000000003859b  /system/lib64/android.hardware.graphics.composer@2.4.so (android::hardware::graphics::composer::V2_4::BnHwComposerCallback::onTransact(unsigned int, android::hardware::Parcel const&, android::hardware::Parcel*, unsigned int, std::__1::function<void (android::hardware::Parcel&)>)+603)
+#04 pc 000000000009ad49  /system/lib64/libhidlbase.so (android::hardware::BHwBinder::transact(unsigned int, android::hardware::Parcel const&, android::hardware::Parcel*, unsigned int, std::__1::function<void (android::hardware::Parcel&)>)+137)
+#05 pc 00000000000a035a  /system/lib64/libhidlbase.so (android::hardware::IPCThreadState::executeCommand(int)+3770)
+#06 pc 00000000000a11a7  /system/lib64/libhidlbase.so (android::hardware::IPCThreadState::waitForResponse(android::hardware::Parcel*, int*)+103)
+#07 pc 00000000000a0ceb  /system/lib64/libhidlbase.so (android::hardware::IPCThreadState::transact(int, unsigned int, android::hardware::Parcel const&, android::hardware::Parcel*, unsigned int)+171)
+#08 pc 000000000009bc95  /system/lib64/libhidlbase.so (android::hardware::BpHwBinder::transact(unsigned int, android::hardware::Parcel const&, android::hardware::Parcel*, unsigned int, std::__1::function<void (android::hardware::Parcel&)>)+69)
+#09 pc 000000000003eb72  /system/lib64/android.hardware.graphics.composer@2.4.so (android::hardware::graphics::composer::V2_4::BpHwComposerClient::_hidl_registerCallback_2_4(android::hardware::IInterface*, android::hardware::details::HidlInstrumentor*, android::sp<android::hardware::graphics::composer::V2_4::IComposerCallback> const&)+514)
+#10 pc 0000000000043298  /system/lib64/android.hardware.graphics.composer@2.4.so (android::hardware::graphics::composer::V2_4::BpHwComposerClient::registerCallback_2_4(android::sp<android::hardware::graphics::composer::V2_4::IComposerCallback> const&)+40)
+#11 pc 0000000000175c35  /system/bin/surfaceflinger (android::Hwc2::HidlComposer::registerCallback(android::HWC2::ComposerCallback&)+229)
+#12 pc 0000000000183c74  /system/bin/surfaceflinger (android::impl::HWComposer::setCallback(android::HWC2::ComposerCallback&)+4004)
+#13 pc 00000000001e4e8d  /system/bin/surfaceflinger (android::SurfaceFlinger::init()+877)
+#14 pc 0000000000237a34  /system/bin/surfaceflinger (main+1220)
+#15 pc 0000000000050cc9  /apex/com.android.runtime/lib64/bionic/libc.so (__libc_init+89)
+```
+
+## SurfaceFlinger::run
+
+```c++
+adb logcat | findstr "Scheduler::run"
+- waiting for device -
+#00 pc 00000000001d38fb  /system/bin/surfaceflinger (android::scheduler::Scheduler::run()+59)
+#01 pc 0000000000237d9a  /system/bin/surfaceflinger (main+2090)
+#02 pc 0000000000050cc9  /apex/com.android.runtime/lib64/bionic/libc.so (__libc_init+89)
+```
+
+## SurfaceFlinger::initScheduler
+
+```c++
+ #  adb logcat | findstr "SurfaceFlinger::initScheduler"
+- waiting for device -
+#00 pc 00000000001f674f  /system/bin/surfaceflinger (android::SurfaceFlinger::processDisplayAdded(android::wp<android::IBinder> const&, android::DisplayDeviceState const&)+7359)
+#01 pc 00000000001ea395  /system/bin/surfaceflinger (android::SurfaceFlinger::processDisplayChangesLocked()+3685)
+#02 pc 00000000001e747f  /system/bin/surfaceflinger (android::SurfaceFlinger::processDisplayHotplugEventsLocked()+8559)
+#03 pc 00000000001ec964  /system/bin/surfaceflinger (android::SurfaceFlinger::onComposerHalHotplug(unsigned long, android::hardware::graphics::composer::V2_1::IComposerCallback::Connection)+436)
+#04 pc 000000000017bdc1  /system/bin/surfaceflinger (android::Hwc2::(anonymous namespace)::ComposerCallbackBridge::onHotplug(unsigned long, android::hardware::graphics::composer::V2_1::IComposerCallback::Connection)+17)
+#05 pc 00000000000293ef  /system/lib64/android.hardware.graphics.composer@2.1.so (android::hardware::graphics::composer::V2_1::BnHwComposerCallback::_hidl_onHotplug(android::hidl::base::V1_0::BnHwBase*, android::hardware::Parcel const&, android::hardware::Parcel*, std::__1::function<void (android::hardware::Parcel&)>)+239)
+#06 pc 000000000003859b  /system/lib64/android.hardware.graphics.composer@2.4.so (android::hardware::graphics::composer::V2_4::BnHwComposerCallback::onTransact(unsigned int, android::hardware::Parcel const&, android::hardware::Parcel*, unsigned int, std::__1::function<void (android::hardware::Parcel&)>)+603)
+#07 pc 000000000009ad49  /system/lib64/libhidlbase.so (android::hardware::BHwBinder::transact(unsigned int, android::hardware::Parcel const&, android::hardware::Parcel*, unsigned int, std::__1::function<void (android::hardware::Parcel&)>)+137)
+#08 pc 00000000000a035a  /system/lib64/libhidlbase.so (android::hardware::IPCThreadState::executeCommand(int)+3770)
+#09 pc 00000000000a11a7  /system/lib64/libhidlbase.so (android::hardware::IPCThreadState::waitForResponse(android::hardware::Parcel*, int*)+103)
+#10 pc 00000000000a0ceb  /system/lib64/libhidlbase.so (android::hardware::IPCThreadState::transact(int, unsigned int, android::hardware::Parcel const&, android::hardware::Parcel*, unsigned int)+171)
+#11 pc 000000000009bc95  /system/lib64/libhidlbase.so (android::hardware::BpHwBinder::transact(unsigned int, android::hardware::Parcel const&, android::hardware::Parcel*, unsigned int, std::__1::function<void (android::hardware::Parcel&)>)+69)
+#12 pc 000000000003eb72  /system/lib64/android.hardware.graphics.composer@2.4.so (android::hardware::graphics::composer::V2_4::BpHwComposerClient::_hidl_registerCallback_2_4(android::hardware::IInterface*, android::hardware::details::HidlInstrumentor*, android::sp<android::hardware::graphics::composer::V2_4::IComposerCallback> const&)+514)
+#13 pc 0000000000043298  /system/lib64/android.hardware.graphics.composer@2.4.so (android::hardware::graphics::composer::V2_4::BpHwComposerClient::registerCallback_2_4(android::sp<android::hardware::graphics::composer::V2_4::IComposerCallback> const&)+40)
+#14 pc 0000000000175c35  /system/bin/surfaceflinger (android::Hwc2::HidlComposer::registerCallback(android::HWC2::ComposerCallback&)+229)
+#15 pc 0000000000183c74  /system/bin/surfaceflinger (android::impl::HWComposer::setCallback(android::HWC2::ComposerCallback&)+4004)
+#16 pc 00000000001e4e8d  /system/bin/surfaceflinger (android::SurfaceFlinger::init()+877)
+#17 pc 0000000000237b34  /system/bin/surfaceflinger (main+1220)
+#18 pc 0000000000050cc9  /apex/com.android.runtime/lib64/bionic/libc.so (__libc_init+89)
+```
+
+- <https://www.cnblogs.com/roger-yu/p/15761646.html>
+- <https://www.cnblogs.com/roger-yu/p/15099541.html>
+- <https://blog.csdn.net/xiajun07061225/article/details/9250579>
+- <https://blog.csdn.net/xiaosayidao/article/details/73992078>
+
+## epoll_wait
+
+`epoll_wait()`是Linux中用于监视多个文件描述符（file descriptors）的I/O事件的高效方法。它是Linux特有的I/O多路复用（I/O multiplexing）机制，类似于`select()`和`poll()`，但在性能和可扩展性方面有显著的优势。`epoll_wait()`可以在大量并发连接的情况下实现高效的I/O事件通知，因此在高并发服务器（如Web服务器、数据库服务器等）和事件驱动编程中非常有用。
+
+`epoll_wait()`的作用是等待`epoll`实例中的文件描述符上的I/O事件。当关注的文件描述符上有事件发生（如数据可读、数据可写、错误等），`epoll_wait()`会将这些事件放入一个事件数组中，以便应用程序可以处理这些事件。
+
+以下是`epoll_wait()`的简要使用步骤：
+
+1. 使用`epoll_create()`或`epoll_create1()`创建一个新的`epoll`实例。
+2. 使用`epoll_ctl()`将需要监视的文件描述符添加到`epoll`实例中，并指定感兴趣的事件（如`EPOLLIN`表示可读，`EPOLLOUT`表示可写等）。
+3. 调用`epoll_wait()`等待`epoll`实例中的文件描述符上的事件。这个调用会阻塞，直到有事件发生或超时。
+4. 当`epoll_wait()`返回时，检查事件数组中的事件，并相应地处理这些事件。
+5. 重复步骤3和4，直到应用程序完成对文件描述符的监视。
+
+以下是`epoll_wait()`函数的原型：
+
+```c
+int epoll_wait(int epfd, struct epoll_event *events, int maxevents, int timeout);
+```
+
+参数解释：
+
+- `epfd`：由`epoll_create()`或`epoll_create1()`返回的`epoll`实例的文件描述符。
+- `events`：指向`epoll_event`结构体数组的指针，用于存储发生的事件。
+- `maxevents`：`events`数组的大小，即最多可以返回的事件数量。
+- `timeout`：等待事件的超时时间（以毫秒为单位）。如果设置为-1，`epoll_wait()`将一直阻塞，直到有事件发生；如果设置为0，则`epoll_wait()`立即返回，即使没有事件发生。
+
+返回值：
+
+- 成功时，返回发生的事件数量。
+- 失败时，返回-1并设置`errno`。
+
+注意：`epoll_wait()`是Linux特有的，不是POSIX标准的一部分。因此，在非Linux系统上（如BSD、macOS等），需要使用其他I/O多路复用机制（如`select()`、`poll()`或`kqueue()`）。
+
+## Scheduler::createVsyncSchedule
+
+```c++
+ #  adb logcat | findstr "Scheduler::createVsyncSchedule"
+- waiting for device -
+#00 pc 00000000001d39f5  /system/bin/surfaceflinger (android::scheduler::Scheduler::createVsyncSchedule(android::ftl::Flags<android::scheduler::Feature>)+133)
+#01 pc 00000000001f6cab  /system/bin/surfaceflinger (android::SurfaceFlinger::processDisplayAdded(android::wp<android::IBinder> const&, android::DisplayDeviceState const&)+8587)
+#02 pc 00000000001ea425  /system/bin/surfaceflinger (android::SurfaceFlinger::processDisplayChangesLocked()+3685)
+#03 pc 00000000001e750f  /system/bin/surfaceflinger (android::SurfaceFlinger::processDisplayHotplugEventsLocked()+8559)
+#04 pc 00000000001ec9f4  /system/bin/surfaceflinger (android::SurfaceFlinger::onComposerHalHotplug(unsigned long, android::hardware::graphics::composer::V2_1::IComposerCallback::Connection)+436)
+#05 pc 000000000017be01  /system/bin/surfaceflinger (android::Hwc2::(anonymous namespace)::ComposerCallbackBridge::onHotplug(unsigned long, android::hardware::graphics::composer::V2_1::IComposerCallback::Connection)+17)
+#06 pc 00000000000293ef  /system/lib64/android.hardware.graphics.composer@2.1.so (android::hardware::graphics::composer::V2_1::BnHwComposerCallback::_hidl_onHotplug(android::hidl::base::V1_0::BnHwBase*, android::hardware::Parcel const&, android::hardware::Parcel*, std::__1::function<void (android::hardware::Parcel&)>)+239)
+#07 pc 000000000003859b  /system/lib64/android.hardware.graphics.composer@2.4.so (android::hardware::graphics::composer::V2_4::BnHwComposerCallback::onTransact(unsigned int, android::hardware::Parcel const&, android::hardware::Parcel*, unsigned int, std::__1::function<void (android::hardware::Parcel&)>)+603)
+#08 pc 000000000009ad49  /system/lib64/libhidlbase.so (android::hardware::BHwBinder::transact(unsigned int, android::hardware::Parcel const&, android::hardware::Parcel*, unsigned int, std::__1::function<void (android::hardware::Parcel&)>)+137)
+#09 pc 00000000000a035a  /system/lib64/libhidlbase.so (android::hardware::IPCThreadState::executeCommand(int)+3770)
+#10 pc 00000000000a11a7  /system/lib64/libhidlbase.so (android::hardware::IPCThreadState::waitForResponse(android::hardware::Parcel*, int*)+103)
+#11 pc 00000000000a0ceb  /system/lib64/libhidlbase.so (android::hardware::IPCThreadState::transact(int, unsigned int, android::hardware::Parcel const&, android::hardware::Parcel*, unsigned int)+171)
+#12 pc 000000000009bc95  /system/lib64/libhidlbase.so (android::hardware::BpHwBinder::transact(unsigned int, android::hardware::Parcel const&, android::hardware::Parcel*, unsigned int, std::__1::function<void (android::hardware::Parcel&)>)+69)
+#13 pc 000000000003eb72  /system/lib64/android.hardware.graphics.composer@2.4.so (android::hardware::graphics::composer::V2_4::BpHwComposerClient::_hidl_registerCallback_2_4(android::hardware::IInterface*, android::hardware::details::HidlInstrumentor*, android::sp<android::hardware::graphics::composer::V2_4::IComposerCallback> const&)+514)
+#14 pc 0000000000043298  /system/lib64/android.hardware.graphics.composer@2.4.so (android::hardware::graphics::composer::V2_4::BpHwComposerClient::registerCallback_2_4(android::sp<android::hardware::graphics::composer::V2_4::IComposerCallback> const&)+40)
+#15 pc 0000000000175c75  /system/bin/surfaceflinger (android::Hwc2::HidlComposer::registerCallback(android::HWC2::ComposerCallback&)+229)
+#16 pc 0000000000183cb4  /system/bin/surfaceflinger (android::impl::HWComposer::setCallback(android::HWC2::ComposerCallback&)+4004)
+#17 pc 00000000001e4f1d  /system/bin/surfaceflinger (android::SurfaceFlinger::init()+877)
+#18 pc 0000000000237bc4  /system/bin/surfaceflinger (main+1220)
+#19 pc 0000000000050cc9  /apex/com.android.runtime/lib64/bionic/libc.so (__libc_init+89)
+```
+
+```c++
+void Scheduler::createVsyncSchedule(FeatureFlags features) {
+    mVsyncSchedule.emplace(features);
+}
+
+```
+
+```c++
+VsyncSchedule::VsyncSchedule(FeatureFlags features)
+      : mTracker(createTracker()),
+        mDispatch(createDispatch(*mTracker)),
+        mController(createController(*mTracker, features)) {
+    if (features.test(Feature::kTracePredictedVsync)) {
+        mTracer = std::make_unique<PredictedVsyncTracer>(*mDispatch);
+    }
+}
+
+VsyncSchedule::VsyncSchedule(TrackerPtr tracker, DispatchPtr dispatch, ControllerPtr controller)
+      : mTracker(std::move(tracker)),
+        mDispatch(std::move(dispatch)),
+        mController(std::move(controller)) {}
+
+VsyncSchedule::VsyncSchedule(VsyncSchedule&&) = default;
+VsyncSchedule::~VsyncSchedule() = default;
+```
+
+- <https://cs.android.com/android/platform/superproject/+/refs/heads/master:external/libcxx/include/optional;drc=7346c436e5a11ce08f6a80dcfeb8ef941ca30176;bpv=0;bpt=1;l=820?hl=zh-cn>
+
+## VSyncDispatchTimerQueue::registerCallback
+
+```c++
+adb logcat | findstr "VSyncDispatchTimerQueue::registerCallback"
+- waiting for device -
+#00 pc 00000000001d8f2f  /system/bin/surfaceflinger (android::scheduler::VSyncDispatchTimerQueue::registerCallback(std::__1::function<void (long, long, long)>, std::__1::basic_string<char, std::__1::char_traits<char>, std::__1::allocator<char> >)+95)
+#01 pc 00000000001da38c  /system/bin/surfaceflinger (android::scheduler::VSyncCallbackRegistration::VSyncCallbackRegistration(android::scheduler::VSyncDispatch&, std::__1::function<void (long, long, long)>, std::__1::basic_string<char, std::__1::char_traits<char>, std::__1::allocator<char> >)+140)
+#02 pc 00000000001be235  /system/bin/surfaceflinger (android::scheduler::DispSyncSource::DispSyncSource(android::scheduler::VSyncDispatch&, android::scheduler::VSyncTracker&, std::__1::chrono::duration<long long, std::__1::ratio<1l, 1000000000l> >, std::__1::chrono::duration<long long, std::__1::ratio<1l, 1000000000l> >, bool, char const*)+805)
+#03 pc 00000000001d3c34  /system/bin/surfaceflinger (android::scheduler::Scheduler::createConnection(char const*, android::frametimeline::TokenManager*, std::__1::chrono::duration<long long, std::__1::ratio<1l, 1000000000l> >, std::__1::chrono::duration<long long, std::__1::ratio<1l, 1000000000l> >, std::__1::function<void (long)>)+116)
+#04 pc 00000000001f6eea  /system/bin/surfaceflinger (android::SurfaceFlinger::processDisplayAdded(android::wp<android::IBinder> const&, android::DisplayDeviceState const&)+8842)
+#05 pc 00000000001ea565  /system/bin/surfaceflinger (android::SurfaceFlinger::processDisplayChangesLocked()+3685)
+#06 pc 00000000001e764f  /system/bin/surfaceflinger (android::SurfaceFlinger::processDisplayHotplugEventsLocked()+8559)
+#07 pc 00000000001ecb34  /system/bin/surfaceflinger (android::SurfaceFlinger::onComposerHalHotplug(unsigned long, android::hardware::graphics::composer::V2_1::IComposerCallback::Connection)+436)
+#08 pc 000000000017be41  /system/bin/surfaceflinger (android::Hwc2::(anonymous namespace)::ComposerCallbackBridge::onHotplug(unsigned long, android::hardware::graphics::composer::V2_1::IComposerCallback::Connection)+17)
+#09 pc 00000000000293ef  /system/lib64/android.hardware.graphics.composer@2.1.so (android::hardware::graphics::composer::V2_1::BnHwComposerCallback::_hidl_onHotplug(android::hidl::base::V1_0::BnHwBase*, android::hardware::Parcel const&, android::hardware::Parcel*, std::__1::function<void (android::hardware::Parcel&)>)+239)
+#10 pc 000000000003859b  /system/lib64/android.hardware.graphics.composer@2.4.so (android::hardware::graphics::composer::V2_4::BnHwComposerCallback::onTransact(unsigned int, android::hardware::Parcel const&, android::hardware::Parcel*, unsigned int, std::__1::function<void (android::hardware::Parcel&)>)+603)
+#11 pc 000000000009ad49  /system/lib64/libhidlbase.so (android::hardware::BHwBinder::transact(unsigned int, android::hardware::Parcel const&, android::hardware::Parcel*, unsigned int, std::__1::function<void (android::hardware::Parcel&)>)+137)
+#12 pc 00000000000a035a  /system/lib64/libhidlbase.so (android::hardware::IPCThreadState::executeCommand(int)+3770)
+#13 pc 00000000000a11a7  /system/lib64/libhidlbase.so (android::hardware::IPCThreadState::waitForResponse(android::hardware::Parcel*, int*)+103)
+#14 pc 00000000000a0ceb  /system/lib64/libhidlbase.so (android::hardware::IPCThreadState::transact(int, unsigned int, android::hardware::Parcel const&, android::hardware::Parcel*, unsigned int)+171)
+#15 pc 000000000009bc95  /system/lib64/libhidlbase.so (android::hardware::BpHwBinder::transact(unsigned int, android::hardware::Parcel const&, android::hardware::Parcel*, unsigned int, std::__1::function<void (android::hardware::Parcel&)>)+69)
+#16 pc 000000000003eb72  /system/lib64/android.hardware.graphics.composer@2.4.so (android::hardware::graphics::composer::V2_4::BpHwComposerClient::_hidl_registerCallback_2_4(android::hardware::IInterface*, android::hardware::details::HidlInstrumentor*, android::sp<android::hardware::graphics::composer::V2_4::IComposerCallback> const&)+514)
+#17 pc 0000000000043298  /system/lib64/android.hardware.graphics.composer@2.4.so (android::hardware::graphics::composer::V2_4::BpHwComposerClient::registerCallback_2_4(android::sp<android::hardware::graphics::composer::V2_4::IComposerCallback> const&)+40)
+#18 pc 0000000000175cb5  /system/bin/surfaceflinger (android::Hwc2::HidlComposer::registerCallback(android::HWC2::ComposerCallback&)+229)
+#19 pc 0000000000183cf4  /system/bin/surfaceflinger (android::impl::HWComposer::setCallback(android::HWC2::ComposerCallback&)+4004)
+#20 pc 00000000001e505d  /system/bin/surfaceflinger (android::SurfaceFlinger::init()+877)
+#21 pc 0000000000237d04  /system/bin/surfaceflinger (main+1220)
+#22 pc 0000000000050cc9  /apex/com.android.runtime/lib64/bionic/libc.so (__libc_init+89)
+```
+
+```c++
+#00 pc 00000000001d8f2f  /system/bin/surfaceflinger (android::scheduler::VSyncDispatchTimerQueue::registerCallback(std::__1::function<void (long, long, long)>, std::__1::basic_string<char, std::__1::char_traits<char>, std::__1::allocator<char> >)+95)
+#01 pc 00000000001da38c  /system/bin/surfaceflinger (android::scheduler::VSyncCallbackRegistration::VSyncCallbackRegistration(android::scheduler::VSyncDispatch&, std::__1::function<void (long, long, long)>, std::__1::basic_string<char, std::__1::char_traits<char>, std::__1::allocator<char> >)+140)
+#02 pc 00000000001be235  /system/bin/surfaceflinger (android::scheduler::DispSyncSource::DispSyncSource(android::scheduler::VSyncDispatch&, android::scheduler::VSyncTracker&, std::__1::chrono::duration<long long, std::__1::ratio<1l, 1000000000l> >, std::__1::chrono::duration<long long, std::__1::ratio<1l, 1000000000l> >, bool, char const*)+805)
+#03 pc 00000000001d3c34  /system/bin/surfaceflinger (android::scheduler::Scheduler::createConnection(char const*, android::frametimeline::TokenManager*, std::__1::chrono::duration<long long, std::__1::ratio<1l, 1000000000l> >, std::__1::chrono::duration<long long, std::__1::ratio<1l, 1000000000l> >, std::__1::function<void (long)>)+116)
+#04 pc 00000000001f6f5e  /system/bin/surfaceflinger (android::SurfaceFlinger::processDisplayAdded(android::wp<android::IBinder> const&, android::DisplayDeviceState const&)+8958)
+#05 pc 00000000001ea565  /system/bin/surfaceflinger (android::SurfaceFlinger::processDisplayChangesLocked()+3685)
+#06 pc 00000000001e764f  /system/bin/surfaceflinger (android::SurfaceFlinger::processDisplayHotplugEventsLocked()+8559)
+#07 pc 00000000001ecb34  /system/bin/surfaceflinger (android::SurfaceFlinger::onComposerHalHotplug(unsigned long, android::hardware::graphics::composer::V2_1::IComposerCallback::Connection)+436)
+#08 pc 000000000017be41  /system/bin/surfaceflinger (android::Hwc2::(anonymous namespace)::ComposerCallbackBridge::onHotplug(unsigned long, android::hardware::graphics::composer::V2_1::IComposerCallback::Connection)+17)
+#09 pc 00000000000293ef  /system/lib64/android.hardware.graphics.composer@2.1.so (android::hardware::graphics::composer::V2_1::BnHwComposerCallback::_hidl_onHotplug(android::hidl::base::V1_0::BnHwBase*, android::hardware::Parcel const&, android::hardware::Parcel*, std::__1::function<void (android::hardware::Parcel&)>)+239)
+#10 pc 000000000003859b  /system/lib64/android.hardware.graphics.composer@2.4.so (android::hardware::graphics::composer::V2_4::BnHwComposerCallback::onTransact(unsigned int, android::hardware::Parcel const&, android::hardware::Parcel*, unsigned int, std::__1::function<void (android::hardware::Parcel&)>)+603)
+#11 pc 000000000009ad49  /system/lib64/libhidlbase.so (android::hardware::BHwBinder::transact(unsigned int, android::hardware::Parcel const&, android::hardware::Parcel*, unsigned int, std::__1::function<void (android::hardware::Parcel&)>)+137)
+#12 pc 00000000000a035a  /system/lib64/libhidlbase.so (android::hardware::IPCThreadState::executeCommand(int)+3770)
+#13 pc 00000000000a11a7  /system/lib64/libhidlbase.so (android::hardware::IPCThreadState::waitForResponse(android::hardware::Parcel*, int*)+103)
+#14 pc 00000000000a0ceb  /system/lib64/libhidlbase.so (android::hardware::IPCThreadState::transact(int, unsigned int, android::hardware::Parcel const&, android::hardware::Parcel*, unsigned int)+171)
+#15 pc 000000000009bc95  /system/lib64/libhidlbase.so (android::hardware::BpHwBinder::transact(unsigned int, android::hardware::Parcel const&, android::hardware::Parcel*, unsigned int, std::__1::function<void (android::hardware::Parcel&)>)+69)
+#16 pc 000000000003eb72  /system/lib64/android.hardware.graphics.composer@2.4.so (android::hardware::graphics::composer::V2_4::BpHwComposerClient::_hidl_registerCallback_2_4(android::hardware::IInterface*, android::hardware::details::HidlInstrumentor*, android::sp<android::hardware::graphics::composer::V2_4::IComposerCallback> const&)+514)
+#17 pc 0000000000043298  /system/lib64/android.hardware.graphics.composer@2.4.so (android::hardware::graphics::composer::V2_4::BpHwComposerClient::registerCallback_2_4(android::sp<android::hardware::graphics::composer::V2_4::IComposerCallback> const&)+40)
+#18 pc 0000000000175cb5  /system/bin/surfaceflinger (android::Hwc2::HidlComposer::registerCallback(android::HWC2::ComposerCallback&)+229)
+#19 pc 0000000000183cf4  /system/bin/surfaceflinger (android::impl::HWComposer::setCallback(android::HWC2::ComposerCallback&)+4004)
+#20 pc 00000000001e505d  /system/bin/surfaceflinger (android::SurfaceFlinger::init()+877)
+#21 pc 0000000000237d04  /system/bin/surfaceflinger (main+1220)
+#22 pc 0000000000050cc9  /apex/com.android.runtime/lib64/bionic/libc.so (__libc_init+89)
+
+```
+
+```c++
+#00 pc 00000000001d8f2f  /system/bin/surfaceflinger (android::scheduler::VSyncDispatchTimerQueue::registerCallback(std::__1::function<void (long, long, long)>, std::__1::basic_string<char, std::__1::char_traits<char>, std::__1::allocator<char> >)+95)
+#01 pc 00000000001da38c  /system/bin/surfaceflinger (android::scheduler::VSyncCallbackRegistration::VSyncCallbackRegistration(android::scheduler::VSyncDispatch&, std::__1::function<void (long, long, long)>, std::__1::basic_string<char, std::__1::char_traits<char>, std::__1::allocator<char> >)+140)
+#02 pc 00000000001ca4b9  /system/bin/surfaceflinger (android::impl::MessageQueue::initVsync(android::scheduler::VSyncDispatch&, android::frametimeline::TokenManager&, std::__1::chrono::duration<long long, std::__1::ratio<1l, 1000000000l> >)+153)
+#03 pc 00000000001f6fb7  /system/bin/surfaceflinger (android::SurfaceFlinger::processDisplayAdded(android::wp<android::IBinder> const&, android::DisplayDeviceState const&)+9047)
+#04 pc 00000000001ea565  /system/bin/surfaceflinger (android::SurfaceFlinger::processDisplayChangesLocked()+3685)
+#05 pc 00000000001e764f  /system/bin/surfaceflinger (android::SurfaceFlinger::processDisplayHotplugEventsLocked()+8559)
+#06 pc 00000000001ecb34  /system/bin/surfaceflinger (android::SurfaceFlinger::onComposerHalHotplug(unsigned long, android::hardware::graphics::composer::V2_1::IComposerCallback::Connection)+436)
+#07 pc 000000000017be41  /system/bin/surfaceflinger (android::Hwc2::(anonymous namespace)::ComposerCallbackBridge::onHotplug(unsigned long, android::hardware::graphics::composer::V2_1::IComposerCallback::Connection)+17)
+#08 pc 00000000000293ef  /system/lib64/android.hardware.graphics.composer@2.1.so (android::hardware::graphics::composer::V2_1::BnHwComposerCallback::_hidl_onHotplug(android::hidl::base::V1_0::BnHwBase*, android::hardware::Parcel const&, android::hardware::Parcel*, std::__1::function<void (android::hardware::Parcel&)>)+239)
+#09 pc 000000000003859b  /system/lib64/android.hardware.graphics.composer@2.4.so (android::hardware::graphics::composer::V2_4::BnHwComposerCallback::onTransact(unsigned int, android::hardware::Parcel const&, android::hardware::Parcel*, unsigned int, std::__1::function<void (android::hardware::Parcel&)>)+603)
+#10 pc 000000000009ad49  /system/lib64/libhidlbase.so (android::hardware::BHwBinder::transact(unsigned int, android::hardware::Parcel const&, android::hardware::Parcel*, unsigned int, std::__1::function<void (android::hardware::Parcel&)>)+137)
+#11 pc 00000000000a035a  /system/lib64/libhidlbase.so (android::hardware::IPCThreadState::executeCommand(int)+3770)
+#12 pc 00000000000a11a7  /system/lib64/libhidlbase.so (android::hardware::IPCThreadState::waitForResponse(android::hardware::Parcel*, int*)+103)
+#13 pc 00000000000a0ceb  /system/lib64/libhidlbase.so (android::hardware::IPCThreadState::transact(int, unsigned int, android::hardware::Parcel const&, android::hardware::Parcel*, unsigned int)+171)
+#14 pc 000000000009bc95  /system/lib64/libhidlbase.so (android::hardware::BpHwBinder::transact(unsigned int, android::hardware::Parcel const&, android::hardware::Parcel*, unsigned int, std::__1::function<void (android::hardware::Parcel&)>)+69)
+#15 pc 000000000003eb72  /system/lib64/android.hardware.graphics.composer@2.4.so (android::hardware::graphics::composer::V2_4::BpHwComposerClient::_hidl_registerCallback_2_4(android::hardware::IInterface*, android::hardware::details::HidlInstrumentor*, android::sp<android::hardware::graphics::composer::V2_4::IComposerCallback> const&)+514)
+#16 pc 0000000000043298  /system/lib64/android.hardware.graphics.composer@2.4.so (android::hardware::graphics::composer::V2_4::BpHwComposerClient::registerCallback_2_4(android::sp<android::hardware::graphics::composer::V2_4::IComposerCallback> const&)+40)
+#17 pc 0000000000175cb5  /system/bin/surfaceflinger (android::Hwc2::HidlComposer::registerCallback(android::HWC2::ComposerCallback&)+229)
+#18 pc 0000000000183cf4  /system/bin/surfaceflinger (android::impl::HWComposer::setCallback(android::HWC2::ComposerCallback&)+4004)
+#19 pc 00000000001e505d  /system/bin/surfaceflinger (android::SurfaceFlinger::init()+877)
+#20 pc 0000000000237d04  /system/bin/surfaceflinger (main+1220)
+#21 pc 0000000000050cc9  /apex/com.android.runtime/lib64/bionic/libc.so (__libc_init+89)
+
+```
+
+## VSyncDispatchTimerQueue::setTimer
+
+```c++
+#00 pc 00000000001d8da6  /system/bin/surfaceflinger (android::scheduler::VSyncDispatchTimerQueue::rearmTimerSkippingUpdateFor(long, std::__1::__hash_map_iterator<std::__1::__hash_iterator<std::__1::__hash_node<std::__1::__hash_value_type<android::StrongTyping<unsigned long, android::scheduler::CallbackTokenTag, android::Compare, android::Hash>, std::__1::shared_ptr<android::scheduler::VSyncDispatchTimerQueueEntry> >, void*>*> > const&)+2310)
+#01 pc 00000000001d9cd1  /system/bin/surfaceflinger (android::scheduler::VSyncDispatchTimerQueue::schedule(android::StrongTyping<unsigned long, android::scheduler::CallbackTokenTag, android::Compare, android::Hash>, android::scheduler::VSyncDispatch::ScheduleTiming)+657)
+#02 pc 00000000001da3fe  /system/bin/surfaceflinger (android::scheduler::VSyncCallbackRegistration::schedule(android::scheduler::VSyncDispatch::ScheduleTiming)+46)
+#03 pc 00000000001be52f  /system/bin/surfaceflinger (android::scheduler::DispSyncSource::setVSyncEnabled(bool)+159)
+#04 pc 00000000001c1fab  /system/bin/surfaceflinger (void* std::__1::__thread_proxy<std::__1::tuple<std::__1::unique_ptr<std::__1::__thread_struct, std::__1::default_delete<std::__1::__thread_struct> >, android::impl::EventThread::EventThread(std::__1::unique_ptr<android::VSyncSource, std::__1::default_delete<android::VSyncSource> >, android::frametimeline::TokenManager*, std::__1::function<void (long)>, std::__1::function<bool (long, unsigned int)>, std::__1::function<long (unsigned int)>)::$_1> >(void*)+187)
+#05 pc 00000000000ccd9a  /apex/com.android.runtime/lib64/bionic/libc.so (__pthread_start(void*)+58)
+#06 pc 0000000000060d47  /apex/com.android.runtime/lib64/bionic/libc.so (__start_thread+55)
+
+```
+
+```c++
+#00 pc 00000000001d8da6  /system/bin/surfaceflinger (android::scheduler::VSyncDispatchTimerQueue::rearmTimerSkippingUpdateFor(long, std::__1::__hash_map_iterator<std::__1::__hash_iterator<std::__1::__hash_node<std::__1::__hash_value_type<android::StrongTyping<unsigned long, android::scheduler::CallbackTokenTag, android::Compare, android::Hash>, std::__1::shared_ptr<android::scheduler::VSyncDispatchTimerQueueEntry> >, void*>*> > const&)+2310)
+#01 pc 00000000001d9cd1  /system/bin/surfaceflinger (android::scheduler::VSyncDispatchTimerQueue::schedule(android::StrongTyping<unsigned long, android::scheduler::CallbackTokenTag, android::Compare, android::Hash>, android::scheduler::VSyncDispatch::ScheduleTiming)+657)
+#02 pc 00000000001da3fe  /system/bin/surfaceflinger (android::scheduler::VSyncCallbackRegistration::schedule(android::scheduler::VSyncDispatch::ScheduleTiming)+46)
+#03 pc 00000000001bec63  /system/bin/surfaceflinger (android::scheduler::CallbackRepeater::callback(long, long, long)+179)
+#04 pc 00000000001d83ca  /system/bin/surfaceflinger (android::scheduler::VSyncDispatchTimerQueue::timerCallback()+986)
+#05 pc 00000000006707d1  /system/bin/surfaceflinger (void* std::__1::__thread_proxy<std::__1::tuple<std::__1::unique_ptr<std::__1::__thread_struct, std::__1::default_delete<std::__1::__thread_struct> >, android::scheduler::Timer::Timer()::$_0> >(void*)+833)
+#06 pc 00000000000ccd9a  /apex/com.android.runtime/lib64/bionic/libc.so (__pthread_start(void*)+58)
+#07 pc 0000000000060d47  /apex/com.android.runtime/lib64/bionic/libc.so (__start_thread+55)
+
+```
+
+```c++
+#00 pc 00000000001d8da6  /system/bin/surfaceflinger (android::scheduler::VSyncDispatchTimerQueue::rearmTimerSkippingUpdateFor(long, std::__1::__hash_map_iterator<std::__1::__hash_iterator<std::__1::__hash_node<std::__1::__hash_value_type<android::StrongTyping<unsigned long, android::scheduler::CallbackTokenTag, android::Compare, android::Hash>, std::__1::shared_ptr<android::scheduler::VSyncDispatchTimerQueueEntry> >, void*>*> > const&)+2310)
+#01 pc 00000000001d9cd1  /system/bin/surfaceflinger (android::scheduler::VSyncDispatchTimerQueue::schedule(android::StrongTyping<unsigned long, android::scheduler::CallbackTokenTag, android::Compare, android::Hash>, android::scheduler::VSyncDispatch::ScheduleTiming)+657)
+#02 pc 00000000001da3fe  /system/bin/surfaceflinger (android::scheduler::VSyncCallbackRegistration::schedule(android::scheduler::VSyncDispatch::ScheduleTiming)+46)
+#03 pc 00000000001ca7a2  /system/bin/surfaceflinger (android::impl::MessageQueue::scheduleFrame()+146)
+#04 pc 00000000001e43fd  /system/bin/surfaceflinger (android::SurfaceFlinger::setTransactionFlags(unsigned int, android::scheduler::TransactionSchedule, android::sp<android::IBinder> const&, android::SurfaceFlinger::FrameHint)+397)
+#05 pc 00000000001fd541  /system/bin/surfaceflinger (android::SurfaceFlinger::setTransactionState(android::FrameTimelineInfo const&, android::Vector<android::ComposerState> const&, android::Vector<android::DisplayState> const&, unsigned int, android::sp<android::IBinder> const&, android::InputWindowCommands const&, long, bool, android::client_cache_t const&, bool, std::__1::vector<android::ListenerCallbacks, std::__1::allocator<android::ListenerCallbacks> > const&, unsigned long)+2033)
+#06 pc 00000000000d84d9  /system/lib64/libgui.so (android::BnSurfaceComposer::onTransact(unsigned int, android::Parcel const&, android::Parcel*, unsigned int)+11849)
+#07 pc 0000000000204850  /system/bin/surfaceflinger (android::SurfaceFlinger::onTransact(unsigned int, android::Parcel const&, android::Parcel*, unsigned int)+800)
+#08 pc 00000000000586f0  /system/lib64/libbinder.so (android::BBinder::transact(unsigned int, android::Parcel const&, android::Parcel*, unsigned int)+176)
+#09 pc 0000000000063833  /system/lib64/libbinder.so (android::IPCThreadState::executeCommand(int)+1203)
+#10 pc 00000000000632bd  /system/lib64/libbinder.so (android::IPCThreadState::getAndExecuteCommand()+157)
+#11 pc 0000000000063c8f  /system/lib64/libbinder.so (android::IPCThreadState::joinThreadPool(bool)+63)
+#12 pc 00000000000939e7  /system/lib64/libbinder.so (android::PoolThread::threadLoop()+23)
+#13 pc 0000000000013e55  /system/lib64/libutils.so (android::Thread::_threadLoop(void*)+325)
+#14 pc 00000000000ccd9a  /apex/com.android.runtime/lib64/bionic/libc.so (__pthread_start(void*)+58)
+#15 pc 0000000000060d47  /apex/com.android.runtime/lib64/bionic/libc.so (__start_thread+55)
+```
+
+## DispSyncSource
+
+```c++
+DispSyncSource::DispSyncSource(VSyncDispatch& vSyncDispatch, VSyncTracker& vSyncTracker,
+                               std::chrono::nanoseconds workDuration,
+                               std::chrono::nanoseconds readyDuration, bool traceVsync,
+                               const char* name)
+      : mName(name),
+        mValue(base::StringPrintf("VSYNC-%s", name), 0),
+        mTraceVsync(traceVsync),
+        mVsyncOnLabel(base::StringPrintf("VsyncOn-%s", name)),
+        mVSyncTracker(vSyncTracker),
+        mWorkDuration(base::StringPrintf("VsyncWorkDuration-%s", name), workDuration),
+        mReadyDuration(readyDuration) {
+    mCallbackRepeater =
+            std::make_unique<CallbackRepeater>(vSyncDispatch,
+                                               std::bind(&DispSyncSource::onVsyncCallback, this,
+                                                         std::placeholders::_1,
+                                                         std::placeholders::_2,
+                                                         std::placeholders::_3),
+                                               name, workDuration, readyDuration,
+                                               std::chrono::steady_clock::now().time_since_epoch());
+}
+```
+
+```c++
+CallbackRepeater::CallbackRepeater(VSyncDispatch& dispatch, VSyncDispatch::Callback cb, const char* name,
+                    std::chrono::nanoseconds workDuration, std::chrono::nanoseconds readyDuration,
+                    std::chrono::nanoseconds notBefore)
+        : mName(name),
+        mCallback(cb),
+        mRegistration(dispatch,
+                        std::bind(&CallbackRepeater::callback, this, std::placeholders::_1,
+                                std::placeholders::_2, std::placeholders::_3),
+                        mName),
+        mStarted(false),
+        mWorkDuration(workDuration),
+        mReadyDuration(readyDuration),
+        mLastCallTime(notBefore) {}
+
+void callback(nsecs_t vsyncTime, nsecs_t wakeupTime, nsecs_t readyTime) {
+ 
+    mCallback(vsyncTime, wakeupTime, readyTime);
+
+}
+```
+
+```c++
+void DispSyncSource::onVsyncCallback(nsecs_t vsyncTime, nsecs_t targetWakeupTime,
+                                     nsecs_t readyTime) {
+    VSyncSource::Callback* callback;
+    {
+        std::lock_guard lock(mCallbackMutex);
+        callback = mCallback;
+    }
+
+    if (mTraceVsync) {
+        mValue = (mValue + 1) % 2;
+    }
+
+    if (callback != nullptr) {
+        callback->onVSyncEvent(targetWakeupTime, {vsyncTime, readyTime});
+    }
+}
+```
+
+```c++
+EventThread::EventThread(std::unique_ptr<VSyncSource> vsyncSource,
+                         android::frametimeline::TokenManager* tokenManager,
+                         InterceptVSyncsCallback interceptVSyncsCallback,
+                         ThrottleVsyncCallback throttleVsyncCallback,
+                         GetVsyncPeriodFunction getVsyncPeriodFunction)
+      : mVSyncSource(std::move(vsyncSource)),
+        mTokenManager(tokenManager),
+        mInterceptVSyncsCallback(std::move(interceptVSyncsCallback)),
+        mThrottleVsyncCallback(std::move(throttleVsyncCallback)),
+        mGetVsyncPeriodFunction(std::move(getVsyncPeriodFunction)),
+        mThreadName(mVSyncSource->getName()) {
+
+    mVSyncSource->setCallback(this);
+
+    mThread = std::thread([this]() NO_THREAD_SAFETY_ANALYSIS {
+        std::unique_lock<std::mutex> lock(mMutex);
+        threadMain(lock);
+    });
+
+}
+```
+
+## EventThread::onVSyncEvent
+
+```c++
+05-04 23:05:44.768   422   547 D EventThread::onVSyncEvent: #00 pc 00000000001c106e  /system/bin/surfaceflinger (android::impl::EventThread::onVSyncEvent(long, android::VSyncSource::VSyncData)+94)
+05-04 23:05:44.768   422   547 D EventThread::onVSyncEvent: #01 pc 00000000001bec22  /system/bin/surfaceflinger (android::scheduler::CallbackRepeater::callback(long, long, long)+114)
+05-04 23:05:44.768   422   547 D EventThread::onVSyncEvent: #02 pc 00000000001d844a  /system/bin/surfaceflinger (android::scheduler::VSyncDispatchTimerQueue::timerCallback()+986)
+05-04 23:05:44.768   422   547 D EventThread::onVSyncEvent: #03 pc 0000000000670851  /system/bin/surfaceflinger (void* std::__1::__thread_proxy<std::__1::tuple<std::__1::unique_ptr<std::__1::__thread_struct, std::__1::default_delete<std::__1::__thread_struct> >, android::scheduler::Timer::Timer()::$_0> >(void*)+833)
+05-04 23:05:44.768   422   547 D EventThread::onVSyncEvent: #04 pc 00000000000ccd9a  /apex/com.android.runtime/lib64/bionic/libc.so (__pthread_start(void*)+58)
+05-04 23:05:44.768   422   547 D EventThread::onVSyncEvent: #05 pc 0000000000060d47  /apex/com.android.runtime/lib64/bionic/libc.so (__start_thread+55)
+```
+
+## MessageQueue::vsyncCallback
+
+```c++
+#00 pc 00000000001ca4c2  /system/bin/surfaceflinger (android::impl::MessageQueue::vsyncCallback(long, long, long)+258)
+#01 pc 00000000001d84da  /system/bin/surfaceflinger (android::scheduler::VSyncDispatchTimerQueue::timerCallback()+986)
+#02 pc 00000000006708e1  /system/bin/surfaceflinger (void* std::__1::__thread_proxy<std::__1::tuple<std::__1::unique_ptr<std::__1::__thread_struct, std::__1::default_delete<std::__1::__thread_struct> >, android::scheduler::Timer::Timer()::$_0> >(void*)+833)
+#03 pc 00000000000ccd9a  /apex/com.android.runtime/lib64/bionic/libc.so (__pthread_start(void*)+58)
+#04 pc 0000000000060d47  /apex/com.android.runtime/lib64/bionic/libc.so (__start_thread+55)
+```
+
+## dumpsys SurfaceFlinger
+
+```text
+VsyncDispatch:
+        Timer:
+                DebugState: Waiting
+        mTimerSlack: 0.50ms mMinVsyncDistance: 3.00ms
+        mIntendedWakeupTime: 9223372013568.00ms from now
+        mLastTimerCallback: 16057.86ms ago mLastTimerSchedule: 16049.38ms ago
+        Callbacks:
+                sf:
+                        workDuration: 15.67ms readyDuration: 0.00ms earliestVsync: -20259.13ms relative to now
+                        mLastDispatchTime: 16059.13ms ago
+                appSf:
+                        workDuration: 16.67ms readyDuration: 15.67ms earliestVsync: -52892.46ms relative to now
+                        mLastDispatchTime: 52892.46ms ago
+                app:
+                        workDuration: 16.67ms readyDuration: 15.67ms earliestVsync: -16025.80ms relative to now
+                        mLastDispatchTime: 16025.80ms ago
+```
 
 ## Reference
 
