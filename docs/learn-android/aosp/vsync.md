@@ -6,7 +6,9 @@ tag:
 
 # Android | VSYNC
 
-## SurfaceFlinger
+## SurfaceFlinger工程理解
+
+### SurfaceFlinger
 
 SurfaceFlinger的启动和消息队列处理机制（四）
 
@@ -14,9 +16,7 @@ SurfaceFlinger的启动和消息队列处理机制（四）
 - <https://cs.android.com/android/platform/superproject/+/android-13.0.0_r41:frameworks/native/services/surfaceflinger/main_surfaceflinger.cpp?hl=zh-cn>
 - <https://cs.android.com/android/platform/superproject/+/android-13.0.0_r41:frameworks/native/services/surfaceflinger/SurfaceFlingerFactory.cpp;l=26?q=createSurfaceFlinger&ss=android%2Fplatform%2Fsuperproject&hl=zh-cn>
 
-## surfaceflinger.rc的作用，以及其内容的含义
-
-<https://cs.android.com/android/platform/superproject/+/master:frameworks/native/services/surfaceflinger/surfaceflinger.rc;l=1?q=surfaceflinger.rc&sq=&hl=zh-cn>
+### surfaceflinger.rc的作用，以及其内容的含义
 
 `surfaceflinger.rc` 是一个 Android init 脚本，用于定义 SurfaceFlinger 服务的配置。SurfaceFlinger 是 Android 系统的核心组件，负责合成和显示图形。该文件定义了 SurfaceFlinger 服务的启动方式和权限。现在让我们分析文件的每一行内容：
 
@@ -38,7 +38,9 @@ SurfaceFlinger的启动和消息队列处理机制（四）
 
 总之，`surfaceflinger.rc` 文件定义了 SurfaceFlinger 服务的启动配置、权限和通信方式。这个文件在 Android 系统启动时被 init 进程读取，用于正确地启动和运行 SurfaceFlinger 服务。
 
-## Android init 脚本是什么？ 有什么作用？怎么使用？
+- <https://cs.android.com/android/platform/superproject/+/master:frameworks/native/services/surfaceflinger/surfaceflinger.rc;l=1?q=surfaceflinger.rc&sq=&hl=zh-cn>
+
+### Android init 脚本
 
 Android init 脚本是一种 Android 系统启动时用于配置和启动各种服务、设置属性和创建目录等操作的脚本。它们主要用于定义系统的启动流程和配置各种组件。这些脚本通常位于 Android 源码中的各个子项目和设备特定代码中，如 `system/core/rootdir`、`device/<manufacturer>/<device>/rootdir` 等。
 
@@ -68,7 +70,7 @@ Android init 脚本使用一种名为 `init` 的简单语言编写，该语言�
 
 - <https://cs.android.com/android/platform/superproject/+/master:frameworks/native/services/surfaceflinger/Android.bp?hl=zh-cn>
 
-## Android.bp的作用
+### Android.bp的作用
 
 `Android.bp` 是 Android 开源项目 (AOSP) 中的一种构建脚本，它使用类似 Makefile 的语法来描述如何构建 Android 应用程序、库和模块。它是 AOSP 中使用的 Soong 构建系统的核心组件之一，是 Android 7.0 及更高版本中用于构建的主要构建系统。
 
@@ -78,11 +80,11 @@ Android init 脚本使用一种名为 `init` 的简单语言编写，该语言�
 
 总之，`Android.bp` 文件是 AOSP 中描述如何构建 Android 应用程序、库和模块的核心文件，它是 Soong 构建系统的核心组件之一。
 
-## SurfaceFlinger::onComposerHalHotplug
+## SurfaceFlinger初始化逻辑
+
+### SurfaceFlinger::onComposerHalHotplug
 
 ```c++
-adb logcat | findstr "SurfaceFlinger::onComposerHalHotplug"
-- waiting for device -
 #00 pc 00000000001ec9bc  /system/bin/surfaceflinger (android::SurfaceFlinger::onComposerHalHotplug(unsigned long, android::hardware::graphics::composer::V2_1::IComposerCallback::Connection)+524)
 #01 pc 000000000017bdc1  /system/bin/surfaceflinger (android::Hwc2::(anonymous namespace)::ComposerCallbackBridge::onHotplug(unsigned long, android::hardware::graphics::composer::V2_1::IComposerCallback::Connection)+17)
 #02 pc 00000000000293ef  /system/lib64/android.hardware.graphics.composer@2.1.so (android::hardware::graphics::composer::V2_1::BnHwComposerCallback::_hidl_onHotplug(android::hidl::base::V1_0::BnHwBase*, android::hardware::Parcel const&, android::hardware::Parcel*, std::__1::function<void (android::hardware::Parcel&)>)+239)
@@ -101,17 +103,17 @@ adb logcat | findstr "SurfaceFlinger::onComposerHalHotplug"
 #15 pc 0000000000050cc9  /apex/com.android.runtime/lib64/bionic/libc.so (__libc_init+89)
 ```
 
-## SurfaceFlinger::run
+### SurfaceFlinger::run
 
 ```c++
-adb logcat | findstr "Scheduler::run"
-- waiting for device -
 #00 pc 00000000001d38fb  /system/bin/surfaceflinger (android::scheduler::Scheduler::run()+59)
 #01 pc 0000000000237d9a  /system/bin/surfaceflinger (main+2090)
 #02 pc 0000000000050cc9  /apex/com.android.runtime/lib64/bionic/libc.so (__libc_init+89)
 ```
 
-## SurfaceFlinger::initScheduler
+## SurfaceFlinger的VSYNC初始化逻辑
+
+### SurfaceFlinger::initScheduler
 
 ```c++
  #  adb logcat | findstr "SurfaceFlinger::initScheduler"
@@ -142,7 +144,7 @@ adb logcat | findstr "Scheduler::run"
 - <https://blog.csdn.net/xiajun07061225/article/details/9250579>
 - <https://blog.csdn.net/xiaosayidao/article/details/73992078>
 
-## epoll_wait
+### epoll_wait
 
 `epoll_wait()`是Linux中用于监视多个文件描述符（file descriptors）的I/O事件的高效方法。它是Linux特有的I/O多路复用（I/O multiplexing）机制，类似于`select()`和`poll()`，但在性能和可扩展性方面有显著的优势。`epoll_wait()`可以在大量并发连接的情况下实现高效的I/O事件通知，因此在高并发服务器（如Web服务器、数据库服务器等）和事件驱动编程中非常有用。
 
@@ -176,7 +178,7 @@ int epoll_wait(int epfd, struct epoll_event *events, int maxevents, int timeout)
 
 注意：`epoll_wait()`是Linux特有的，不是POSIX标准的一部分。因此，在非Linux系统上（如BSD、macOS等），需要使用其他I/O多路复用机制（如`select()`、`poll()`或`kqueue()`）。
 
-## Scheduler::createVsyncSchedule
+### Scheduler::createVsyncSchedule
 
 ```c++
  #  adb logcat | findstr "Scheduler::createVsyncSchedule"
@@ -231,7 +233,7 @@ VsyncSchedule::~VsyncSchedule() = default;
 
 - <https://cs.android.com/android/platform/superproject/+/refs/heads/master:external/libcxx/include/optional;drc=7346c436e5a11ce08f6a80dcfeb8ef941ca30176;bpv=0;bpt=1;l=820?hl=zh-cn>
 
-## VSyncDispatchTimerQueue::registerCallback
+### VSyncDispatchTimerQueue::registerCallback
 
 ```c++
 adb logcat | findstr "VSyncDispatchTimerQueue::registerCallback"
@@ -314,7 +316,9 @@ adb logcat | findstr "VSyncDispatchTimerQueue::registerCallback"
 
 ```
 
-## VSyncDispatchTimerQueue::setTimer
+## SurfaceFlinger的VSYNC的分发逻辑
+
+### VSyncDispatchTimerQueue::setTimer
 
 ```c++
 #00 pc 00000000001d8da6  /system/bin/surfaceflinger (android::scheduler::VSyncDispatchTimerQueue::rearmTimerSkippingUpdateFor(long, std::__1::__hash_map_iterator<std::__1::__hash_iterator<std::__1::__hash_node<std::__1::__hash_value_type<android::StrongTyping<unsigned long, android::scheduler::CallbackTokenTag, android::Compare, android::Hash>, std::__1::shared_ptr<android::scheduler::VSyncDispatchTimerQueueEntry> >, void*>*> > const&)+2310)
@@ -358,7 +362,7 @@ adb logcat | findstr "VSyncDispatchTimerQueue::registerCallback"
 #15 pc 0000000000060d47  /apex/com.android.runtime/lib64/bionic/libc.so (__start_thread+55)
 ```
 
-## DispSyncSource
+### DispSyncSource
 
 ```c++
 DispSyncSource::DispSyncSource(VSyncDispatch& vSyncDispatch, VSyncTracker& vSyncTracker,
@@ -447,18 +451,18 @@ EventThread::EventThread(std::unique_ptr<VSyncSource> vsyncSource,
 }
 ```
 
-## EventThread::onVSyncEvent
+### EventThread::onVSyncEvent
 
 ```c++
-05-04 23:05:44.768   422   547 D EventThread::onVSyncEvent: #00 pc 00000000001c106e  /system/bin/surfaceflinger (android::impl::EventThread::onVSyncEvent(long, android::VSyncSource::VSyncData)+94)
-05-04 23:05:44.768   422   547 D EventThread::onVSyncEvent: #01 pc 00000000001bec22  /system/bin/surfaceflinger (android::scheduler::CallbackRepeater::callback(long, long, long)+114)
-05-04 23:05:44.768   422   547 D EventThread::onVSyncEvent: #02 pc 00000000001d844a  /system/bin/surfaceflinger (android::scheduler::VSyncDispatchTimerQueue::timerCallback()+986)
-05-04 23:05:44.768   422   547 D EventThread::onVSyncEvent: #03 pc 0000000000670851  /system/bin/surfaceflinger (void* std::__1::__thread_proxy<std::__1::tuple<std::__1::unique_ptr<std::__1::__thread_struct, std::__1::default_delete<std::__1::__thread_struct> >, android::scheduler::Timer::Timer()::$_0> >(void*)+833)
-05-04 23:05:44.768   422   547 D EventThread::onVSyncEvent: #04 pc 00000000000ccd9a  /apex/com.android.runtime/lib64/bionic/libc.so (__pthread_start(void*)+58)
-05-04 23:05:44.768   422   547 D EventThread::onVSyncEvent: #05 pc 0000000000060d47  /apex/com.android.runtime/lib64/bionic/libc.so (__start_thread+55)
+#00 pc 00000000001c106e  /system/bin/surfaceflinger (android::impl::EventThread::onVSyncEvent(long, android::VSyncSource::VSyncData)+94)
+#01 pc 00000000001bec22  /system/bin/surfaceflinger (android::scheduler::CallbackRepeater::callback(long, long, long)+114)
+#02 pc 00000000001d844a  /system/bin/surfaceflinger (android::scheduler::VSyncDispatchTimerQueue::timerCallback()+986)
+#03 pc 0000000000670851  /system/bin/surfaceflinger (void* std::__1::__thread_proxy<std::__1::tuple<std::__1::unique_ptr<std::__1::__thread_struct, std::__1::default_delete<std::__1::__thread_struct> >, android::scheduler::Timer::Timer()::$_0> >(void*)+833)
+#04 pc 00000000000ccd9a  /apex/com.android.runtime/lib64/bionic/libc.so (__pthread_start(void*)+58)
+#05 pc 0000000000060d47  /apex/com.android.runtime/lib64/bionic/libc.so (__start_thread+55)
 ```
 
-## MessageQueue::vsyncCallback
+### MessageQueue::vsyncCallback
 
 ```c++
 #00 pc 00000000001ca4c2  /system/bin/surfaceflinger (android::impl::MessageQueue::vsyncCallback(long, long, long)+258)
@@ -488,6 +492,451 @@ VsyncDispatch:
                         workDuration: 16.67ms readyDuration: 15.67ms earliestVsync: -16025.80ms relative to now
                         mLastDispatchTime: 16025.80ms ago
 ```
+
+## DisplayEventReceiver建立与SurfaceFlinger通信通道
+
+```c++
+DisplayEventReceiver::DisplayEventReceiver(
+        ISurfaceComposer::VsyncSource vsyncSource,
+        ISurfaceComposer::EventRegistrationFlags eventRegistration) {
+    sp<ISurfaceComposer> sf(ComposerService::getComposerService());
+    if (sf != nullptr) {
+        mEventConnection = sf->createDisplayEventConnection(vsyncSource, eventRegistration);
+        if (mEventConnection != nullptr) {
+            mDataChannel = std::make_unique<gui::BitTube>();
+            const auto status = mEventConnection->stealReceiveChannel(mDataChannel.get());
+            if (!status.isOk()) {
+                ALOGE("stealReceiveChannel failed: %s", status.toString8().c_str());
+                mInitError = std::make_optional<status_t>(status.transactionError());
+                mDataChannel.reset();
+                mEventConnection.clear();
+            }
+        }
+    }
+}
+```
+
+```c++
+#00 pc 00000000001c08c4  /system/bin/surfaceflinger (android::impl::EventThread::createEventConnection(std::__1::function<void ()>, android::ftl::Flags<android::ISurfaceComposer::EventRegistration>) const+100)
+#01 pc 00000000001d40d6  /system/bin/surfaceflinger (android::scheduler::Scheduler::createConnection(std::__1::unique_ptr<android::EventThread, std::__1::default_delete<android::EventThread> >)+118)
+#02 pc 00000000001d3fcf  /system/bin/surfaceflinger (android::scheduler::Scheduler::createConnection(char const*, android::frametimeline::TokenManager*, std::__1::chrono::duration<long long, std::__1::ratio<1l, 1000000000l> >, std::__1::chrono::duration<long long, std::__1::ratio<1l, 1000000000l> >, std::__1::function<void (long)>)+671)
+#03 pc 00000000001f701a  /system/bin/surfaceflinger (android::SurfaceFlinger::processDisplayAdded(android::wp<android::IBinder> const&, android::DisplayDeviceState const&)+8842)
+#04 pc 00000000001ea695  /system/bin/surfaceflinger (android::SurfaceFlinger::processDisplayChangesLocked()+3685)
+#05 pc 00000000001e777f  /system/bin/surfaceflinger (android::SurfaceFlinger::processDisplayHotplugEventsLocked()+8559)
+#06 pc 00000000001ecc64  /system/bin/surfaceflinger (android::SurfaceFlinger::onComposerHalHotplug(unsigned long, android::hardware::graphics::composer::V2_1::IComposerCallback::Connection)+436)
+#07 pc 000000000017be81  /system/bin/surfaceflinger (android::Hwc2::(anonymous namespace)::ComposerCallbackBridge::onHotplug(unsigned long, android::hardware::graphics::composer::V2_1::IComposerCallback::Connection)+17)
+#08 pc 00000000000293ef  /system/lib64/android.hardware.graphics.composer@2.1.so (android::hardware::graphics::composer::V2_1::BnHwComposerCallback::_hidl_onHotplug(android::hidl::base::V1_0::BnHwBase*, android::hardware::Parcel const&, android::hardware::Parcel*, std::__1::function<void (android::hardware::Parcel&)>)+239)
+#09 pc 000000000003859b  /system/lib64/android.hardware.graphics.composer@2.4.so (android::hardware::graphics::composer::V2_4::BnHwComposerCallback::onTransact(unsigned int, android::hardware::Parcel const&, android::hardware::Parcel*, unsigned int, std::__1::function<void (android::hardware::Parcel&)>)+603)
+#10 pc 000000000009ad49  /system/lib64/libhidlbase.so (android::hardware::BHwBinder::transact(unsigned int, android::hardware::Parcel const&, android::hardware::Parcel*, unsigned int, std::__1::function<void (android::hardware::Parcel&)>)+137)
+#11 pc 00000000000a035a  /system/lib64/libhidlbase.so (android::hardware::IPCThreadState::executeCommand(int)+3770)
+#12 pc 00000000000a11a7  /system/lib64/libhidlbase.so (android::hardware::IPCThreadState::waitForResponse(android::hardware::Parcel*, int*)+103)
+#13 pc 00000000000a0ceb  /system/lib64/libhidlbase.so (android::hardware::IPCThreadState::transact(int, unsigned int, android::hardware::Parcel const&, android::hardware::Parcel*, unsigned int)+171)
+#14 pc 000000000009bc95  /system/lib64/libhidlbase.so (android::hardware::BpHwBinder::transact(unsigned int, android::hardware::Parcel const&, android::hardware::Parcel*, unsigned int, std::__1::function<void (android::hardware::Parcel&)>)+69)
+#15 pc 000000000003eb72  /system/lib64/android.hardware.graphics.composer@2.4.so (android::hardware::graphics::composer::V2_4::BpHwComposerClient::_hidl_registerCallback_2_4(android::hardware::IInterface*, android::hardware::details::HidlInstrumentor*, android::sp<android::hardware::graphics::composer::V2_4::IComposerCallback> const&)+514)
+#16 pc 0000000000043298  /system/lib64/android.hardware.graphics.composer@2.4.so (android::hardware::graphics::composer::V2_4::BpHwComposerClient::registerCallback_2_4(android::sp<android::hardware::graphics::composer::V2_4::IComposerCallback> const&)+40)
+#17 pc 0000000000175cf5  /system/bin/surfaceflinger (android::Hwc2::HidlComposer::registerCallback(android::HWC2::ComposerCallback&)+229)
+#18 pc 0000000000183d34  /system/bin/surfaceflinger (android::impl::HWComposer::setCallback(android::HWC2::ComposerCallback&)+4004)
+#19 pc 00000000001e518d  /system/bin/surfaceflinger (android::SurfaceFlinger::init()+877)
+#20 pc 0000000000237e34  /system/bin/surfaceflinger (main+1220)
+#21 pc 0000000000050cc9  /apex/com.android.runtime/lib64/bionic/libc.so (__libc_init+89)
+```
+
+```c++
+#00 pc 00000000001c08c4  /system/bin/surfaceflinger (android::impl::EventThread::createEventConnection(std::__1::function<void ()>, android::ftl::Flags<android::ISurfaceComposer::EventRegistration>) const+100)
+#01 pc 00000000001d40d6  /system/bin/surfaceflinger (android::scheduler::Scheduler::createConnection(std::__1::unique_ptr<android::EventThread, std::__1::default_delete<android::EventThread> >)+118)
+#02 pc 00000000001d3fcf  /system/bin/surfaceflinger (android::scheduler::Scheduler::createConnection(char const*, android::frametimeline::TokenManager*, std::__1::chrono::duration<long long, std::__1::ratio<1l, 1000000000l> >, std::__1::chrono::duration<long long, std::__1::ratio<1l, 1000000000l> >, std::__1::function<void (long)>)+671)
+#03 pc 00000000001f708e  /system/bin/surfaceflinger (android::SurfaceFlinger::processDisplayAdded(android::wp<android::IBinder> const&, android::DisplayDeviceState const&)+8958)
+#04 pc 00000000001ea695  /system/bin/surfaceflinger (android::SurfaceFlinger::processDisplayChangesLocked()+3685)
+#05 pc 00000000001e777f  /system/bin/surfaceflinger (android::SurfaceFlinger::processDisplayHotplugEventsLocked()+8559)
+#06 pc 00000000001ecc64  /system/bin/surfaceflinger (android::SurfaceFlinger::onComposerHalHotplug(unsigned long, android::hardware::graphics::composer::V2_1::IComposerCallback::Connection)+436)
+#07 pc 000000000017be81  /system/bin/surfaceflinger (android::Hwc2::(anonymous namespace)::ComposerCallbackBridge::onHotplug(unsigned long, android::hardware::graphics::composer::V2_1::IComposerCallback::Connection)+17)
+#08 pc 00000000000293ef  /system/lib64/android.hardware.graphics.composer@2.1.so (android::hardware::graphics::composer::V2_1::BnHwComposerCallback::_hidl_onHotplug(android::hidl::base::V1_0::BnHwBase*, android::hardware::Parcel const&, android::hardware::Parcel*, std::__1::function<void (android::hardware::Parcel&)>)+239)
+#09 pc 000000000003859b  /system/lib64/android.hardware.graphics.composer@2.4.so (android::hardware::graphics::composer::V2_4::BnHwComposerCallback::onTransact(unsigned int, android::hardware::Parcel const&, android::hardware::Parcel*, unsigned int, std::__1::function<void (android::hardware::Parcel&)>)+603)
+#10 pc 000000000009ad49  /system/lib64/libhidlbase.so (android::hardware::BHwBinder::transact(unsigned int, android::hardware::Parcel const&, android::hardware::Parcel*, unsigned int, std::__1::function<void (android::hardware::Parcel&)>)+137)
+#11 pc 00000000000a035a  /system/lib64/libhidlbase.so (android::hardware::IPCThreadState::executeCommand(int)+3770)
+#12 pc 00000000000a11a7  /system/lib64/libhidlbase.so (android::hardware::IPCThreadState::waitForResponse(android::hardware::Parcel*, int*)+103)
+#13 pc 00000000000a0ceb  /system/lib64/libhidlbase.so (android::hardware::IPCThreadState::transact(int, unsigned int, android::hardware::Parcel const&, android::hardware::Parcel*, unsigned int)+171)
+#14 pc 000000000009bc95  /system/lib64/libhidlbase.so (android::hardware::BpHwBinder::transact(unsigned int, android::hardware::Parcel const&, android::hardware::Parcel*, unsigned int, std::__1::function<void (android::hardware::Parcel&)>)+69)
+#15 pc 000000000003eb72  /system/lib64/android.hardware.graphics.composer@2.4.so (android::hardware::graphics::composer::V2_4::BpHwComposerClient::_hidl_registerCallback_2_4(android::hardware::IInterface*, android::hardware::details::HidlInstrumentor*, android::sp<android::hardware::graphics::composer::V2_4::IComposerCallback> const&)+514)
+#16 pc 0000000000043298  /system/lib64/android.hardware.graphics.composer@2.4.so (android::hardware::graphics::composer::V2_4::BpHwComposerClient::registerCallback_2_4(android::sp<android::hardware::graphics::composer::V2_4::IComposerCallback> const&)+40)
+#17 pc 0000000000175cf5  /system/bin/surfaceflinger (android::Hwc2::HidlComposer::registerCallback(android::HWC2::ComposerCallback&)+229)
+#18 pc 0000000000183d34  /system/bin/surfaceflinger (android::impl::HWComposer::setCallback(android::HWC2::ComposerCallback&)+4004)
+#19 pc 00000000001e518d  /system/bin/surfaceflinger (android::SurfaceFlinger::init()+877)
+#20 pc 0000000000237e34  /system/bin/surfaceflinger (main+1220)
+#21 pc 0000000000050cc9  /apex/com.android.runtime/lib64/bionic/libc.so (__libc_init+89)
+```
+
+```c++
+#00 pc 00000000001c08c4  /system/bin/surfaceflinger (android::impl::EventThread::createEventConnection(std::__1::function<void ()>, android::ftl::Flags<android::ISurfaceComposer::EventRegistration>) const+100)
+#01 pc 00000000001d4611  /system/bin/surfaceflinger (android::scheduler::Scheduler::createDisplayEventConnection(android::scheduler::ConnectionHandle, android::ftl::Flags<android::ISurfaceComposer::EventRegistration>)+433)
+#02 pc 00000000001ec0b0  /system/bin/surfaceflinger (android::SurfaceFlinger::createDisplayEventConnection(android::ISurfaceComposer::VsyncSource, android::ftl::Flags<android::ISurfaceComposer::EventRegistration>)+64)
+#03 pc 00000000000d6092  /system/lib64/libgui.so (android::BnSurfaceComposer::onTransact(unsigned int, android::Parcel const&, android::Parcel*, unsigned int)+2562)
+#04 pc 00000000002049c0  /system/bin/surfaceflinger (android::SurfaceFlinger::onTransact(unsigned int, android::Parcel const&, android::Parcel*, unsigned int)+800)
+#05 pc 00000000000586f0  /system/lib64/libbinder.so (android::BBinder::transact(unsigned int, android::Parcel const&, android::Parcel*, unsigned int)+176)
+#06 pc 0000000000063833  /system/lib64/libbinder.so (android::IPCThreadState::executeCommand(int)+1203)
+#07 pc 00000000000632bd  /system/lib64/libbinder.so (android::IPCThreadState::getAndExecuteCommand()+157)
+#08 pc 0000000000063c8f  /system/lib64/libbinder.so (android::IPCThreadState::joinThreadPool(bool)+63)
+#09 pc 00000000000939e7  /system/lib64/libbinder.so (android::PoolThread::threadLoop()+23)
+#10 pc 0000000000013e55  /system/lib64/libutils.so (android::Thread::_threadLoop(void*)+325)
+#11 pc 00000000000ccd9a  /apex/com.android.runtime/lib64/bionic/libc.so (__pthread_start(void*)+58)
+#12 pc 0000000000060d47  /apex/com.android.runtime/lib64/bionic/libc.so (__start_thread+55)
+```
+
+```c++
+binder::Status EventThreadConnection::stealReceiveChannel(gui::BitTube* outChannel) {
+    std::scoped_lock lock(mLock);
+    if (mChannel.initCheck() != NO_ERROR) {
+        return binder::Status::fromStatusT(NAME_NOT_FOUND);
+    }
+
+    outChannel->setReceiveFd(mChannel.moveReceiveFd());
+    outChannel->setSendFd(base::unique_fd(dup(mChannel.getSendFd())));
+    return binder::Status::ok();
+}
+```
+
+- <https://www.cnblogs.com/roger-yu/p/16158539.html>
+
+## DisplayEventReceiver::sendEvents
+
+```c++
+
+#00 pc 00000000000c1715  /system/lib64/libgui.so (android::DisplayEventReceiver::sendEvents(android::gui::BitTube*, android::DisplayEventReceiver::Event const*, unsigned long)+85)
+#01 pc 00000000001c010d  /system/bin/surfaceflinger (android::EventThreadConnection::postEvent(android::DisplayEventReceiver::Event const&)+109)
+#02 pc 00000000001c2a29  /system/bin/surfaceflinger (void* std::__1::__thread_proxy<std::__1::tuple<std::__1::unique_ptr<std::__1::__thread_struct, std::__1::default_delete<std::__1::__thread_struct> >, android::impl::EventThread::EventThread(std::__1::unique_ptr<android::VSyncSource, std::__1::default_delete<android::VSyncSource> >, android::frametimeline::TokenManager*, std::__1::function<void (long)>, std::__1::function<bool (long, unsigned int)>, std::__1::function<long (unsigned int)>)::$_1> >(void*)+2585)
+#03 pc 00000000000ccd9a  /apex/com.android.runtime/lib64/bionic/libc.so (__pthread_start(void*)+58)
+#04 pc 0000000000060d47  /apex/com.android.runtime/lib64/bionic/libc.so (__start_thread+55)
+```
+
+```c++
+void EventThread::onVSyncEvent(nsecs_t timestamp, VSyncSource::VSyncData vsyncData) {
+    std::lock_guard<std::mutex> lock(mMutex);
+
+    LOG_FATAL_IF(!mVSyncState);
+    mPendingEvents.push_back(makeVSync(mVSyncState->displayId, timestamp, ++mVSyncState->count,
+                                       vsyncData.expectedPresentationTime,
+                                       vsyncData.deadlineTimestamp));
+    mCondition.notify_all();
+}
+
+void EventThread::threadMain(std::unique_lock<std::mutex>& lock) {
+    DisplayEventConsumers consumers;
+
+    while (mState != State::Quit) {
+        std::optional<DisplayEventReceiver::Event> event;
+
+        // Determine next event to dispatch.
+        if (!mPendingEvents.empty()) {
+            event = mPendingEvents.front();
+            mPendingEvents.pop_front();
+
+            switch (event->header.type) {
+                case DisplayEventReceiver::DISPLAY_EVENT_HOTPLUG:
+                    if (event->hotplug.connected && !mVSyncState) {
+                        mVSyncState.emplace(event->header.displayId);
+                    } else if (!event->hotplug.connected && mVSyncState &&
+                               mVSyncState->displayId == event->header.displayId) {
+                        mVSyncState.reset();
+                    }
+                    break;
+
+                case DisplayEventReceiver::DISPLAY_EVENT_VSYNC:
+                    if (mInterceptVSyncsCallback) {
+                        mInterceptVSyncsCallback(event->header.timestamp);
+                    }
+                    break;
+            }
+        }
+
+        bool vsyncRequested = false;
+
+        // Find connections that should consume this event.
+        auto it = mDisplayEventConnections.begin();
+        while (it != mDisplayEventConnections.end()) {
+            if (const auto connection = it->promote()) {
+                vsyncRequested |= connection->vsyncRequest != VSyncRequest::None;
+
+                if (event && shouldConsumeEvent(*event, connection)) {
+                    consumers.push_back(connection);
+                }
+
+                ++it;
+            } else {
+                it = mDisplayEventConnections.erase(it);
+            }
+        }
+
+        if (!consumers.empty()) {
+            dispatchEvent(*event, consumers);
+            consumers.clear();
+        }
+
+        State nextState;
+        if (mVSyncState && vsyncRequested) {
+            nextState = mVSyncState->synthetic ? State::SyntheticVSync : State::VSync;
+        } else {
+            ALOGW_IF(!mVSyncState, "Ignoring VSYNC request while display is disconnected");
+            nextState = State::Idle;
+        }
+
+        if (mState != nextState) {
+            if (mState == State::VSync) {
+                mVSyncSource->setVSyncEnabled(false);
+            } else if (nextState == State::VSync) {
+                mVSyncSource->setVSyncEnabled(true);
+            }
+
+            mState = nextState;
+        }
+
+        if (event) {
+            continue;
+        }
+
+        // Wait for event or client registration/request.
+        if (mState == State::Idle) {
+            mCondition.wait(lock);
+        } else {
+            // Generate a fake VSYNC after a long timeout in case the driver stalls. When the
+            // display is off, keep feeding clients at 60 Hz.
+            const std::chrono::nanoseconds timeout =
+                    mState == State::SyntheticVSync ? 16ms : 1000ms;
+            if (mCondition.wait_for(lock, timeout) == std::cv_status::timeout) {
+                if (mState == State::VSync) {
+                    ALOGW("Faking VSYNC due to driver stall for thread %s", mThreadName);
+                    std::string debugInfo = "VsyncSource debug info:\n";
+                    mVSyncSource->dump(debugInfo);
+                    // Log the debug info line-by-line to avoid logcat overflow
+                    auto pos = debugInfo.find('\n');
+                    while (pos != std::string::npos) {
+                        ALOGW("%s", debugInfo.substr(0, pos).c_str());
+                        debugInfo = debugInfo.substr(pos + 1);
+                        pos = debugInfo.find('\n');
+                    }
+                }
+
+                LOG_FATAL_IF(!mVSyncState);
+                const auto now = systemTime(SYSTEM_TIME_MONOTONIC);
+                const auto deadlineTimestamp = now + timeout.count();
+                const auto expectedVSyncTime = deadlineTimestamp + timeout.count();
+                mPendingEvents.push_back(makeVSync(mVSyncState->displayId, now,
+                                                   ++mVSyncState->count, expectedVSyncTime,
+                                                   deadlineTimestamp));
+            }
+        }
+    }
+}
+
+bool EventThread::shouldConsumeEvent(const DisplayEventReceiver::Event& event,
+                                     const sp<EventThreadConnection>& connection) const {
+    const auto throttleVsync = [&] {
+        return mThrottleVsyncCallback &&
+                mThrottleVsyncCallback(event.vsync.vsyncData.preferredExpectedPresentationTime(),
+                                       connection->mOwnerUid);
+    };
+
+    switch (event.header.type) {
+        case DisplayEventReceiver::DISPLAY_EVENT_HOTPLUG:
+            return true;
+
+        case DisplayEventReceiver::DISPLAY_EVENT_MODE_CHANGE: {
+            return connection->mEventRegistration.test(
+                    ISurfaceComposer::EventRegistration::modeChanged);
+        }
+
+        // VSYNC事件
+        case DisplayEventReceiver::DISPLAY_EVENT_VSYNC:
+            switch (connection->vsyncRequest) {
+
+                // rate==0，不分发
+                case VSyncRequest::None:
+                    return false;
+
+                // requestNextVsync 有请求时case
+                case VSyncRequest::SingleSuppressCallback:
+                    connection->vsyncRequest = VSyncRequest::None;
+                    return false;
+
+                // requestNextVsync 有请求时case
+                case VSyncRequest::Single: {
+                    if (throttleVsync()) {
+                        return false;
+                    }
+                    connection->vsyncRequest = VSyncRequest::SingleSuppressCallback;
+                    return true;
+                }
+                case VSyncRequest::Periodic:
+                    if (throttleVsync()) {
+                        return false;
+                    }
+                    return true;
+                default:
+                    // We don't throttle vsync if the app set a vsync request rate
+                    // since there is no easy way to do that and this is a very
+                    // rare case
+                    // 根据setVsyncRate设置分发的频率，周期性的计数，每connection->vsyncRequest个分发一个
+                    return event.vsync.count % vsyncPeriod(connection->vsyncRequest) == 0;
+            }
+
+        case DisplayEventReceiver::DISPLAY_EVENT_FRAME_RATE_OVERRIDE:
+            [[fallthrough]];
+        case DisplayEventReceiver::DISPLAY_EVENT_FRAME_RATE_OVERRIDE_FLUSH:
+            return connection->mEventRegistration.test(
+                    ISurfaceComposer::EventRegistration::frameRateOverride);
+
+        default:
+            return false;
+    }
+}
+
+void EventThread::dispatchEvent(const DisplayEventReceiver::Event& event,
+                                const DisplayEventConsumers& consumers) {
+    for (const auto& consumer : consumers) {
+        DisplayEventReceiver::Event copy = event;
+        if (event.header.type == DisplayEventReceiver::DISPLAY_EVENT_VSYNC) {
+            const int64_t frameInterval = mGetVsyncPeriodFunction(consumer->mOwnerUid);
+            copy.vsync.vsyncData.frameInterval = frameInterval;
+            generateFrameTimeline(copy.vsync.vsyncData, frameInterval, copy.header.timestamp,
+                                  event.vsync.vsyncData.preferredExpectedPresentationTime(),
+                                  event.vsync.vsyncData.preferredDeadlineTimestamp());
+        }
+        switch (consumer->postEvent(copy)) {
+            case NO_ERROR:
+                break;
+
+            case -EAGAIN:
+                // TODO: Try again if pipe is full.
+                ALOGW("Failed dispatching %s for %s", toString(event).c_str(),
+                      toString(*consumer).c_str());
+                break;
+
+            default:
+                // Treat EPIPE and other errors as fatal.
+                removeDisplayEventConnectionLocked(consumer);
+        }
+    }
+}
+
+```
+
+- <https://www.cnblogs.com/roger-yu/p/16167404.html>
+
+## SurfaceFlinger::composite
+
+```c++
+#00 pc 00000000001f1d32  /system/bin/surfaceflinger (android::SurfaceFlinger::composite(long, long)+130)
+#01 pc 00000000001ca168  /system/bin/surfaceflinger (android::impl::MessageQueue::Handler::handleMessage(android::Message const&)+72)
+#02 pc 00000000000184af  /system/lib64/libutils.so (android::Looper::pollInner(int)+447)
+#03 pc 000000000001828e  /system/lib64/libutils.so (android::Looper::pollOnce(int, int*, int*, void**)+110)
+#04 pc 00000000001ca841  /system/bin/surfaceflinger (android::impl::MessageQueue::waitMessage()+97)
+#05 pc 00000000001d3b58  /system/bin/surfaceflinger (android::scheduler::Scheduler::run()+104)
+#06 pc 000000000023824a  /system/bin/surfaceflinger (main+2090)
+```
+
+```c++
+void MessageQueue::scheduleFrame() {
+    ATRACE_CALL();
+
+    {
+        std::lock_guard lock(mInjector.mutex);
+        if (CC_UNLIKELY(mInjector.connection)) {
+            ALOGD("%s while injecting VSYNC", __FUNCTION__);
+            mInjector.connection->requestNextVsync();
+            return;
+        }
+    }
+
+    std::lock_guard lock(mVsync.mutex);
+    mVsync.scheduledFrameTime =
+            mVsync.registration->schedule({.workDuration = mVsync.workDuration.get().count(),
+                                           .readyDuration = 0,
+                                           .earliestVsync = mVsync.lastCallbackTime.count()});
+}
+```
+
+```c++
+
+/*
+* 调度已注册的回调以便派发。
+*
+* 回调将在一个 vsync 事件前 'workDuration + readyDuration' 纳秒被派发。
+*
+* 调用者通过 earliestVsync 参数指定应被目标化的最早的 vsync 事件。
+* 回调将在 (workDuration + readyDuration - predictedVsync) 时被调度，其中
+* predictedVsync 是第一个满足 ( predictedVsync >= earliestVsync ) 的 vsync 事件时间。
+*
+* 如果 (workDuration + readyDuration - earliestVsync) 已经过去，或者如果一个回调已经
+* 被派发给预测的vsync，那么将返回一个错误。
+*
+* 重新调度一个回调到不同的时间是有效的。
+*
+* \param [in] token           要调度的回调。
+* \param [in] scheduleTiming  这次调度调用的时间信息
+* \return                     如果调度了一个回调，返回预期的回调时间。
+*                             如果回调没有被注册，返回 std::nullopt。
+*/
+
+/*
+* Schedules the registered callback to be dispatched.
+*
+* The callback will be dispatched at 'workDuration + readyDuration' nanoseconds before a vsync
+* event.
+*
+* The caller designates the earliest vsync event that should be targeted by the earliestVsync
+* parameter.
+* The callback will be scheduled at (workDuration + readyDuration - predictedVsync), where
+* predictedVsync is the first vsync event time where ( predictedVsync >= earliestVsync ).
+*
+* If (workDuration + readyDuration - earliestVsync) is in the past, or if a callback has
+* already been dispatched for the predictedVsync, an error will be returned.
+*
+* It is valid to reschedule a callback to a different time.
+*
+* \param [in] token           The callback to schedule.
+* \param [in] scheduleTiming  The timing information for this schedule call
+* \return                     The expected callback time if a callback was scheduled.
+*                             std::nullopt if the callback is not registered.
+*/
+virtual ScheduleResult schedule(CallbackToken token, ScheduleTiming scheduleTiming) = 0;
+
+
+void MessageQueue::Handler::dispatchFrame(int64_t vsyncId, nsecs_t expectedVsyncTime) {
+    if (!mFramePending.exchange(true)) {
+        mVsyncId = vsyncId;
+        mExpectedVsyncTime = expectedVsyncTime;
+        mQueue.mLooper->sendMessage(this, Message());
+    }
+}
+
+void MessageQueue::Handler::handleMessage(const Message&) {
+    mFramePending.store(false);
+
+    const nsecs_t frameTime = systemTime();
+    auto& compositor = mQueue.mCompositor;
+
+    if (!compositor.commit(frameTime, mVsyncId, mExpectedVsyncTime)) {
+        return;
+    }
+
+    compositor.composite(frameTime, mVsyncId);
+    compositor.sample();
+}
+
+void SurfaceFlinger::composite(nsecs_t frameTime, int64_t vsyncId)
+    ....
+}
+```
+
+## VSYNC::Perfetto
+
+```c++
+onComposerHalVsync(16666666)
+HIDL::IComposerCallback::onVsync_2_4::server 
+HIDL::IComposerCallback::onVsync_2_4::client
+```
+
+![](/learn-android/aosp/vsync_perfetto.png)
+
 
 ## Reference
 
