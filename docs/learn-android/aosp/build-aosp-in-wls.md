@@ -328,7 +328,6 @@ emulator.exe -avd biezhihua_aosp  -system "\\wsl.localhost\Ubuntu-18.04\home\bie
 emulator.exe -avd biezhihua_aosp  -system "\\wsl.localhost\Ubuntu-18.04\home\biezhihua\projects\aosp\out\target\product\emulator_x86_64\system-qemu.img" -data "\\wsl.localhost\Ubuntu-18.04\home\biezhihua\projects\aosp\out\target\product\emulator_x86_64\userdata.img" -writable-system -show-kernel -skip-adb-auth
 ```
 
-
 - <https://sidneyding.cn/posts/c64b5633/>
 
 ## 对于AOSP，如何打包单个模块并更新system.img文件，请以framework/native为例
@@ -467,9 +466,9 @@ ld.lld: error: undefined symbol: android::CallStack::log(char const*, android_Lo
 ld.lld: error: undefined symbol: android::CallStack::~CallStack()
 ```
 
-- https://www.cnblogs.com/roger-yu/p/15596840.html
-- https://utzcoz.github.io/2020/04/29/Print-call-stack-in-AOSP-native-code.html
-- https://blog.csdn.net/zhaojia92/article/details/97827285
+- <https://www.cnblogs.com/roger-yu/p/15596840.html>
+- <https://utzcoz.github.io/2020/04/29/Print-call-stack-in-AOSP-native-code.html>
+- <https://blog.csdn.net/zhaojia92/article/details/97827285>
 
 ## AOSP 过滤调用栈日志
 
@@ -478,6 +477,7 @@ emulator.exe -avd biezhihua_aosp  -system "\\wsl.localhost\Ubuntu-18.04\home\bie
 ```
 
 `onComposerHalHotplug`的调用栈：
+
 ```text
  # adb logcat | findstr "bzh"
 05-03 23:34:47.773   443   443 D bzh     : #00 pc 00000000001ec91c  /system/bin/surfaceflinger (android::SurfaceFlinger::onComposerHalHotplug(unsigned long, android::hardware::graphics::composer::V2_1::IComposerCallback::Connection)+524)
@@ -497,3 +497,8 @@ emulator.exe -avd biezhihua_aosp  -system "\\wsl.localhost\Ubuntu-18.04\home\bie
 05-03 23:34:47.774   443   443 D bzh     : #14 pc 0000000000237994  /system/bin/surfaceflinger (main+1220)
 05-03 23:34:47.774   443   443 D bzh     : #15 pc 0000000000050cc9  /apex/com.android.runtime/lib64/bionic/libc.so (__libc_init+89)
 ```
+
+## IDE导入AOSP源码
+
+- <https://zhuanlan.zhihu.com/p/272522594>
+- <https://www.youtube.com/watch?v=XJ0dI2SYHIE>

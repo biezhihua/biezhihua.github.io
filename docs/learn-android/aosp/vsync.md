@@ -1160,3 +1160,4 @@ HIDL::IComposerCallback::onVsync_2_4::client
 - <https://www.cnblogs.com/roger-yu/p/15641545.html>
 - <https://www.cnblogs.com/roger-yu/p/16122236.html>
 - <https://www.cnblogs.com/roger-yu/p/15596840.html>
+- <https://juejin.cn/post/7166061140298956836>
