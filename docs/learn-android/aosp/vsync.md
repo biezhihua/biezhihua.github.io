@@ -472,7 +472,7 @@ EventThread::EventThread(std::unique_ptr<VSyncSource> vsyncSource,
 #04 pc 0000000000060d47  /apex/com.android.runtime/lib64/bionic/libc.so (__start_thread+55)
 ```
 
-## dumpsys SurfaceFlinger
+### dumpsys SurfaceFlinger
 
 ```text
 VsyncDispatch:
@@ -493,7 +493,9 @@ VsyncDispatch:
                         mLastDispatchTime: 16025.80ms ago
 ```
 
-## DisplayEventReceiver建立与SurfaceFlinger通信通道
+## SurfaceFlinger与DisplayEventReceiver的通信通道
+
+### DisplayEventReceiver建立与SurfaceFlinger通信通道
 
 ```c++
 DisplayEventReceiver::DisplayEventReceiver(
@@ -597,7 +599,7 @@ binder::Status EventThreadConnection::stealReceiveChannel(gui::BitTube* outChann
 
 - <https://www.cnblogs.com/roger-yu/p/16158539.html>
 
-## DisplayEventReceiver::sendEvents
+### DisplayEventReceiver::sendEvents
 
 ```c++
 
@@ -1027,6 +1029,53 @@ void SurfaceFlinger::composite(nsecs_t frameTime, int64_t vsyncId)
 #07 pc 00000000001d3c78  /system/bin/surfaceflinger (android::scheduler::Scheduler::run()+104)
 #08 pc 000000000023849a  /system/bin/surfaceflinger (main+2090)
 #09 pc 0000000000050cc9  /apex/com.android.runtime/lib64/bionic/libc.so (__libc_init+89)
+```
+
+### MessageQueue::scheduleFrame
+
+```c++
+
+#00 pc 00000000001caae9  /system/bin/surfaceflinger (android::impl::MessageQueue::scheduleFrame()+89)
+#01 pc 00000000001e482d  /system/bin/surfaceflinger (android::SurfaceFlinger::setTransactionFlags(unsigned int, android::scheduler::TransactionSchedule, android::sp<android::IBinder> const&, android::SurfaceFlinger::FrameHint)+493)
+#02 pc 00000000001fdab1  /system/bin/surfaceflinger (android::SurfaceFlinger::setTransactionState(android::FrameTimelineInfo const&, android::Vector<android::ComposerState> const&, android::Vector<android::DisplayState> const&, unsigned int, android::sp<android::IBinder> const&, android::InputWindowCommands const&, long, bool, android::client_cache_t const&, bool, std::__1::vector<android::ListenerCallbacks, std::__1::allocator<android::ListenerCallbacks> > const&, unsigned long)+2033)
+#03 pc 00000000000d8819  /system/lib64/libgui.so (android::BnSurfaceComposer::onTransact(unsigned int, android::Parcel const&, android::Parcel*, unsigned int)+11849)
+#04 pc 0000000000204dc0  /system/bin/surfaceflinger (android::SurfaceFlinger::onTransact(unsigned int, android::Parcel const&, android::Parcel*, unsigned int)+800)
+#05 pc 00000000000586f0  /system/lib64/libbinder.so (android::BBinder::transact(unsigned int, android::Parcel const&, android::Parcel*, unsigned int)+176)
+#06 pc 0000000000063833  /system/lib64/libbinder.so (android::IPCThreadState::executeCommand(int)+1203)
+#07 pc 00000000000632bd  /system/lib64/libbinder.so (android::IPCThreadState::getAndExecuteCommand()+157)
+#08 pc 0000000000063c8f  /system/lib64/libbinder.so (android::IPCThreadState::joinThreadPool(bool)+63)
+#09 pc 00000000000939e7  /system/lib64/libbinder.so (android::PoolThread::threadLoop()+23)
+#10 pc 0000000000013e55  /system/lib64/libutils.so (android::Thread::_threadLoop(void*)+325)
+#11 pc 00000000000ccd9a  /apex/com.android.runtime/lib64/bionic/libc.so (__pthread_start(void*)+58)
+#12 pc 0000000000060d47  /apex/com.android.runtime/lib64/bionic/libc.so (__start_thread+55)
+```
+
+```c++
+#00 pc 00000000001caae9  /system/bin/surfaceflinger (android::impl::MessageQueue::scheduleFrame()+89)
+#01 pc 00000000001e482d  /system/bin/surfaceflinger (android::SurfaceFlinger::setTransactionFlags(unsigned int, android::scheduler::TransactionSchedule, android::sp<android::IBinder> const&, android::SurfaceFlinger::FrameHint)+493)
+#02 pc 00000000001fa443  /system/bin/surfaceflinger (android::SurfaceFlinger::flushPendingTransactionQueues(std::__1::vector<android::TransactionState, std::__1::allocator<android::TransactionState> >&, std::__1::unordered_map<android::sp<android::IBinder>, unsigned long, android::gui::SpHash<android::IBinder>, std::__1::equal_to<android::sp<android::IBinder> >, std::__1::allocator<std::__1::pair<android::sp<android::IBinder> const, unsigned long> > >&, std::__1::unordered_set<android::sp<android::IBinder>, android::gui::SpHash<android::IBinder>, std::__1::equal_to<android::sp<android::IBinder> >, std::__1::allocator<android::sp<android::IBinder> > >&, bool)+931)
+#03 pc 00000000001eebea  /system/bin/surfaceflinger (android::SurfaceFlinger::commit(long, long, long)+5978)
+#04 pc 00000000001ca2c4  /system/bin/surfaceflinger (android::impl::MessageQueue::Handler::handleMessage(android::Message const&)+52)
+#05 pc 00000000000184af  /system/lib64/libutils.so (android::Looper::pollInner(int)+447)
+#06 pc 000000000001828e  /system/lib64/libutils.so (android::Looper::pollOnce(int, int*, int*, void**)+110)
+#07 pc 00000000001caa11  /system/bin/surfaceflinger (android::impl::MessageQueue::waitMessage()+97)
+#08 pc 00000000001d3d78  /system/bin/surfaceflinger (android::scheduler::Scheduler::run()+104)
+#09 pc 000000000023859a  /system/bin/surfaceflinger (main+2090)
+#10 pc 0000000000050cc9  /apex/com.android.runtime/lib64/bionic/libc.so (__libc_init+89)
+
+
+```
+
+```c++
+#00 pc 00000000001caae9  /system/bin/surfaceflinger (android::impl::MessageQueue::scheduleFrame()+89)
+#01 pc 00000000001eda80  /system/bin/surfaceflinger (android::SurfaceFlinger::commit(long, long, long)+1520)
+#02 pc 00000000001ca2c4  /system/bin/surfaceflinger (android::impl::MessageQueue::Handler::handleMessage(android::Message const&)+52)
+#03 pc 00000000000184af  /system/lib64/libutils.so (android::Looper::pollInner(int)+447)
+#04 pc 000000000001828e  /system/lib64/libutils.so (android::Looper::pollOnce(int, int*, int*, void**)+110)
+#05 pc 00000000001caa11  /system/bin/surfaceflinger (android::impl::MessageQueue::waitMessage()+97)
+#06 pc 00000000001d3d78  /system/bin/surfaceflinger (android::scheduler::Scheduler::run()+104)
+#07 pc 000000000023859a  /system/bin/surfaceflinger (main+2090)
+#08 pc 0000000000050cc9  /apex/com.android.runtime/lib64/bionic/libc.so (__libc_init+89)
 ```
 
 ### CallbackRepeater::start
