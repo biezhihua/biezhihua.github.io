@@ -131,6 +131,10 @@ sudo resize2fs /dev/sda 50G
 
 完成这些步骤后，WSL2 Ubuntu 18.04 的磁盘容量应已成功扩展。您可以使用 `df -h` 命令检查新的磁盘空间。
 
+## wls2 install android-studio && clion
+
+<https://learn.microsoft.com/zh-cn/windows/wsl/tutorials/gui-apps>
+
 ## aosp install repo
 
 ```bash
@@ -330,6 +334,12 @@ emulator.exe -avd biezhihua_aosp  -system "\\wsl.localhost\Ubuntu-18.04\home\bie
 
 - <https://sidneyding.cn/posts/c64b5633/>
 
+## run a compiled image to emulator | method3
+
+```bash
+emulator -avd biezhihua_aosp  -system "/home/biezhihua/projects/aosp/out/target/product/emulator_x86_64/system-qemu.img" -data "/home/biezhihua/projects/aosp/out/target/product/emulator_x86_64/userdata.img" -writable-system -show-kernel -skip-adb-auth -wipe-data
+```
+
 ## 对于AOSP，如何打包单个模块并更新system.img文件，请以framework/native为例
 
 在 AOSP 源代码中，若要仅构建 framework/native 模块并更新 system.img 文件，可按照以下步骤操作：
@@ -498,7 +508,76 @@ emulator.exe -avd biezhihua_aosp  -system "\\wsl.localhost\Ubuntu-18.04\home\bie
 05-03 23:34:47.774   443   443 D bzh     : #15 pc 0000000000050cc9  /apex/com.android.runtime/lib64/bionic/libc.so (__libc_init+89)
 ```
 
-## IDE导入AOSP源码
+## AIDEGen IDE导入AOSP源码
+
+```bash
+aidegen frameworks/native/services/surfaceflinger -i c -s
+aidegen frameworks/native/services/surfaceflinger -i c -s
+```
 
 - <https://zhuanlan.zhihu.com/p/272522594>
 - <https://www.youtube.com/watch?v=XJ0dI2SYHIE>
+- <https://juejin.cn/post/7166061140298956836>
+- <https://android.googlesource.com/platform/tools/asuite/+/refs/heads/master/aidegen/README.md>
+
+## CLion debug android native code
+
+### 安装LLDB
+
+- <https://blog.csdn.net/iamdy/article/details/111272854>
+- <https://source.android.google.cn/docs/core/tests/debug/gdb?hl=zh-cn>
+- <https://lldb.llvm.org/>
+- <https://www.jetbrains.com/help/clion/remote-debug.html>
+- <https://www.jianshu.com/p/76ae75688079>
+- <https://blog.csdn.net/qq_23542165/article/details/121275404>
+
+### LLDB FOR Android
+
+```bash
+/root/Android/Sdk/ndk/25.2.9519653/toolchains/llvm/prebuilt/linux-x86_64/lib64/clang/14.0.7/lib/linux/x86_64/lldb-server
+
+adb push lldb-server /data/local/tmp
+```
+
+```bash
+emulator_x86_64:/data/local/tmp # chmod 775 ./lldb-server
+
+emulator_x86_64:/data/local/tmp # ./lldb-server platform --listen "*:1234" --server
+```
+
+```bash
+adb push lldb-server /data/local/tmp/
+adb shell 
+cd /data/local/tmp
+chmod 755 lldb-server
+./lldb-server p --server --listen unix-abstract:///data/local/tmp/debug.sock
+```
+
+```bash
+lldb-<version>
+platform list  # 查看lldb可以连接的平台
+platform select remote-android
+platform status # 查看平台状态
+platform connect unix-abstract-connect:///data/local/tmp/debug.sock
+
+```
+
+```bash
+./lldb-server platform --listen "*:1234" --server
+```
+
+```bash
+platform connect connect://emulator-5554:1234
+```
+
+- <https://stackoverflow.com/questions/53733781/how-do-i-use-lldb-to-debug-c-code-on-android-on-command-line>
+- <https://youtrack.jetbrains.com/issue/CPP-26922>
+- <https://www.lili.kim/2019/01/28/android/Debug%20Android%20Native%20with%20LLDB/>
+
+## VS Code debug android native code
+
+```bash
+aidegen frameworks/native/services -i v -s -p /mnt/d/App/Microsoft\ VS\ Code/bin
+```
+
+- https://github.com/xxr0ss/vscode_lldb_remote_android
