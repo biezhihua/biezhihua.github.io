@@ -574,10 +574,127 @@ platform connect connect://emulator-5554:1234
 - <https://youtrack.jetbrains.com/issue/CPP-26922>
 - <https://www.lili.kim/2019/01/28/android/Debug%20Android%20Native%20with%20LLDB/>
 
-## VS Code debug android native code
+### LLDB VS Code debug android native code
 
 ```bash
 aidegen frameworks/native/services -i v -s -p /mnt/d/App/Microsoft\ VS\ Code/bin
 ```
 
-- https://github.com/xxr0ss/vscode_lldb_remote_android
+- <https://github.com/xxr0ss/vscode_lldb_remote_android>
+
+## GDB Clion debug android native code
+
+```bash
+adb shell pidof surfaceflinger
+
+./gdbserver :12345 --attach 460
+```
+
+- <https://www.jetbrains.com/help/clion/remote-debug.html>
+
+### android emulator 怎么开启 gdbserver
+
+您可以通过以下步骤在 Android 模拟器上启动 gdbserver：
+
+1. 在模拟器中安装 gdbserver
+
+首先，您需要在模拟器中安装 gdbserver。您可以使用以下 adb 命令安装：
+
+```
+adb push gdbserver /data/local/tmp/
+adb shell chmod 755 /data/local/tmp/gdbserver
+```
+
+2. 在模拟器中启动 gdbserver
+
+接下来，您需要在模拟器中启动 gdbserver，以便可以通过 GDB 连接到它。您可以使用以下 adb 命令启动 gdbserver：
+
+```
+adb shell /data/local/tmp/gdbserver :<port> <process-id>
+```
+
+其中 `<port>` 是您要使用的调试端口号，`<process-id>` 是您要调试的进程 ID。例如，以下命令将启动 gdbserver 并将其绑定到端口号 1234，以调试进程 ID 12345：
+
+```
+adb shell /data/local/tmp/gdbserver :1234 12345
+```
+
+3. 在主机上连接到 gdbserver
+
+最后，您需要在主机上运行 GDB，并使用以下命令连接到模拟器中的 gdbserver：
+
+```
+gdb <executable> -ex 'target remote <ip-address>:<port>'
+```
+
+其中 `<executable>` 是您要调试的可执行文件，`<ip-address>` 是您的模拟器 IP 地址，`<port>` 是您在第 2 步中指定的端口号。例如，以下命令将使用 GDB 连接到 IP 地址为 192.168.0.2，端口号为 1234 的模拟器：
+
+```
+gdb my_app -ex 'target remote 192.168.0.2:1234'
+```
+
+请注意，在连接到模拟器之前，您需要确保模拟器和主机在同一网络中，并且可以相互通信。
+
+希望这可以帮助您启动 gdbserver 并连接到 Android 模拟器进行调试。
+
+### android可用的gdbserver在哪里可以找到
+
+可以在 Android NDK 中找到可用的 gdbserver。可以从以下位置下载 Android NDK：<https://developer.android.com/ndk/downloads。>
+
+在下载并解压缩 Android NDK 后，您可以在 `<ndk_root>/prebuilt/android-x86/gdbserver`（或其他 CPU 架构的相应目录）找到 gdbserver 可执行文件。
+
+将此可执行文件复制到 Android 设备上，并在设备上运行它以启动 gdbserver。例如，如果您的 Android 设备的 IP 地址为 `192.168.1.100`，则可以使用以下命令启动 gdbserver：
+
+```
+adb shell /data/local/tmp/gdbserver :9999 --attach <pid>
+```
+
+这将在 Android 设备上的 `9999` 端口上启动 gdbserver，并将其附加到 `<pid>` 指定的进程。然后，您可以在本地主机上使用 gdb 来连接 gdbserver 并进行调试：
+
+```
+gdb
+(gdb) target remote 192.168.1.100:9999
+(gdb) ...
+```
+
+注意，如果您的 Android 设备已经 root，并且已经安装了 SuperSU 或 Magisk 等 root 管理应用程序，则可以直接将 gdbserver 安装到设备上，而不需要每次都复制它。
+
+## CLion预览代码，LLDB调试代码
+
+预览代码
+
+```bash
+aidegen frameworks -i c -s
+```
+
+启动模拟器
+
+```
+emulator -avd biezhihua_aosp  -system "/home/biezhihua/projects/aosp/out/target/product/emulator_x86_64/system-qemu.img" -data "/home/biezhihua/projects/aosp/out/target/product/emulator_x86_64/userdata.img" -writable-system -show-kernel -skip-adb-auth -wipe-data
+```
+
+获取目标进程PID
+
+```
+adb shell pidof surfaceflinger
+```
+
+调试代码
+
+```bash
+
+// 进入调试模式
+lldbclient.py -p 446
+
+// 首次进入后，所有线程会因为stop reason = signal SIGSTOP挂起
+continue 让进程继续执行
+```
+
+增加断点：
+
+```
+breakpoint set -M SurfaceFlinger::onComposerHalVsync
+```
+
+- <https://source.android.com/docs/core/tests/debug/gdb?hl=zh-cn>
+- <https://lldb.llvm.org/>

@@ -316,161 +316,155 @@ adb logcat | findstr "VSyncDispatchTimerQueue::registerCallback"
 
 ```
 
+## Scheduler::addResyncSample && Scheduler::addPresentFence
+
+### 帮我解释方法的作用
+
+```
+// Passes a vsync sample to VsyncController. periodFlushed will be true if
+// VsyncController detected that the vsync period changed, and false otherwise.
+void addResyncSample(nsecs_t timestamp, std::optional<nsecs_t> hwcVsyncPeriod,
+                        bool* periodFlushed);
+void addPresentFence(std::shared_ptr<FenceTime>);
+```
+
+ChatGPT
+
+以下是关于这两个方法的解释：
+
+addResyncSample 方法：
+
+此方法用于将一个 vsync 样本传递给 VsyncController。Vsync（垂直同步）是一种用于防止屏幕撕裂现象（图像的一部分比其他部分更新得更快）的技术。在显示系统中，VsyncController 通常负责处理这种垂直同步。
+
+方法参数：
+
+timestamp：表示 vsync 事件的时间戳（以纳秒为单位）。
+hwcVsyncPeriod：一个 std::optional 类型的参数，表示硬件组件（如显示控制器）提供的 vsync 周期（以纳秒为单位）。如果不提供硬件组件的 vsync 周期，这个值为 std::nullopt。
+periodFlushed：一个指向布尔值的指针，用于返回方法执行后的状态。如果 VsyncController 检测到 vsync 周期发生变化，则返回 true；否则返回 false。
+
+该方法的作用是将 vsync 样本信息传递给 VsyncController 进行处理。在处理过程中，VsyncController 可能会检测到 vsync 周期的变化。这个方法可以帮助显示系统了解何时需要调整 vsync 周期以实现更好的画面同步。
+
+addPresentFence 方法：
+
+此方法用于向类的实例添加一个 PresentFence。PresentFence 通常是一个同步原语，用于确保在显示设备的显示内容更新之前，所有相关的图形操作已经完成。
+
+方法参数：
+
+std::shared_ptr<FenceTime>：一个指向 FenceTime 对象的智能指针（shared_ptr），表示一个 PresentFence。
+
+该方法的作用是将一个 PresentFence 添加到类的实例中，以便在需要时可以同步图形操作和显示设备的更新。这有助于确保画面的正确呈现，防止由于操作未完成而导致的画面撕裂等问题。
+
 ## SurfaceFlinger的VSYNC的分发逻辑
 
 ### VSyncDispatchTimerQueue::setTimer
 
 ```c++
-#00 pc 00000000001d8da6  /system/bin/surfaceflinger (android::scheduler::VSyncDispatchTimerQueue::rearmTimerSkippingUpdateFor(long, std::__1::__hash_map_iterator<std::__1::__hash_iterator<std::__1::__hash_node<std::__1::__hash_value_type<android::StrongTyping<unsigned long, android::scheduler::CallbackTokenTag, android::Compare, android::Hash>, std::__1::shared_ptr<android::scheduler::VSyncDispatchTimerQueueEntry> >, void*>*> > const&)+2310)
-#01 pc 00000000001d9cd1  /system/bin/surfaceflinger (android::scheduler::VSyncDispatchTimerQueue::schedule(android::StrongTyping<unsigned long, android::scheduler::CallbackTokenTag, android::Compare, android::Hash>, android::scheduler::VSyncDispatch::ScheduleTiming)+657)
-#02 pc 00000000001da3fe  /system/bin/surfaceflinger (android::scheduler::VSyncCallbackRegistration::schedule(android::scheduler::VSyncDispatch::ScheduleTiming)+46)
-#03 pc 00000000001be52f  /system/bin/surfaceflinger (android::scheduler::DispSyncSource::setVSyncEnabled(bool)+159)
-#04 pc 00000000001c1fab  /system/bin/surfaceflinger (void* std::__1::__thread_proxy<std::__1::tuple<std::__1::unique_ptr<std::__1::__thread_struct, std::__1::default_delete<std::__1::__thread_struct> >, android::impl::EventThread::EventThread(std::__1::unique_ptr<android::VSyncSource, std::__1::default_delete<android::VSyncSource> >, android::frametimeline::TokenManager*, std::__1::function<void (long)>, std::__1::function<bool (long, unsigned int)>, std::__1::function<long (unsigned int)>)::$_1> >(void*)+187)
-#05 pc 00000000000ccd9a  /apex/com.android.runtime/lib64/bionic/libc.so (__pthread_start(void*)+58)
-#06 pc 0000000000060d47  /apex/com.android.runtime/lib64/bionic/libc.so (__start_thread+55)
-
+frame #0: 0x00005abb741b9a7a surfaceflinger`android::scheduler::VSyncDispatchTimerQueue::rearmTimerSkippingUpdateFor(long, std::__1::__hash_map_iterator<std::__1::__hash_iterator<std::__1::__hash_node<std::__1::__hash_value_type<android::StrongTyping<unsigned long, android::scheduler::CallbackTokenTag, android::Compare, android::Hash>, std::__1::shared_ptr<android::scheduler::VSyncDispatchTimerQueueEntry> >, void*>*> > const&) [inlined] android::scheduler::VSyncDispatchTimerQueue::setTimer(this=0x000075f24c689140, targetTime=93240144574, (null)=<unavailable>) at VSyncDispatchTimerQueue.cpp:221:25
+frame #1: 0x00005abb741b9a7a surfaceflinger`android::scheduler::VSyncDispatchTimerQueue::rearmTimerSkippingUpdateFor(this=0x000075f24c689140, now=93230497120, skipUpdateIt=<unavailable>) at VSyncDispatchTimerQueue.cpp:259:9
+frame #2: 0x00005abb741ba922 surfaceflinger`android::scheduler::VSyncDispatchTimerQueue::schedule(this=0x000075f24c689140, token=<unavailable>, scheduleTiming=(workDuration = 16666666, readyDuration = 15666666, earliestVsync = 89739144714)) at VSyncDispatchTimerQueue.cpp:360:13
+frame #3: 0x00005abb741bb04f surfaceflinger`android::scheduler::VSyncCallbackRegistration::schedule(this=<unavailable>, scheduleTiming=(workDuration = 16666666, readyDuration = 15666666, earliestVsync = 89739144714)) at VSyncDispatchTimerQueue.cpp:436:28
+frame #4: 0x00005abb7419f2e0 surfaceflinger`android::scheduler::DispSyncSource::setVSyncEnabled(bool) [inlined] android::scheduler::CallbackRepeater::start(this=<unavailable>, workDuration=(__rep_ = 16666666), readyDuration=(__rep_ = 15666666)) at DispSyncSource.cpp:61:31
+frame #5: 0x00005abb7419f288 surfaceflinger`android::scheduler::DispSyncSource::setVSyncEnabled(this=0x000075f28c68c430, enable=<unavailable>) at DispSyncSource.cpp:144:28
+frame #6: 0x00005abb741a2d5c surfaceflinger`void* std::__1::__thread_proxy<std::__1::tuple<std::__1::unique_ptr<std::__1::__thread_struct, std::__1::default_delete<std::__1::__thread_struct> >, android::impl::EventThread::EventThread(std::__1::unique_ptr<android::VSyncSource, std::__1::default_delete<android::VSyncSource> >, android::frametimeline::TokenManager*, std::__1::function<void (long)>, std::__1::function<bool (long, unsigned int)>, std::__1::function<long (unsigned int)>)::$_1> >(void*) at EventThread.cpp:0
+frame #7: 0x00005abb741a2d04 surfaceflinger`void* std::__1::__thread_proxy<std::__1::tuple<std::__1::unique_ptr<std::__1::__thread_struct, std::__1::default_delete<std::__1::__thread_struct> >, android::impl::EventThread::EventThread(std::__1::unique_ptr<android::VSyncSource, std::__1::default_delete<android::VSyncSource> >, android::frametimeline::TokenManager*, std::__1::function<void (long)>, std::__1::function<bool (long, unsigned int)>, std::__1::function<long (unsigned int)>)::$_1> >(void*) [inlined] android::impl::EventThread::EventThread(this=0x000075f1dc689378)>, std::__1::function<bool (long, unsigned int)>, std::__1::function<long (unsigned int)>)::$_1::operator()() const at EventThread.cpp:255:9
+frame #8: 0x00005abb741a2ce4 surfaceflinger`void* std::__1::__thread_proxy<std::__1::tuple<std::__1::unique_ptr<std::__1::__thread_struct, std::__1::default_delete<std::__1::__thread_struct> >, android::impl::EventThread::EventThread(std::__1::unique_ptr<android::VSyncSource, std::__1::default_delete<android::VSyncSource> >, android::frametimeline::TokenManager*, std::__1::function<void (long)>, std::__1::function<bool (long, unsigned int)>, std::__1::function<long (unsigned int)>)::$_1> >(void*) [inlined] decltype(__f=0x000075f1dc689378)>, std::__1::function<bool (long, unsigned int)>, std::__1::function<long (unsigned int)>)::$_1>(fp)()) std::__1::__invoke<android::impl::EventThread::EventThread(std::__1::unique_ptr<android::VSyncSource, std::__1::default_delete<android::VSyncSource> >, android::frametimeline::TokenManager*, std::__1::function<void (long)>, std::__1::function<bool (long, unsigned int)>, std::__1::function<long (unsigned int)>)::$_1>(android::impl::EventThread::EventThread(std::__1::unique_ptr<android::VSyncSource, std::__1::default_delete<android::VSyncSource> >, android::frametimeline::TokenManager*, std::__1::function<void (long)>, std::__1::function<bool (long, unsigned int)>, std::__1::function<long (unsigned int)>)::$_1&&) at type_traits:4353:1
+frame #9: 0x00005abb741a2ce4 surfaceflinger`void* std::__1::__thread_proxy<std::__1::tuple<std::__1::unique_ptr<std::__1::__thread_struct, std::__1::default_delete<std::__1::__thread_struct> >, android::impl::EventThread::EventThread(std::__1::unique_ptr<android::VSyncSource, std::__1::default_delete<android::VSyncSource> >, android::frametimeline::TokenManager*, std::__1::function<void (long)>, std::__1::function<bool (long, unsigned int)>, std::__1::function<long (unsigned int)>)::$_1> >(void*) [inlined] void std::__1::__thread_execute<std::__1::unique_ptr<std::__1::__thread_struct, std::__1::default_delete<std::__1::__thread_struct> >, android::impl::EventThread::EventThread(std::__1::unique_ptr<android::VSyncSource, std::__1::default_delete<android::VSyncSource> >, android::frametimeline::TokenManager*, std::__1::function<void (long)>, std::__1::function<bool (long, unsigned int)>, std::__1::function<long (unsigned int)>)::$_1>(__t=size=2, (null)=<unavailable>)>, std::__1::function<bool (long, unsigned int)>, std::__1::function<long (unsigned int)>)::$_1>&, std::__1::__tuple_indices<>) at thread:342:5
+frame #10: 0x00005abb741a2ce4 surfaceflinger`void* std::__1::__thread_proxy<std::__1::tuple<std::__1::unique_ptr<std::__1::__thread_struct, std::__1::default_delete<std::__1::__thread_struct> >, android::impl::EventThread::EventThread(std::__1::unique_ptr<android::VSyncSource, std::__1::default_delete<android::VSyncSource> >, android::frametimeline::TokenManager*, std::__1::function<void (long)>, std::__1::function<bool (long, unsigned int)>, std::__1::function<long (unsigned int)>)::$_1> >(__vp=0x000075f1dc689370) at thread:352:5
+frame #11: 0x000075f45f56bd9b libc.so`__pthread_start(arg=0x000075f1c52cecf0) at pthread_create.cpp:364:18
+frame #12: 0x000075f45f4ffd48 libc.so`::__start_thread(fn=(libc.so`__pthread_start(void*) at pthread_create.cpp:339), arg=0x000075f1c52cecf0)(void *), void *) at clone.cpp:53:16
 ```
 
-```c++
-#00 pc 00000000001d8da6  /system/bin/surfaceflinger (android::scheduler::VSyncDispatchTimerQueue::rearmTimerSkippingUpdateFor(long, std::__1::__hash_map_iterator<std::__1::__hash_iterator<std::__1::__hash_node<std::__1::__hash_value_type<android::StrongTyping<unsigned long, android::scheduler::CallbackTokenTag, android::Compare, android::Hash>, std::__1::shared_ptr<android::scheduler::VSyncDispatchTimerQueueEntry> >, void*>*> > const&)+2310)
-#01 pc 00000000001d9cd1  /system/bin/surfaceflinger (android::scheduler::VSyncDispatchTimerQueue::schedule(android::StrongTyping<unsigned long, android::scheduler::CallbackTokenTag, android::Compare, android::Hash>, android::scheduler::VSyncDispatch::ScheduleTiming)+657)
-#02 pc 00000000001da3fe  /system/bin/surfaceflinger (android::scheduler::VSyncCallbackRegistration::schedule(android::scheduler::VSyncDispatch::ScheduleTiming)+46)
-#03 pc 00000000001bec63  /system/bin/surfaceflinger (android::scheduler::CallbackRepeater::callback(long, long, long)+179)
-#04 pc 00000000001d83ca  /system/bin/surfaceflinger (android::scheduler::VSyncDispatchTimerQueue::timerCallback()+986)
-#05 pc 00000000006707d1  /system/bin/surfaceflinger (void* std::__1::__thread_proxy<std::__1::tuple<std::__1::unique_ptr<std::__1::__thread_struct, std::__1::default_delete<std::__1::__thread_struct> >, android::scheduler::Timer::Timer()::$_0> >(void*)+833)
-#06 pc 00000000000ccd9a  /apex/com.android.runtime/lib64/bionic/libc.so (__pthread_start(void*)+58)
-#07 pc 0000000000060d47  /apex/com.android.runtime/lib64/bionic/libc.so (__start_thread+55)
+这是一个调用栈，表示当前线程在代码中的执行路径。从最底层的 `frame #0` 到更高层的 `frame #10`，我们可以看到每个函数调用和它们在源代码中的位置。
 
-```
+1. `frame #0`：在 `VSyncDispatchTimerQueue.cpp` 的第 337 行，`android::scheduler::VSyncDispatchTimerQueue::schedule` 函数正在执行。它试图将已注册的回调安排在特定时间调度。
+2. `frame #1`：在 `VSyncDispatchTimerQueue.cpp` 的第 436 行，`android::scheduler::VSyncCallbackRegistration::schedule` 函数调用了 `VSyncDispatchTimerQueue::schedule` 函数。
+3. `frame #2` 和 `frame #3`：在 `DispSyncSource.cpp` 的第 144 行，`android::scheduler::DispSyncSource::setVSyncEnabled` 函数调用了 `android::scheduler::CallbackRepeater::start` 函数。
+4. `frame #4` 到 `frame #8`：这些帧表示在 `EventThread.cpp` 文件中创建和运行一个新线程的过程。它是由 `std::__1::__thread_proxy` 与 `std::__1::__thread_execute` 等 C++ 标准库函数实现的。
+5. `frame #9` 和 `frame #10`：这些帧表示在 Android libc 中启动新线程的底层实现。这里有 `__pthread_start` 和 `__start_thread` 这两个函数。
 
-```c++
-#00 pc 00000000001d8da6  /system/bin/surfaceflinger (android::scheduler::VSyncDispatchTimerQueue::rearmTimerSkippingUpdateFor(long, std::__1::__hash_map_iterator<std::__1::__hash_iterator<std::__1::__hash_node<std::__1::__hash_value_type<android::StrongTyping<unsigned long, android::scheduler::CallbackTokenTag, android::Compare, android::Hash>, std::__1::shared_ptr<android::scheduler::VSyncDispatchTimerQueueEntry> >, void*>*> > const&)+2310)
-#01 pc 00000000001d9cd1  /system/bin/surfaceflinger (android::scheduler::VSyncDispatchTimerQueue::schedule(android::StrongTyping<unsigned long, android::scheduler::CallbackTokenTag, android::Compare, android::Hash>, android::scheduler::VSyncDispatch::ScheduleTiming)+657)
-#02 pc 00000000001da3fe  /system/bin/surfaceflinger (android::scheduler::VSyncCallbackRegistration::schedule(android::scheduler::VSyncDispatch::ScheduleTiming)+46)
-#03 pc 00000000001ca7a2  /system/bin/surfaceflinger (android::impl::MessageQueue::scheduleFrame()+146)
-#04 pc 00000000001e43fd  /system/bin/surfaceflinger (android::SurfaceFlinger::setTransactionFlags(unsigned int, android::scheduler::TransactionSchedule, android::sp<android::IBinder> const&, android::SurfaceFlinger::FrameHint)+397)
-#05 pc 00000000001fd541  /system/bin/surfaceflinger (android::SurfaceFlinger::setTransactionState(android::FrameTimelineInfo const&, android::Vector<android::ComposerState> const&, android::Vector<android::DisplayState> const&, unsigned int, android::sp<android::IBinder> const&, android::InputWindowCommands const&, long, bool, android::client_cache_t const&, bool, std::__1::vector<android::ListenerCallbacks, std::__1::allocator<android::ListenerCallbacks> > const&, unsigned long)+2033)
-#06 pc 00000000000d84d9  /system/lib64/libgui.so (android::BnSurfaceComposer::onTransact(unsigned int, android::Parcel const&, android::Parcel*, unsigned int)+11849)
-#07 pc 0000000000204850  /system/bin/surfaceflinger (android::SurfaceFlinger::onTransact(unsigned int, android::Parcel const&, android::Parcel*, unsigned int)+800)
-#08 pc 00000000000586f0  /system/lib64/libbinder.so (android::BBinder::transact(unsigned int, android::Parcel const&, android::Parcel*, unsigned int)+176)
-#09 pc 0000000000063833  /system/lib64/libbinder.so (android::IPCThreadState::executeCommand(int)+1203)
-#10 pc 00000000000632bd  /system/lib64/libbinder.so (android::IPCThreadState::getAndExecuteCommand()+157)
-#11 pc 0000000000063c8f  /system/lib64/libbinder.so (android::IPCThreadState::joinThreadPool(bool)+63)
-#12 pc 00000000000939e7  /system/lib64/libbinder.so (android::PoolThread::threadLoop()+23)
-#13 pc 0000000000013e55  /system/lib64/libutils.so (android::Thread::_threadLoop(void*)+325)
-#14 pc 00000000000ccd9a  /apex/com.android.runtime/lib64/bionic/libc.so (__pthread_start(void*)+58)
-#15 pc 0000000000060d47  /apex/com.android.runtime/lib64/bionic/libc.so (__start_thread+55)
-```
-
-### DispSyncSource
-
-```c++
-DispSyncSource::DispSyncSource(VSyncDispatch& vSyncDispatch, VSyncTracker& vSyncTracker,
-                               std::chrono::nanoseconds workDuration,
-                               std::chrono::nanoseconds readyDuration, bool traceVsync,
-                               const char* name)
-      : mName(name),
-        mValue(base::StringPrintf("VSYNC-%s", name), 0),
-        mTraceVsync(traceVsync),
-        mVsyncOnLabel(base::StringPrintf("VsyncOn-%s", name)),
-        mVSyncTracker(vSyncTracker),
-        mWorkDuration(base::StringPrintf("VsyncWorkDuration-%s", name), workDuration),
-        mReadyDuration(readyDuration) {
-    mCallbackRepeater =
-            std::make_unique<CallbackRepeater>(vSyncDispatch,
-                                               std::bind(&DispSyncSource::onVsyncCallback, this,
-                                                         std::placeholders::_1,
-                                                         std::placeholders::_2,
-                                                         std::placeholders::_3),
-                                               name, workDuration, readyDuration,
-                                               std::chrono::steady_clock::now().time_since_epoch());
-}
-```
-
-```c++
-CallbackRepeater::CallbackRepeater(VSyncDispatch& dispatch, VSyncDispatch::Callback cb, const char* name,
-                    std::chrono::nanoseconds workDuration, std::chrono::nanoseconds readyDuration,
-                    std::chrono::nanoseconds notBefore)
-        : mName(name),
-        mCallback(cb),
-        mRegistration(dispatch,
-                        std::bind(&CallbackRepeater::callback, this, std::placeholders::_1,
-                                std::placeholders::_2, std::placeholders::_3),
-                        mName),
-        mStarted(false),
-        mWorkDuration(workDuration),
-        mReadyDuration(readyDuration),
-        mLastCallTime(notBefore) {}
-
-void callback(nsecs_t vsyncTime, nsecs_t wakeupTime, nsecs_t readyTime) {
- 
-    mCallback(vsyncTime, wakeupTime, readyTime);
-
-}
-```
-
-```c++
-void DispSyncSource::onVsyncCallback(nsecs_t vsyncTime, nsecs_t targetWakeupTime,
-                                     nsecs_t readyTime) {
-    VSyncSource::Callback* callback;
-    {
-        std::lock_guard lock(mCallbackMutex);
-        callback = mCallback;
-    }
-
-    if (mTraceVsync) {
-        mValue = (mValue + 1) % 2;
-    }
-
-    if (callback != nullptr) {
-        callback->onVSyncEvent(targetWakeupTime, {vsyncTime, readyTime});
-    }
-}
-```
-
-```c++
-EventThread::EventThread(std::unique_ptr<VSyncSource> vsyncSource,
-                         android::frametimeline::TokenManager* tokenManager,
-                         InterceptVSyncsCallback interceptVSyncsCallback,
-                         ThrottleVsyncCallback throttleVsyncCallback,
-                         GetVsyncPeriodFunction getVsyncPeriodFunction)
-      : mVSyncSource(std::move(vsyncSource)),
-        mTokenManager(tokenManager),
-        mInterceptVSyncsCallback(std::move(interceptVSyncsCallback)),
-        mThrottleVsyncCallback(std::move(throttleVsyncCallback)),
-        mGetVsyncPeriodFunction(std::move(getVsyncPeriodFunction)),
-        mThreadName(mVSyncSource->getName()) {
-
-    mVSyncSource->setCallback(this);
-
-    mThread = std::thread([this]() NO_THREAD_SAFETY_ANALYSIS {
-        std::unique_lock<std::mutex> lock(mMutex);
-        threadMain(lock);
-    });
-
-}
-```
+这个调用栈显示了 `surfaceflinger` 进程中与调度和 VSync（垂直同步）相关的函数调用。从调用栈中我们可以看到，这个线程正在尝试根据所提供的时间安排回调函数，并启用或禁用 VSync 功能。
 
 ### EventThread::onVSyncEvent
 
 ```c++
-#00 pc 00000000001c106e  /system/bin/surfaceflinger (android::impl::EventThread::onVSyncEvent(long, android::VSyncSource::VSyncData)+94)
-#01 pc 00000000001bec22  /system/bin/surfaceflinger (android::scheduler::CallbackRepeater::callback(long, long, long)+114)
-#02 pc 00000000001d844a  /system/bin/surfaceflinger (android::scheduler::VSyncDispatchTimerQueue::timerCallback()+986)
-#03 pc 0000000000670851  /system/bin/surfaceflinger (void* std::__1::__thread_proxy<std::__1::tuple<std::__1::unique_ptr<std::__1::__thread_struct, std::__1::default_delete<std::__1::__thread_struct> >, android::scheduler::Timer::Timer()::$_0> >(void*)+833)
-#04 pc 00000000000ccd9a  /apex/com.android.runtime/lib64/bionic/libc.so (__pthread_start(void*)+58)
-#05 pc 0000000000060d47  /apex/com.android.runtime/lib64/bionic/libc.so (__start_thread+55)
+frame #0: 0x00005abb741a1dd8 surfaceflinger`android::impl::EventThread::onVSyncEvent(this=0x000075f29c696ed0, timestamp=1419890091508, vsyncData=(expectedPresentationTime = 1419922424840, deadlineTimestamp = 1419906758174)) at EventThread.cpp:394:38
+frame #1: 0x00005abb7419f9d3 surfaceflinger`android::scheduler::CallbackRepeater::callback(long, long, long) [inlined] std::__1::__function::__value_func<void (long, long, long)>::operator(this=0x000075f25c68bb70, __args=0x000075f1c53cba70, __args=0x000075f1c53cba68, __args=0x000075f1c53cba60)(long&&, long&&, long&&) const at functional:1799:16
+frame #2: 0x00005abb7419f9b1 surfaceflinger`android::scheduler::CallbackRepeater::callback(long, long, long) [inlined] std::__1::function<void (long, long, long)>::operator(this= Function = android::scheduler::DispSyncSource::onVsyncCallback(long, long, long) , __arg=1419922424840, __arg=1419890091508, __arg=1419906758174)(long, long, long) const at functional:2347:12
+frame #3: 0x00005abb7419f9b1 surfaceflinger`android::scheduler::CallbackRepeater::callback(this=0x000075f25c68bb50, vsyncTime=1419922424840, wakeupTime=1419890091508, readyTime=1419906758174) at DispSyncSource.cpp:92:9
+frame #4: 0x00005abb741b90db surfaceflinger`android::scheduler::VSyncDispatchTimerQueue::timerCallback() [inlined] std::__1::__function::__value_func<void (long, long, long)>::operator(this=0x000075f28c68d390, __args=0x000075f1c53cbb18, __args=0x000075f1c53cbb10, __args=0x000075f1c53cbb08)(long&&, long&&, long&&) const at functional:1799:16
+frame #5: 0x00005abb741b90b9 surfaceflinger`android::scheduler::VSyncDispatchTimerQueue::timerCallback() [inlined] std::__1::function<void (long, long, long)>::operator(this= Function = android::scheduler::CallbackRepeater::callback(long, long, long) , __arg=1419922424840, __arg=1419890091508, __arg=1419906758174)(long, long, long) const at functional:2347:12
+frame #6: 0x00005abb741b90b9 surfaceflinger`android::scheduler::VSyncDispatchTimerQueue::timerCallback() [inlined] android::scheduler::VSyncDispatchTimerQueueEntry::callback(this=0x000075f28c68d370, vsyncTimestamp=<unavailable>, wakeupTimestamp=1419890091508, deadlineTimestamp=1419906758174) at VSyncDispatchTimerQueue.cpp:163:5
+frame #7: 0x00005abb741b9087 surfaceflinger`android::scheduler::VSyncDispatchTimerQueue::timerCallback(this=<unavailable>) at VSyncDispatchTimerQueue.cpp:300:30
+frame #8: 0x00005abb746512d2 surfaceflinger`void* std::__1::__thread_proxy<std::__1::tuple<std::__1::unique_ptr<std::__1::__thread_struct, std::__1::default_delete<std::__1::__thread_struct> >, android::scheduler::Timer::Timer()::$_0> >(void*) [inlined] std::__1::__function::__value_func<void ()>::operator(this=0x000075f1c53cbc20)() const at functional:1799:16
+frame #9: 0x00005abb746512bb surfaceflinger`void* std::__1::__thread_proxy<std::__1::tuple<std::__1::unique_ptr<std::__1::__thread_struct, std::__1::default_delete<std::__1::__thread_struct> >, android::scheduler::Timer::Timer()::$_0> >(void*) [inlined] std::__1::function<void ()>::operator(this= Function = android::scheduler::VSyncDispatchTimerQueue::timerCallback() )() const at functional:2347:12
+frame #10: 0x00005abb746512bb surfaceflinger`void* std::__1::__thread_proxy<std::__1::tuple<std::__1::unique_ptr<std::__1::__thread_struct, std::__1::default_delete<std::__1::__thread_struct> >, android::scheduler::Timer::Timer()::$_0> >(void*) at Timer.cpp:216:21
+frame #11: 0x00005abb74650ff2 surfaceflinger`void* std::__1::__thread_proxy<std::__1::tuple<std::__1::unique_ptr<std::__1::__thread_struct, std::__1::default_delete<std::__1::__thread_struct> >, android::scheduler::Timer::Timer()::$_0> >(void*) [inlined] android::scheduler::Timer::threadMain(this=0x000075f24c689560) at Timer.cpp:148:12
+frame #12: 0x00005abb74650ff2 surfaceflinger`void* std::__1::__thread_proxy<std::__1::tuple<std::__1::unique_ptr<std::__1::__thread_struct, std::__1::default_delete<std::__1::__thread_struct> >, android::scheduler::Timer::Timer()::$_0> >(void*) [inlined] android::scheduler::Timer::Timer(this=0x000075f1dc6890b8)::$_0::operator()() const at Timer.cpp:44:46
+frame #13: 0x00005abb74650ff2 surfaceflinger`void* std::__1::__thread_proxy<std::__1::tuple<std::__1::unique_ptr<std::__1::__thread_struct, std::__1::default_delete<std::__1::__thread_struct> >, android::scheduler::Timer::Timer()::$_0> >(void*) [inlined] decltype(__f=0x000075f1dc6890b8)::$_0>(fp)()) std::__1::__invoke<android::scheduler::Timer::Timer()::$_0>(android::scheduler::Timer::Timer()::$_0&&) at type_traits:4353:1
+frame #14: 0x00005abb74650ff2 surfaceflinger`void* std::__1::__thread_proxy<std::__1::tuple<std::__1::unique_ptr<std::__1::__thread_struct, std::__1::default_delete<std::__1::__thread_struct> >, android::scheduler::Timer::Timer()::$_0> >(void*) [inlined] void std::__1::__thread_execute<std::__1::unique_ptr<std::__1::__thread_struct, std::__1::default_delete<std::__1::__thread_struct> >, android::scheduler::Timer::Timer()::$_0>(__t=size=2, (null)=<unavailable>)::$_0>&, std::__1::__tuple_indices<>) at thread:342:5
+frame #15: 0x00005abb74650ff2 surfaceflinger`void* std::__1::__thread_proxy<std::__1::tuple<std::__1::unique_ptr<std::__1::__thread_struct, std::__1::default_delete<std::__1::__thread_struct> >, android::scheduler::Timer::Timer()::$_0> >(__vp=0x000075f1dc6890b0) at thread:352:5
+frame #16: 0x000075f45f56bd9b libc.so`__pthread_start(arg=0x000075f1c53cbcf0) at pthread_create.cpp:364:18
+frame #17: 0x000075f45f4ffd48 libc.so`::__start_thread(fn=(libc.so`__pthread_start(void*) at pthread_create.cpp:339), arg=0x000075f1c53cbcf0)(void *), void *) at clone.cpp:53:16
+```
+
+这是一个调用栈，它显示了在 Android SurfaceFlinger 代码中的一系列函数调用。我们可以从下往上分析这个调用栈。
+
+1. Frame #17 和 #16 是 `libc.so` 库中的线程启动函数。
+2. Frame #15 和之前的 Frame 代表了一个线程实例的创建过程，执行 `std::__1::__thread_proxy` 函数，该函数负责执行线程函数 `android::scheduler::Timer::Timer()::$_0`。
+3. Frame #11 - #14 是在 `android::scheduler::Timer` 类中创建一个新线程，并调用 `threadMain` 方法。在 Frame #12，可以看到 `Timer.cpp` 文件中的 148 行调用了这个方法。
+4. Frame #7 是 `android::scheduler::VSyncDispatchTimerQueue` 类中的 `timerCallback` 方法，在 Frame #10 的调用过程中，这个方法被注册为线程的回调函数。
+5. Frame #6 是在调用队列中的一个条目进行回调，这里的回调函数是在 Frame #5 中通过函数对象的操作符 (`operator()`) 调用的。
+6. Frame #3 是在 `android::scheduler::CallbackRepeater` 类中执行一个名为 `callback` 的函数，该函数用于处理 VSync 事件并通知已注册的监听器。
+7. Frame #1 和 #2 是一个 `std::__1::function` 的实例，用于执行 `android::scheduler::DispSyncSource::onVsyncCallback` 函数。
+8. 最后，Frame #0 是 `android::impl::EventThread::onVSyncEvent` 方法，这是在 `EventThread.cpp` 文件中的 394 行被调用的。这个方法处理 VSync 事件，将它们分发到需要的 SurfaceFlinger 客户端。
+
+从这个调用栈来看，我们可以看到该程序在处理一个 VSync 事件。VSync 是一个用于同步显示器刷新率和图形处理器输出的技术，以减少画面撕裂和卡顿。这个调用栈显示了 VSync 事件如何从底层库经过各种回调函数，最终在 `android::impl::EventThread::onVSyncEvent` 中进行处理。
+
+### makeVSync
+
+```c++
+DisplayEventReceiver::Event makeVSync(PhysicalDisplayId displayId, nsecs_t timestamp,
+                                      uint32_t count, nsecs_t expectedPresentationTime,
+                                      nsecs_t deadlineTimestamp) {
+    DisplayEventReceiver::Event event;
+    event.header = {DisplayEventReceiver::DISPLAY_EVENT_VSYNC, displayId, timestamp};
+    ......
+    return event;
+}
 ```
 
 ### MessageQueue::vsyncCallback
 
 ```c++
-#00 pc 00000000001ca4c2  /system/bin/surfaceflinger (android::impl::MessageQueue::vsyncCallback(long, long, long)+258)
-#01 pc 00000000001d84da  /system/bin/surfaceflinger (android::scheduler::VSyncDispatchTimerQueue::timerCallback()+986)
-#02 pc 00000000006708e1  /system/bin/surfaceflinger (void* std::__1::__thread_proxy<std::__1::tuple<std::__1::unique_ptr<std::__1::__thread_struct, std::__1::default_delete<std::__1::__thread_struct> >, android::scheduler::Timer::Timer()::$_0> >(void*)+833)
-#03 pc 00000000000ccd9a  /apex/com.android.runtime/lib64/bionic/libc.so (__pthread_start(void*)+58)
-#04 pc 0000000000060d47  /apex/com.android.runtime/lib64/bionic/libc.so (__start_thread+55)
+flinger`android::impl::MessageQueue::vsyncCallback(this=0x000075f2dc68ccf0, vsyncTime=2017572400934, targetWakeupTime=2017556734268, readyTime=2017572400934) at MessageQueue.cpp:103:28
+  frame #1: 0x00005abb741b90db surfaceflinger`android::scheduler::VSyncDispatchTimerQueue::timerCallback() [inlined] std::__1::__function::__value_func<void (long, long, long)>::operator(this=0x000075f28c68d910, __args=0x000075f1c53cbb18, __args=0x000075f1c53cbb10, __args=0x000075f1c53cbb08)(long&&, long&&, long&&) const at functional:1799:16
+  frame #2: 0x00005abb741b90b9 surfaceflinger`android::scheduler::VSyncDispatchTimerQueue::timerCallback() [inlined] std::__1::function<void (long, long, long)>::operator(this= Function = android::impl::MessageQueue::vsyncCallback(long, long, long) , __arg=2017572400934, __arg=2017556734268, __arg=2017572400934)(long, long, long) const at functional:2347:12
+  frame #3: 0x00005abb741b90b9 surfaceflinger`android::scheduler::VSyncDispatchTimerQueue::timerCallback() [inlined] android::scheduler::VSyncDispatchTimerQueueEntry::callback(this=0x000075f28c68d8f0, vsyncTimestamp=<unavailable>, wakeupTimestamp=2017556734268, deadlineTimestamp=2017572400934) at VSyncDispatchTimerQueue.cpp:163:5
+  frame #4: 0x00005abb741b9087 surfaceflinger`android::scheduler::VSyncDispatchTimerQueue::timerCallback(this=<unavailable>) at VSyncDispatchTimerQueue.cpp:300:30
+  frame #5: 0x00005abb746512d2 surfaceflinger`void* std::__1::__thread_proxy<std::__1::tuple<std::__1::unique_ptr<std::__1::__thread_struct, std::__1::default_delete<std::__1::__thread_struct> >, android::scheduler::Timer::Timer()::$_0> >(void*) [inlined] std::__1::__function::__value_func<void ()>::operator(this=0x000075f1c53cbc20)() const at functional:1799:16
+  frame #6: 0x00005abb746512bb surfaceflinger`void* std::__1::__thread_proxy<std::__1::tuple<std::__1::unique_ptr<std::__1::__thread_struct, std::__1::default_delete<std::__1::__thread_struct> >, android::scheduler::Timer::Timer()::$_0> >(void*) [inlined] std::__1::function<void ()>::operator(this= Function = android::scheduler::VSyncDispatchTimerQueue::timerCallback() )() const at functional:2347:12
+  frame #7: 0x00005abb746512bb surfaceflinger`void* std::__1::__thread_proxy<std::__1::tuple<std::__1::unique_ptr<std::__1::__thread_struct, std::__1::default_delete<std::__1::__thread_struct> >, android::scheduler::Timer::Timer()::$_0> >(void*) at Timer.cpp:216:21
+  frame #8: 0x00005abb74650ff2 surfaceflinger`void* std::__1::__thread_proxy<std::__1::tuple<std::__1::unique_ptr<std::__1::__thread_struct, std::__1::default_delete<std::__1::__thread_struct> >, android::scheduler::Timer::Timer()::$_0> >(void*) [inlined] android::scheduler::Timer::threadMain(this=0x000075f24c689560) at Timer.cpp:148:12
+  frame #9: 0x00005abb74650ff2 surfaceflinger`void* std::__1::__thread_proxy<std::__1::tuple<std::__1::unique_ptr<std::__1::__thread_struct, std::__1::default_delete<std::__1::__thread_struct> >, android::scheduler::Timer::Timer()::$_0> >(void*) [inlined] android::scheduler::Timer::Timer(this=0x000075f1dc6890b8)::$_0::operator()() const at Timer.cpp:44:46
+  frame #10: 0x00005abb74650ff2 surfaceflinger`void* std::__1::__thread_proxy<std::__1::tuple<std::__1::unique_ptr<std::__1::__thread_struct, std::__1::default_delete<std::__1::__thread_struct> >, android::scheduler::Timer::Timer()::$_0> >(void*) [inlined] decltype(__f=0x000075f1dc6890b8)::$_0>(fp)()) std::__1::__invoke<android::scheduler::Timer::Timer()::$_0>(android::scheduler::Timer::Timer()::$_0&&) at type_traits:4353:1
+  frame #11: 0x00005abb74650ff2 surfaceflinger`void* std::__1::__thread_proxy<std::__1::tuple<std::__1::unique_ptr<std::__1::__thread_struct, std::__1::default_delete<std::__1::__thread_struct> >, android::scheduler::Timer::Timer()::$_0> >(void*) [inlined] void std::__1::__thread_execute<std::__1::unique_ptr<std::__1::__thread_struct, std::__1::default_delete<std::__1::__thread_struct> >, android::scheduler::Timer::Timer()::$_0>(__t=size=2, (null)=<unavailable>)::$_0>&, std::__1::__tuple_indices<>) at thread:342:5
+  frame #12: 0x00005abb74650ff2 surfaceflinger`void* std::__1::__thread_proxy<std::__1::tuple<std::__1::unique_ptr<std::__1::__thread_struct, std::__1::default_delete<std::__1::__thread_struct> >, android::scheduler::Timer::Timer()::$_0> >(__vp=0x000075f1dc6890b0) at thread:352:5
+  frame #13: 0x000075f45f56bd9b libc.so`__pthread_start(arg=0x000075f1c53cbcf0) at pthread_create.cpp:364:18
+  frame #14: 0x000075f45f4ffd48 libc.so`::__start_thread(fn=(libc.so`__pthread_start(void*) at pthread_create.cpp:339), arg=0x000075f1c53cbcf0)(void *), void *) at clone.cpp:53:16
 ```
+
+这是一个调用栈（call stack），用于记录程序在特定时间点的函数调用情况。从上到下是各个栈帧（stack frame），每个栈帧表示一个函数调用，包括函数名、参数、源代码文件名和行号等信息。以下是对这个调用栈的分析：
+
+1. 最底层（frame #14 和 frame #13）是 pthread 相关的代码，表明这是一个以多线程方式运行的程序，使用 POSIX 线程库。
+2. frame #12 是 C++11 标准库的线程实现，`std::__1::__thread_proxy` 函数将 POSIX 线程调用转换为 C++ 标准库线程调用。
+3. 接下来的几个栈帧（frame #11, frame #10, frame #9, 和 frame #8）与 `android::scheduler::Timer` 类相关。它们表示在这个类的一个实例中创建了一个新线程，并调用了一个成员函数 `threadMain`。
+4. 在 frame #7 中，`android::scheduler::Timer` 类的实现被继续执行。它调用了一个名为 `timerCallback` 的成员函数。
+5. frame #6 和 frame #5 是另一个 C++11 函数对象调用，这次它调用了 `android::scheduler::VSyncDispatchTimerQueue::timerCallback()` 函数。
+6. 在 frame #4，`android::scheduler::VSyncDispatchTimerQueue::timerCallback()` 函数被调用。
+7. 接下来的几个栈帧（frame #3, frame #2, 和 frame #1）涉及到 C++11 函数对象的调用。这些调用在 `android::scheduler::VSyncDispatchTimerQueueEntry` 类中，它执行了一个名为 `callback` 的成员函数。
+8. 最后，在 frame #0 中，`android::impl::MessageQueue::vsyncCallback()` 函数被调用，它是一个与 Android SurfaceFlinger 相关的实现细节。
+
+总结：这个调用栈描述了一个与 Android SurfaceFlinger（负责管理 Android 应用的屏幕显示内容）相关的多线程程序。从底层的线程创建到顶层的 `vsyncCallback()` 函数调用，反映了程序在处理屏幕刷新相关任务。
 
 ### dumpsys SurfaceFlinger
 
@@ -1161,3 +1155,4 @@ HIDL::IComposerCallback::onVsync_2_4::client
 - <https://www.cnblogs.com/roger-yu/p/16122236.html>
 - <https://www.cnblogs.com/roger-yu/p/15596840.html>
 - <https://juejin.cn/post/7166061140298956836>
+- <https://www.jianshu.com/p/5e9c558d1543>
