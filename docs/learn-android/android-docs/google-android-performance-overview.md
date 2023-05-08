@@ -1,8 +1,10 @@
 ---
-article: false
+tag:
+  - android
+  - google-docs
 ---
 
-# google-android-performance
+# Android | Docs | google-android-performance
 
 - [performance](https://developer.android.com/topic/performance)
 

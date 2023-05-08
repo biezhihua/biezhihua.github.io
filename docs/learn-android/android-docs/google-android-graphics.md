@@ -1,8 +1,10 @@
 ---
-article: false
+tag:
+  - android
+  - google-docs
 ---
 
-# google-android-vsync
+# Android | Docs | google-android-vsync
 
 ## ChatGPT4问答
 

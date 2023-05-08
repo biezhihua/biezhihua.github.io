@@ -1,8 +1,10 @@
 ---
-article: false
+tag:
+  - android
+  - google-docs
 ---
 
-# google-android-system
+# Android | Docs | google-android-system
 
 ## ChatGPT4问答
 

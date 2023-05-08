@@ -4,7 +4,7 @@ tag:
   - aosp
 ---
 
-# Android | VSYNC
+# Android | AOSP | VSYNC
 
 ## SurfaceFlinger工程理解
 

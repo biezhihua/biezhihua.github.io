@@ -4,7 +4,7 @@ tag:
   - aosp
 ---
 
-# Android | build aosp and run image to emulator in windows11
+# Android | AOSP | build aosp and run image to emulator in windows11
 
 ## environment
 
