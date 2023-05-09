@@ -61,6 +61,72 @@ Android 系统是由事件驱动的，而 input 是最常见的事件之一，�
 ![](/learn-android/aosp/input-3.jpeg)
 ![](/learn-android/aosp/input-4.jpeg)
 
+## 应用进程的创建与启动
+
+### Pause桌面应用
+
+![](/learn-android/aosp/pause-activity-0.jpeg)
+
+![](/learn-android/aosp/pause-activity-1.png)
+
+接着上一节继续往下看，桌面进程收到 input 触控事件并处理后 binder 调用框架 AMS 的的 startActivity 接口启动应用，相关简化代码如下：
+
+```java
+/*frameworks/base/services/core/java/com/android/server/wm/ActivityStarter.java*/
+private int startActivityUnchecked(final ActivityRecord r, ActivityRecord sourceRecord,
+              IVoiceInteractionSession voiceSession, IVoiceInteractor voiceInteractor,
+              int startFlags, boolean doResume, ActivityOptions options, Task inTask,
+              boolean restrictedBgActivity, NeededUriGrants intentGrants) {
+      ...
+      try {
+          ...
+          // 添加“startActivityInner”的trace tag
+          Trace.traceBegin(Trace.TRACE_TAG_WINDOW_MANAGER, "startActivityInner");
+          // 执行startActivityInner启动应用的逻辑
+          result = startActivityInner(r, sourceRecord, voiceSession, voiceInteractor,
+                  startFlags, doResume, options, inTask, restrictedBgActivity, intentGrants);
+      } finally {
+          Trace.traceEnd(Trace.TRACE_TAG_WINDOW_MANAGER);
+          ...
+      }
+      ...
+  }
+```
+
+在执行 startActivityInner 启动应用逻辑中，AMS 中的 Activity 栈管理的逻辑，检查发现当前处于前台Resume 状态的 Activity 是桌面应用，所以第一步需要通知桌面应用的 Activity 进入 Paused 状态，相关简化代码逻辑如下：
+
+```java
+void schedulePauseActivity(ActivityRecord prev, boolean userLeaving,
+        boolean pauseImmediately, boolean autoEnteringPip, String reason) {
+    try {
+        mAtmService.getLifecycleManager().scheduleTransaction(prev.app.getThread(),
+                prev.token, PauseActivityItem.obtain(prev.finishing, userLeaving,
+                        prev.configChangeFlags, pauseImmediately, autoEnteringPip));
+    } catch (Exception e) {
+    }
+}
+
+```
+
+桌面应用进程这边执行收到 pause 消息后执行 Activity 的 onPause 生命周期，并在执行完成后，会 binder 调用 AMS 的 activityPaused 接口通知系统执行完 activity 的 pause 动作，相关代码如下：
+
+![](/learn-android/aosp/pause-activity-2.png)
+
+
+```java
+@Override
+public void activityPaused(IBinder token) {
+    synchronized (mGlobalLock) {
+        Trace.traceBegin(TRACE_TAG_WINDOW_MANAGER, "activityPaused");
+        final ActivityRecord r = ActivityRecord.forTokenLocked(token);
+        if (r != null) {
+            r.activityPaused(false);
+        }
+        Trace.traceEnd(TRACE_TAG_WINDOW_MANAGER);
+    }
+}
+```
+
 ## 其他
 
 ### Perfetto中的 sys_read
