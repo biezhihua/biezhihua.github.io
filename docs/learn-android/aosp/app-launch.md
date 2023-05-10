@@ -114,6 +114,7 @@ void schedulePauseActivity(ActivityRecord prev, boolean userLeaving,
 
 
 ```java
+
 @Override
 public void activityPaused(IBinder token) {
     synchronized (mGlobalLock) {
@@ -123,6 +124,560 @@ public void activityPaused(IBinder token) {
             r.activityPaused(false);
         }
         Trace.traceEnd(TRACE_TAG_WINDOW_MANAGER);
+    }
+}
+
+void activityPaused(boolean timeout) {
+    
+    final TaskFragment taskFragment = getTaskFragment();
+    if (taskFragment != null) {
+        removePauseTimeout();
+
+        final ActivityRecord pausingActivity = taskFragment.getPausingActivity();
+        if (pausingActivity == this) {
+            mAtmService.deferWindowLayout();
+            try {
+              taskFragment.completePause(true /* resumeNext */, null /* resumingActivity */);
+            } finally {
+              ...
+            }
+            return;
+        } else {
+            ...
+        }
+    }
+    ...
+}
+```
+
+![](/learn-android/aosp/start-activity-3.jpeg)
+
+![](/learn-android/aosp/start-activity-1.png)
+
+![](/learn-android/aosp/start-activity-2.png)
+
+AMS 这边收到应用的 activityPaused 调用后，继续执行启动应用的逻辑，判断需要启动的应用 Activity 所在的进程不存在，所以接下来需要先 startProcessAsync 创建应用进程，相关简化代码如下：
+
+
+```java
+void startSpecificActivity(ActivityRecord r, boolean andResume, boolean checkConfig) {
+    // Is this activity's application already running?
+    final WindowProcessController wpc =
+            mService.getProcessController(r.processName, r.info.applicationInfo.uid);
+
+    boolean knownToBeDead = false;
+    if (wpc != null && wpc.hasThread()) {
+        try {
+            realStartActivityLocked(r, wpc, andResume, checkConfig);
+            return;
+        } catch (RemoteException e) {
+        }
+        ...
+    }
+
+    ...
+
+    mService.startProcessAsync(r, knownToBeDead, isTop,
+            isTop ? HostingRecord.HOSTING_TYPE_TOP_ACTIVITY
+                    : HostingRecord.HOSTING_TYPE_ACTIVITY);
+}
+```
+
+### 创建应用进程
+
+接上一小节的分析可以知道，Android 应用进程的启动是被动式的，在桌面点击图标启动一个应用的组件如 Activity 时，如果 Activity 所在的进程不存在，就会创建并启动进程。Android 系统中一般应用进程的创建都是统一由 zygote 进程 fork 创建的，AMS 在需要创建应用进程时，会通过 socket 连接并通知到到 zygote 进程在开机阶段就创建好的 socket 服务端，然后由 zygote 进程 fork 创建出应用进程。整体架构如下图所示：
+
+![](/learn-android/aosp/create-app-0.png)
+![](/learn-android/aosp/create-app-1.webp)
+![](/learn-android/aosp/create-app-2.png)
+![](/learn-android/aosp/create-app-4.png)
+![](/learn-android/aosp/create-app-5.png)
+![](/learn-android/aosp/create-app-6.png)
+![](/learn-android/aosp/create-app-7.png)
+
+我们接着上节中的分析，继续从 AMS#startProcessAsync 创建进程函数入手，继续看一下应用进程创建相关简化流程代码：
+
+#### AMS 发送socket请求
+
+```java
+void startProcessAsync(ActivityRecord activity, boolean knownToBeDead, boolean isTop,
+        String hostingType) {
+    try {
+        if (Trace.isTagEnabled(TRACE_TAG_WINDOW_MANAGER)) {
+            Trace.traceBegin(TRACE_TAG_WINDOW_MANAGER, "dispatchingStartProcess:"
+                    + activity.processName);
+        }
+        // Post message to start process to avoid possible deadlock of calling into AMS with the
+        // ATMS lock held.
+        final Message m = PooledLambda.obtainMessage(ActivityManagerInternal::startProcess,
+                mAmInternal, activity.processName, activity.info.applicationInfo, knownToBeDead,
+                isTop, hostingType, activity.intent.getComponent());
+        mH.sendMessage(m);
+    } finally {
+        Trace.traceEnd(TRACE_TAG_WINDOW_MANAGER);
+    }
+}
+
+@Override
+public void startProcess(String processName, ApplicationInfo info, boolean knownToBeDead,
+        boolean isTop, String hostingType, ComponentName hostingName) {
+    try {
+        if (Trace.isTagEnabled(Trace.TRACE_TAG_ACTIVITY_MANAGER)) {
+            Trace.traceBegin(Trace.TRACE_TAG_ACTIVITY_MANAGER, "startProcess:"
+                    + processName);
+        }
+        synchronized (ActivityManagerService.this) {
+            // If the process is known as top app, set a hint so when the process is
+            // started, the top priority can be applied immediately to avoid cpu being
+            // preempted by other processes before attaching the process of top app.
+            startProcessLocked(processName, info, knownToBeDead, 0 /* intentFlags */,
+                    new HostingRecord(hostingType, hostingName, isTop),
+                    ZYGOTE_POLICY_FLAG_LATENCY_SENSITIVE, false /* allowWhileBooting */,
+                    false /* isolated */);
+        }
+    } finally {
+        Trace.traceEnd(Trace.TRACE_TAG_ACTIVITY_MANAGER);
+    }
+}
+
+@GuardedBy("this")
+final ProcessRecord startProcessLocked(String processName,
+        ApplicationInfo info, boolean knownToBeDead, int intentFlags,
+        HostingRecord hostingRecord, int zygotePolicyFlags, boolean allowWhileBooting,
+        boolean isolated) {
+    return mProcessList.startProcessLocked(processName, info, knownToBeDead, intentFlags,
+            hostingRecord, zygotePolicyFlags, allowWhileBooting, isolated, 0 /* isolatedUid */,
+            false /* isSdkSandbox */, 0 /* sdkSandboxClientAppUid */,
+            null /* sdkSandboxClientAppPackage */,
+            null /* ABI override */, null /* entryPoint */,
+            null /* entryPointArgs */, null /* crashHandler */);
+}
+
+boolean startProcessLocked(HostingRecord hostingRecord, String entryPoint, ProcessRecord app,
+        int uid, int[] gids, int runtimeFlags, int zygotePolicyFlags, int mountExternal,
+        String seInfo, String requiredAbi, String instructionSet, String invokeWith,
+        long startUptime, long startElapsedTime) {
+    ...
+
+    if (mService.mConstants.FLAG_PROCESS_START_ASYNC) {
+        if (DEBUG_PROCESSES) Slog.i(TAG_PROCESSES,
+                "Posting procStart msg for " + app.toShortString());
+        mService.mProcStartHandler.post(() -> handleProcessStart(
+                app, entryPoint, gids, runtimeFlags, zygotePolicyFlags, mountExternal,
+                requiredAbi, instructionSet, invokeWith, startSeq));
+        return true;
+    } else {
+        try {
+            ...
+        } catch (RuntimeException e) {
+            ...
+        }
+        return app.getPid() > 0;
+    }
+}
+
+private void handleProcessStart(final ProcessRecord app, final String entryPoint,
+        final int[] gids, final int runtimeFlags, int zygotePolicyFlags,
+        final int mountExternal, final String requiredAbi, final String instructionSet,
+        final String invokeWith, final long startSeq) {
+    final Runnable startRunnable = () -> {
+        try {
+            final Process.ProcessStartResult startResult = startProcess(app.getHostingRecord(),
+                    entryPoint, app, app.getStartUid(), gids, runtimeFlags, zygotePolicyFlags,
+                    mountExternal, app.getSeInfo(), requiredAbi, instructionSet, invokeWith,
+                    app.getStartTime());
+
+            synchronized (mService) {
+                handleProcessStartedLocked(app, startResult, startSeq);
+            }
+        } catch (RuntimeException e) {
+           ...
+    };
+    ...
+}
+
+
+private Process.ProcessStartResult startProcess(HostingRecord hostingRecord, String entryPoint,
+        ProcessRecord app, int uid, int[] gids, int runtimeFlags, int zygotePolicyFlags,
+        int mountExternal, String seInfo, String requiredAbi, String instructionSet,
+        String invokeWith, long startTime) {
+    try {
+        Trace.traceBegin(Trace.TRACE_TAG_ACTIVITY_MANAGER, "Start proc: " +
+                app.processName);
+
+        ...
+
+        final Process.ProcessStartResult startResult;
+        boolean regularZygote = false;
+        if (hostingRecord.usesWebviewZygote()) {
+           ...
+        } else if (hostingRecord.usesAppZygote()) {
+           ...
+        } else {
+            regularZygote = true;
+            startResult = Process.start(entryPoint,
+                    app.processName, uid, uid, gids, runtimeFlags, mountExternal,
+                    app.info.targetSdkVersion, seInfo, requiredAbi, instructionSet,
+                    app.info.dataDir, invokeWith, app.info.packageName, zygotePolicyFlags,
+                    isTopApp, app.getDisabledCompatChanges(), pkgDataInfoMap,
+                    allowlistedAppDataInfoMap, bindMountAppsData, bindMountAppStorageDirs,
+                    new String[]{PROC_START_SEQ_IDENT + app.getStartSeq()});
+        }
+
+        ....
+
+        return startResult;
+    } finally {
+        Trace.traceEnd(Trace.TRACE_TAG_ACTIVITY_MANAGER);
+    }
+}
+
+
+public final Process.ProcessStartResult start(@NonNull final String processClass,
+                                                final String niceName,
+                                                int uid, int gid, @Nullable int[] gids,
+                                                int runtimeFlags, int mountExternal,
+                                                int targetSdkVersion,
+                                                @Nullable String seInfo,
+                                                @NonNull String abi,
+                                                @Nullable String instructionSet,
+                                                @Nullable String appDataDir,
+                                                @Nullable String invokeWith,
+                                                @Nullable String packageName,
+                                                int zygotePolicyFlags,
+                                                boolean isTopApp,
+                                                @Nullable long[] disabledCompatChanges,
+                                                @Nullable Map<String, Pair<String, Long>>
+                                                        pkgDataInfoMap,
+                                                @Nullable Map<String, Pair<String, Long>>
+                                                        allowlistedDataInfoList,
+                                                boolean bindMountAppsData,
+                                                boolean bindMountAppStorageDirs,
+                                                @Nullable String[] zygoteArgs) {
+    ...
+
+    try {
+        return startViaZygote(processClass, niceName, uid, gid, gids,
+                runtimeFlags, mountExternal, targetSdkVersion, seInfo,
+                abi, instructionSet, appDataDir, invokeWith, /*startChildZygote=*/ false,
+                packageName, zygotePolicyFlags, isTopApp, disabledCompatChanges,
+                pkgDataInfoMap, allowlistedDataInfoList, bindMountAppsData,
+                bindMountAppStorageDirs, zygoteArgs);
+    } catch (ZygoteStartFailedEx ex) {
+        ...
+    }
+}
+
+
+private Process.ProcessStartResult startViaZygote(@NonNull final String processClass,
+                                                    @Nullable final String niceName,
+                                                    final int uid, final int gid,
+                                                    @Nullable final int[] gids,
+                                                    int runtimeFlags, int mountExternal,
+                                                    int targetSdkVersion,
+                                                    @Nullable String seInfo,
+                                                    @NonNull String abi,
+                                                    @Nullable String instructionSet,
+                                                    @Nullable String appDataDir,
+                                                    @Nullable String invokeWith,
+                                                    boolean startChildZygote,
+                                                    @Nullable String packageName,
+                                                    int zygotePolicyFlags,
+                                                    boolean isTopApp,
+                                                    @Nullable long[] disabledCompatChanges,
+                                                    @Nullable Map<String, Pair<String, Long>>
+                                                            pkgDataInfoMap,
+                                                    @Nullable Map<String, Pair<String, Long>>
+                                                            allowlistedDataInfoList,
+                                                    boolean bindMountAppsData,
+                                                    boolean bindMountAppStorageDirs,
+                                                    @Nullable String[] extraArgs)
+                                                    throws ZygoteStartFailedEx {
+    ...
+
+    synchronized(mLock) {
+        ...
+        return zygoteSendArgsAndGetResult(openZygoteSocketIfNeeded(abi),
+                                            zygotePolicyFlags,
+                                            argsForZygote);
+    }
+}
+
+private Process.ProcessStartResult zygoteSendArgsAndGetResult(
+        ZygoteState zygoteState, int zygotePolicyFlags, @NonNull ArrayList<String> args)
+        throws ZygoteStartFailedEx {
+    ...
+
+    /*
+        * See com.android.internal.os.ZygoteArguments.parseArgs()
+        * Presently the wire format to the zygote process is:
+        * a) a count of arguments (argc, in essence)
+        * b) a number of newline-separated argument strings equal to count
+        *
+        * After the zygote process reads these it will write the pid of
+        * the child or -1 on failure, followed by boolean to
+        * indicate whether a wrapper process was used.
+        */
+    String msgStr = args.size() + "\n" + String.join("\n", args) + "\n";
+
+    if (shouldAttemptUsapLaunch(zygotePolicyFlags, args)) {
+        try {
+            return attemptUsapSendArgsAndGetResult(zygoteState, msgStr);
+        } catch (IOException ex) {
+            // If there was an IOException using the USAP pool we will log the error and
+            // attempt to start the process through the Zygote.
+            Log.e(LOG_TAG, "IO Exception while communicating with USAP pool - "
+                    + ex.getMessage());
+        }
+    }
+
+    return attemptZygoteSendArgsAndGetResult(zygoteState, msgStr);
+}
+
+private Process.ProcessStartResult attemptZygoteSendArgsAndGetResult(
+        ZygoteState zygoteState, String msgStr) throws ZygoteStartFailedEx {
+    try {
+        final BufferedWriter zygoteWriter = zygoteState.mZygoteOutputWriter;
+        final DataInputStream zygoteInputStream = zygoteState.mZygoteInputStream;
+
+        zygoteWriter.write(msgStr);
+        zygoteWriter.flush();
+
+        // Always read the entire result from the input stream to avoid leaving
+        // bytes in the stream for future process starts to accidentally stumble
+        // upon.
+        Process.ProcessStartResult result = new Process.ProcessStartResult();
+        result.pid = zygoteInputStream.readInt();
+        result.usingWrapper = zygoteInputStream.readBoolean();
+
+        if (result.pid < 0) {
+            throw new ZygoteStartFailedEx("fork() failed");
+        }
+
+        return result;
+    } catch (IOException ex) {
+        zygoteState.close();
+        Log.e(LOG_TAG, "IO Exception while communicating with Zygote - "
+                + ex.toString());
+        throw new ZygoteStartFailedEx(ex);
+    }
+}
+
+```
+
+```text
+msgStr:
+--runtime-args
+--setuid=10116
+--setgid=10116
+--runtime-flags=16787715
+--mount-external-default
+--target-sdk-version=33
+--setgroups=50116,20116,9997
+--nice-name=com.example.myapplication
+--seinfo=default:targetSdkVersion=33:complete
+--app-data-dir=/data/user/0/com.example.myapplication
+--package-name=com.example.myapplication
+--is-top-app
+--pkg-data-info-map=com.example.myapplication,null,123338
+--bind-mount-data-dirs
+--disabled-compat-changes=132649864,135634846,135772972,143231523,143539591,161145287,162547999,166236554,168419799,169897160,170233598,174042936,174042980,174043039,174227820,174228127,176926741,176926753,176926771,176926829,177438394,178038272,180326787,180326845,181136395,182811243,184838306,185004937,189229956,189969734,189969744,189969749,189969779,189969782,189970036,189970038,189970040,191513214,196254758,208648326,210856463,218959984,226439802,254631730,263259275
+android.app.ActivityThread
+seq=54
+
+```
+
+在 ZygoteProcess#startViaZygote 中，最后创建应用进程的逻辑：
+
+openZygoteSocketIfNeeded 函数中打开本地 socket 客户端连接到 zygote 进程的 socket 服务端；
+zygoteSendArgsAndGetResult 发送 socket 请求参数，带上了创建的应用进程参数信息；
+return返 回的数据结构 ProcessStartResult 中会有新创建的进程的pid字段。
+
+#### Zygote 处理socket请求
+
+其实早在系统开机阶段，zygote 进程创建时，就会在 ZygoteInit#main 入口函数中创建服务端 socket，并预加载系统资源和框架类（加速应用进程启动速度），代码如下：
+
+```java
+public static void main(String[] argv) {
+    ZygoteServer zygoteServer = null;
+
+    try {
+
+        if (!enableLazyPreload) {
+            // 1.preload提前加载框架通用类和系统资源到进程，加速进程启动
+            preload(bootTimingsTraceLog);
+        }
+
+        // 2.创建zygote进程的socket server服务端对象
+        zygoteServer = new ZygoteServer(isPrimaryZygote);
+
+        Log.i(TAG, "Accepting command socket connections");
+
+        // 3.进入死循环，等待AMS发请求过来
+        caller = zygoteServer.runSelectLoop(abiList);
+    } catch (Throwable ex) {
+    } finally {
+        
+    }
+}
+
+```
+
+继续往下看 ZygoteServer#runSelectLoop 如何监听并处理AMS客户端的请求：
+
+```java
+/*frameworks/base/core/java/com/android/internal/os/ZygoteServer.java*/
+Runnable runSelectLoop(String abiList) {
+    // 进入死循环监听
+    while (true) {
+    while (--pollIndex >= 0) {
+        if (pollIndex == 0) {
+            ...
+        } else if (pollIndex < usapPoolEventFDIndex) {
+            // Session socket accepted from the Zygote server socket
+            // 得到一个请求连接封装对象ZygoteConnection
+            ZygoteConnection connection = peers.get(pollIndex);
+            // processCommand函数中处理AMS客户端请求
+            final Runnable command = connection.processCommand(this, multipleForksOK);
+        }
+    }
+    }
+}
+
+Runnable processCommand(ZygoteServer zygoteServer, boolean multipleOK) {
+        ...
+        // 1.fork创建应用子进程
+        pid = Zygote.forkAndSpecialize(...);
+        try {
+            if (pid == 0) {
+                ...
+                // 2.pid为0，当前处于新创建的子应用进程中，处理请求参数
+                return handleChildProc(parsedArgs, childPipeFd, parsedArgs.mStartChildZygote);
+            } else {
+                ...
+                handleParentProc(pid, serverPipeFd);
+            }
+        } finally {
+            ...
+        }
+}
+
+private Runnable handleChildProc(ZygoteArguments parsedArgs,
+        FileDescriptor pipeFd, boolean isZygote) {
+    ...
+    // 关闭从父进程zygote继承过来的ZygoteServer服务端地址
+    closeSocket();
+    ...
+    if (parsedArgs.mInvokeWith != null) {
+        ...
+    } else {
+        if (!isZygote) {
+            // 继续进入ZygoteInit#zygoteInit继续完成子应用进程的相关初始化工作
+            return ZygoteInit.zygoteInit(parsedArgs.mTargetSdkVersion,
+                    parsedArgs.mDisabledCompatChanges,
+                    parsedArgs.mRemainingArgs, null /* classLoader */);
+        } else {
+            ...
+        }
+    }
+}
+```
+
+### 应用进程初始化
+
+接上一节中的分析，zygote 进程监听接收 AMS 的请求，fork 创建子应用进程，然后pid为0时进入子进程空间，然后在 ZygoteInit#zygoteInit 中完成进程的初始化动作，相关简化代码如下：
+
+```java
+/*frameworks/base/core/java/com/android/internal/os/ZygoteInit.java*/
+public static Runnable zygoteInit(int targetSdkVersion, long[] disabledCompatChanges,
+            String[] argv, ClassLoader classLoader) {
+    ...
+    // 原生添加名为“ZygoteInit ”的systrace tag以标识进程初始化流程
+    Trace.traceBegin(Trace.TRACE_TAG_ACTIVITY_MANAGER, "ZygoteInit");
+    RuntimeInit.redirectLogStreams();
+    // 1.RuntimeInit#commonInit中设置应用进程默认的java异常处理机制
+    RuntimeInit.commonInit();
+    // 2.ZygoteInit#nativeZygoteInit函数中JNI调用启动进程的binder线程池
+    ZygoteInit.nativeZygoteInit();
+    // 3.RuntimeInit#applicationInit中反射创建ActivityThread对象并调用其“main”入口方法
+    return RuntimeInit.applicationInit(targetSdkVersion, disabledCompatChanges, argv,
+            classLoader);
+}
+```
+
+应用进程启动后，初始化过程中主要依次完成以下几件事情：
+
+- 应用进程默认的 java 异常处理机制（可以实现监听、拦截应用进程所有的Java crash的逻辑）；
+- JNI调用启动进程的 binder 线程池（注意应用进程的binder线程池资源是自己创建的并非从 zygote 父进程继承的）；
+- 通过反射创建 ActivityThread 对象并调用其 “main” 入口方法。
+
+我们继续看 RuntimeInit#applicationInit 简化的代码流程：
+
+```java
+ /*frameworks/base/core/java/com/android/internal/os/RuntimeInit.java*/
+protected static Runnable applicationInit(int targetSdkVersion, long[] disabledCompatChanges,
+        String[] argv, ClassLoader classLoader) {
+    ...
+    // 结束“ZygoteInit ”的systrace tag
+    Trace.traceEnd(Trace.TRACE_TAG_ACTIVITY_MANAGER);
+    // Remaining arguments are passed to the start class's static main
+    return findStaticMain(args.startClass, args.startArgs, classLoader);
+}
+
+protected static Runnable findStaticMain(String className, String[] argv,
+        ClassLoader classLoader) {
+    Class<?> cl;
+    try {
+        // 1.反射加载创建ActivityThread类对象
+        cl = Class.forName(className, true, classLoader);
+    } catch (ClassNotFoundException ex) {
+        ...
+    }
+    Method m;
+    try {
+        // 2.反射调用其main方法
+        m = cl.getMethod("main", new Class[] { String[].class });
+    } catch (NoSuchMethodException ex) {
+        ...
+    } catch (SecurityException ex) {
+        ...
+    }
+    ...
+    // 3.触发执行以上逻辑
+    return new MethodAndArgsCaller(m, argv);
+}
+```
+
+我们继续往下看 ActivityThread 的 main 函数中又干了什么：
+```java
+/*frameworks/base/core/java/android/app/ActivityThread.java*/
+public static void main(String[] args) {
+     // 原生添加的标识进程ActivityThread初始化过程的systrace tag，名为“ActivityThreadMain”
+     Trace.traceBegin(Trace.TRACE_TAG_ACTIVITY_MANAGER, "ActivityThreadMain");
+     ...
+     // 1.创建并启动主线程的loop消息循环
+     Looper.prepareMainLooper();
+     ...
+     // 2.attachApplication注册到系统AMS中
+     ActivityThread thread = new ActivityThread();
+     thread.attach(false, startSeq);
+     ...
+     Trace.traceEnd(Trace.TRACE_TAG_ACTIVITY_MANAGER);
+     Looper.loop();
+     ...
+}
+
+private void attach(boolean system, long startSeq) {
+    ...
+    if (!system) {
+       ...
+       final IActivityManager mgr = ActivityManager.getService();
+       try {
+          // 通过binder调用AMS的attachApplication接口将自己注册到AMS中
+          mgr.attachApplication(mAppThread, startSeq);
+       } catch (RemoteException ex) {
+                throw ex.rethrowFromSystemServer();
+       }
     }
 }
 ```
@@ -139,7 +694,7 @@ public void activityPaused(IBinder token) {
 
 在 Perfetto 中，`sys_write` 通常与应用程序和内核的 I/O 操作相关。通过跟踪 `sys_write` 系统调用，可以了解应用程序和内核之间的 I/O 操作，以及它们对系统性能的影响。Perfetto 的追踪记录可以用于分析应用程序性能瓶颈，诊断内核和驱动程序问题，以及确定系统瓶颈的根本原因。
 
-### Perfettoz中的 sys_ioctl
+### Perfetto中的 sys_ioctl
 
 在 Linux 中，`ioctl` 是一个系统调用（system call），它可以用来对文件描述符执行各种控制操作。`ioctl` 的参数通常是一个整数（表示要执行的操作），以及一个结构体（用于输入或输出控制信息）。常见的用法包括控制硬件设备（如串口、网卡、声卡等）以及控制虚拟文件系统（如 `/proc`、`/sys` 等）。
 
@@ -150,6 +705,12 @@ public void activityPaused(IBinder token) {
 `sys_epoll_pwait` 是 Linux 内核中的系统调用，主要用于实现异步 I/O 和事件通知。`epoll` 是 Linux 中高效的 I/O 多路复用机制之一，`sys_epoll_pwait` 则是在 `epoll` 机制的基础上提供的等待事件发生的系统调用，可以等待一个或多个文件描述符上的指定事件集合发生，直到事件就绪或者超时为止。当指定的事件发生时，`sys_epoll_pwait` 返回事件相关的文件描述符和事件类型，以便应用程序进行处理。
 
 在 Perfetto 中，`sys_epoll_pwait` 可能会被用于实现异步事件跟踪，通过在 Perfetto 中设置特定的跟踪事件，可以使用 `sys_epoll_pwait` 来等待事件发生并进行处理。例如，可以设置 Perfetto 跟踪网络通信事件，通过 `sys_epoll_pwait` 等待网络事件发生并记录跟踪信息。
+
+### Perfetto中的 sys_recvmsg
+
+`sys_recvmsg` 是一个 Linux 内核系统调用，用于接收一段网络数据。在 Perfetto 中，`sys_recvmsg` 的事件指示在系统中调用此函数的相关信息，包括函数参数和返回值等等。
+
+Perfetto 是一个系统级的跟踪工具，能够收集各种系统事件和指标，并将其导出为跨平台的可视化数据。它可以用于调试和分析各种系统问题，包括性能瓶颈、功耗问题、安全漏洞等等。
 
 ## 引用
 
