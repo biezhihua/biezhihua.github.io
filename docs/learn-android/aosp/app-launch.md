@@ -498,6 +498,7 @@ return返 回的数据结构 ProcessStartResult 中会有新创建的进程的pi
 其实早在系统开机阶段，zygote 进程创建时，就会在 ZygoteInit#main 入口函数中创建服务端 socket，并预加载系统资源和框架类（加速应用进程启动速度），代码如下：
 
 ```java
+com.android.internal.os.ZygoteInit
 public static void main(String[] argv) {
     ZygoteServer zygoteServer = null;
 
@@ -584,6 +585,9 @@ private Runnable handleChildProc(ZygoteArguments parsedArgs,
 ```
 
 ### 应用进程初始化
+
+
+![](/learn-android/aosp/create-app-8.png)
 
 接上一节中的分析，zygote 进程监听接收 AMS 的请求，fork 创建子应用进程，然后pid为0时进入子进程空间，然后在 ZygoteInit#zygoteInit 中完成进程的初始化动作，相关简化代码如下：
 
@@ -681,6 +685,14 @@ private void attach(boolean system, long startSeq) {
     }
 }
 ```
+
+可以看到进程ActivityThread#main函数初始化的主要逻辑是：
+
+创建并启动主线程的loop消息循环；
+通过 binder 调用 AMS 的 attachApplication 接口将自己 attach 注册到 AMS 中。
+
+![](/learn-android/aosp/create-app-9.png)
+![](/learn-android/aosp/create-app-10.png)
 
 ## 其他
 
