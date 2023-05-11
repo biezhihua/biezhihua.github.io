@@ -692,7 +692,210 @@ private void attach(boolean system, long startSeq) {
 ![](/learn-android/aosp/create-app-9.png)
 ![](/learn-android/aosp/create-app-10.png)
 
+## 应用主线程消息循环机制建立
+
+接上一节的分析，我们知道应用进程创建后会通过反射创建 ActivityThread 对象并执行其 main 函数，进行主线程的初始化工作：
+
+```java
+/*frameworks/base/core/java/android/app/ActivityThread.java*/
+public static void main(String[] args) {
+     ...
+     // 1.创建Looper、MessageQueue
+     Looper.prepareMainLooper();
+     ...
+     // 2.启动loop消息循环，开始准备接收消息
+     Looper.loop();
+     ...
+}
+
+// 3.创建主线程Handler对象
+final H mH = new H();
+
+class H extends Handler {
+  ...
+}
+
+/*frameworks/base/core/java/android/os/Looper.java*/
+public static void prepareMainLooper() {
+     // 准备主线程的Looper
+     prepare(false);
+     synchronized (Looper.class) {
+          if (sMainLooper != null) {
+              throw new IllegalStateException("The main Looper has already been prepared.");
+          }
+          sMainLooper = myLooper();
+     }
+}
+
+private static void prepare(boolean quitAllowed) {
+      if (sThreadLocal.get() != null) {
+          throw new RuntimeException("Only one Looper may be created per thread");
+      }
+      // 创建主线程的Looper对象，并通过ThreadLocal机制实现与主线程的一对一绑定
+      sThreadLocal.set(new Looper(quitAllowed));
+}
+
+private Looper(boolean quitAllowed) {
+      // 创建MessageQueue消息队列
+      mQueue = new MessageQueue(quitAllowed);
+      mThread = Thread.currentThread();
+}
+```
+
+主线程初始化完成后，主线程就有了完整的 Looper、MessageQueue、Handler，此时 ActivityThread 的 Handler 就可以开始处理 Message，包括 Application、Activity、ContentProvider、Service、Broadcast 等组件的生命周期函数，都会以 Message 的形式，在主线程按照顺序处理，这就是 App 主线程的初始化和运行原理，部分处理的 Message 如下
+
+```java
+/*frameworks/base/core/java/android/app/ActivityThread.java*/
+class H extends Handler {
+        public static final int BIND_APPLICATION        = 110;
+        @UnsupportedAppUsage
+        public static final int RECEIVER                = 113;
+        @UnsupportedAppUsage
+        public static final int CREATE_SERVICE          = 114;
+        @UnsupportedAppUsage
+        public static final int BIND_SERVICE            = 121;
+        
+        public void handleMessage(Message msg) {
+            switch (msg.what) {
+                case BIND_APPLICATION:
+                    Trace.traceBegin(Trace.TRACE_TAG_ACTIVITY_MANAGER, "bindApplication");
+                    AppBindData data = (AppBindData)msg.obj;
+                    handleBindApplication(data);
+                    Trace.traceEnd(Trace.TRACE_TAG_ACTIVITY_MANAGER);
+                    break;
+                    ...
+            }
+         }
+         ...
+}
+```
+
+主线程初始化完成后，主线程就进入阻塞状态，等待 Message，一旦有 Message 发过来，主线程就会被唤醒，处理 Message，处理完成之后，如果没有其他的 Message 需要处理，那么主线程就会进入休眠阻塞状态继续等待。可以说Android系统的运行是受消息机制驱动的，而整个消息机制是由上面所说的四个关键角色相互配合实现的（Handler、Looper、MessageQueue、Message），其运行原理如下图所示：
+
+![](/learn-android/aosp/pause-activity-11.png)
+
+```java
+/**
+ * Run the message queue in this thread. Be sure to call
+ * {@link #quit()} to end the loop.
+ */
+@SuppressWarnings("AndroidFrameworkBinderIdentity")
+public static void loop() {
+    final Looper me = myLooper();
+    
+    ...
+
+    for (;;) {
+        if (!loopOnce(me, ident, thresholdOverride)) {
+            return;
+        }
+    }
+}
+
+private static boolean loopOnce(final Looper me,
+        final long ident, final int thresholdOverride) {
+    Message msg = me.mQueue.next(); // might block
+    
+    ...
+
+    try {
+        msg.target.dispatchMessage(msg);
+        ...
+    } catch (Exception exception) {
+    } finally {
+    }
+
+    ...
+
+    return true;
+}
+
+@UnsupportedAppUsage
+Message next() {
+    ...
+
+    for (;;) {
+        ...
+
+        nativePollOnce(ptr, nextPollTimeoutMillis);
+
+        ...
+    }
+}
+
+// frameworks/base/core/jni/android_os_MessageQueue.cpp
+static void android_os_MessageQueue_nativePollOnce(JNIEnv* env, jobject obj,
+        jlong ptr, jint timeoutMillis) {
+    ...
+    nativeMessageQueue->pollOnce(env, obj, timeoutMillis);
+}
+
+// frameworks/base/core/jni/android_os_MessageQueue.cpp
+void NativeMessageQueue::pollOnce(JNIEnv* env, jobject pollObj, int timeoutMillis) {
+    ...
+    mLooper->pollOnce(timeoutMillis);
+    ...
+}
+
+ /**
+ * Waits for events to be available, with optional timeout in milliseconds.
+ * Invokes callbacks for all file descriptors on which an event occurred.
+ */
+int pollOnce(int timeoutMillis, int* outFd, int* outEvents, void** outData);
+inline int pollOnce(int timeoutMillis) {
+    return pollOnce(timeoutMillis, nullptr, nullptr, nullptr);
+}
+
+// system/core/libutils/Looper.cpp
+int Looper::pollOnce(int timeoutMillis, int* outFd, int* outEvents, void** outData) {
+    for (;;) {
+        
+        ...
+
+        result = pollInner(timeoutMillis);
+    }
+}
+
+// system/core/libutils/Looper.cpp
+int Looper::pollInner(int timeoutMillis) {
+
+    ...
+
+    int eventCount = epoll_wait(mEpollFd.get(), eventItems, EPOLL_MAX_EVENTS, timeoutMillis);
+
+    ...
+    
+    return result;
+}
+
+```
+
+- Handler : Handler 主要是用来处理 Message，应用可以在任何线程创建 Handler，只要在创建的时候指定对应的 Looper 即可，如果不指定，默认是在当前 Thread 对应的 Looper。
+- Looper : Looper 可以看成是一个循环器，其 loop 方法开启后，不断地从 MessageQueue 中获取 Message，对 Message 进行 Delivery 和 Dispatch，最终发给对应的 Handler 去处理。
+- **MessageQueue**：MessageQueue 就是一个 Message 管理器，队列中是 Message，在没有 Message 的时候，MessageQueue 借助 Linux 的 ePoll机制，阻塞休眠等待，直到有 Message 进入队列将其唤醒。
+- **Message**：Message 是传递消息的对象，其内部包含了要传递的内容，最常用的包括 what、arg、callback 等。
+
+## 应用Application和Activity组件创建与初始化
+
 ## 其他
+
+### Android中的epoll机制
+
+在 Android 中，epoll 是一种事件通知机制，用于处理 I/O 事件的多路复用。它是基于 Linux 的 epoll 概念进行实现的，提供了高效的事件管理和触发机制，常用于网络编程和异步 I/O 操作。
+
+epoll 的工作原理如下：
+
+1. 创建 epoll 实例：首先需要创建一个 epoll 实例，通过调用 `epoll_create` 函数完成。
+
+2. 注册文件描述符：将需要监视的文件描述符注册到 epoll 实例中，可以使用 `epoll_ctl` 函数完成注册操作。注册时需要指定感兴趣的事件类型，如可读事件、可写事件等。
+
+3. 等待事件触发：调用 `epoll_wait` 函数等待事件的发生。当注册的文件描述符中有事件发生时，epoll_wait 函数会返回触发事件的文件描述符列表。
+
+4. 处理事件：根据返回的文件描述符列表，进行相应的事件处理操作。可以通过检查事件的类型来确定具体的操作，如读取数据、发送数据等。
+
+使用 epoll 机制可以有效地监视多个文件描述符的事件，而不需要通过轮询方式不断检查每个文件描述符的状态。这样可以提高系统的性能和效率，尤其在处理大量并发连接的网络应用中表现出色。
+
+在 Android 中，epoll 机制被广泛应用于网络编程、异步 I/O 操作以及事件驱动的框架和库中，如 Android 的网络库、Socket 通信、JNI 开发等场景。
 
 ### Perfetto中的 sys_read
 
