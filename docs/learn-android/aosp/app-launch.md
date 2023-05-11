@@ -112,7 +112,6 @@ void schedulePauseActivity(ActivityRecord prev, boolean userLeaving,
 
 ![](/learn-android/aosp/pause-activity-2.png)
 
-
 ```java
 
 @Override
@@ -157,7 +156,6 @@ void activityPaused(boolean timeout) {
 ![](/learn-android/aosp/start-activity-2.png)
 
 AMS 这边收到应用的 activityPaused 调用后，继续执行启动应用的逻辑，判断需要启动的应用 Activity 所在的进程不存在，所以接下来需要先 startProcessAsync 创建应用进程，相关简化代码如下：
-
 
 ```java
 void startSpecificActivity(ActivityRecord r, boolean andResume, boolean checkConfig) {
@@ -586,7 +584,6 @@ private Runnable handleChildProc(ZygoteArguments parsedArgs,
 
 ### 应用进程初始化
 
-
 ![](/learn-android/aosp/create-app-8.png)
 
 接上一节中的分析，zygote 进程监听接收 AMS 的请求，fork 创建子应用进程，然后pid为0时进入子进程空间，然后在 ZygoteInit#zygoteInit 中完成进程的初始化动作，相关简化代码如下：
@@ -653,6 +650,7 @@ protected static Runnable findStaticMain(String className, String[] argv,
 ```
 
 我们继续往下看 ActivityThread 的 main 函数中又干了什么：
+
 ```java
 /*frameworks/base/core/java/android/app/ActivityThread.java*/
 public static void main(String[] args) {
@@ -724,6 +722,24 @@ private void attach(boolean system, long startSeq) {
 
 Perfetto 是一个系统级的跟踪工具，能够收集各种系统事件和指标，并将其导出为跨平台的可视化数据。它可以用于调试和分析各种系统问题，包括性能瓶颈、功耗问题、安全漏洞等等。
 
+### system/core/rootdir/init.rc && system/core/rootdir/init.zygote64.rc
+
+这段代码是 Android 系统 init 进程中的一个服务定义，用于启动 zygote 进程。zygote 进程是 Android 系统中的一个关键进程，用于启动和管理应用程序。以下是代码中各行的分析：
+
+1. `service zygote /system/bin/app_process64 -Xzygote /system/bin --zygote --start-system-server`: 定义一个名为 "zygote" 的服务，使用 `/system/bin/app_process64` 作为可执行文件，其后的参数用于指定启动 zygote 进程及系统服务。
+2. `class main`: 将 zygote 服务归类为主要服务。
+3. `priority -20`: 为 zygote 服务设置优先级 -20。这表示它具有较高的优先级。
+4. `user root`: 以 root 用户身份运行 zygote 服务。
+5. `group root readproc reserved_disk`: 为 zygote 服务设置组权限，包括 root、readproc 和 reserved_disk。
+6. `socket zygote stream 660 root system`: 创建名为 zygote 的 UNIX 域套接字，用于与其他进程通信。
+7. `socket usap_pool_primary stream 660 root system`: 创建名为 usap_pool_primary 的 UNIX 域套接字，用于与其他进程通信。
+8. `onrestart ...`: 定义在 zygote 服务重启时要执行的一系列操作，例如重启其他系统服务、恢复系统电源状态等。
+9. `task_profiles ProcessCapacityHigh`: 将 zygote 服务的任务配置文件设置为 ProcessCapacityHigh，表示这是一个高容量进程。
+10. `critical window=${zygote.critical_window.minute:-off} target=zygote-fatal`: 设置 zygote 服务的关键窗口，若在这个时间内出现关键错误，将触发名为 zygote-fatal 的操作。
+
+总结：这段代码负责启动和配置 Android 系统中的 zygote 服务，它是一个关键服务，用于启动和管理应用程序。代码定义了 zygote 服务的运行参数、通信套接字、重启操作以及优先级等配置。
+
 ## 引用
 
 - <https://www.jianshu.com/p/37370c1d17fc>
+- <https://blog.csdn.net/u013028621/article/details/116271537>
