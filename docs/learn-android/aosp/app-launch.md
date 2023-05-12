@@ -877,6 +877,9 @@ int Looper::pollInner(int timeoutMillis) {
 
 ## 应用Application和Activity组件创建与初始化
 
+应用进程启动初始化执行 ActivityThread#main 函数过程中，在开启主线程loop 消息循环之前，会通过 Binder 调用系统核心服务 AMS 的 attachApplication 接口将自己注册到 AMS 中。下面我们接着这个流程往下看，我们先从Perfetto上看看 AMS 服务的 attachApplication 接口是如何处理应用进程的 attach 注册请求的：
+
+
 ## 其他
 
 ### Android中的epoll机制
