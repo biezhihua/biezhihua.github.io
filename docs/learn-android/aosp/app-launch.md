@@ -853,6 +853,7 @@ int Looper::pollOnce(int timeoutMillis, int* outFd, int* outEvents, void** outDa
         ...
 
         result = pollInner(timeoutMillis);
+        result = pollInner(timeoutMillis);
     }
 }
 
@@ -877,7 +878,508 @@ int Looper::pollInner(int timeoutMillis) {
 
 ## 应用Application和Activity组件创建与初始化
 
+### Application的创建与初始化
+
 应用进程启动初始化执行 ActivityThread#main 函数过程中，在开启主线程loop 消息循环之前，会通过 Binder 调用系统核心服务 AMS 的 attachApplication 接口将自己注册到 AMS 中。下面我们接着这个流程往下看，我们先从Perfetto上看看 AMS 服务的 attachApplication 接口是如何处理应用进程的 attach 注册请求的：
+
+![](/learn-android/aosp/pause-activity-12.png)
+
+![](/learn-android/aosp/pause-activity-13.png)
+
+我们继续来看相关代码的简化流程：
+
+```java
+
+
+// frameworks/base/services/core/java/com/android/server/am/ActivityManagerService.java
+public final void attachApplication(IApplicationThread thread, long startSeq) {
+    synchronized (this) {
+        ...
+        attachApplicationLocked(thread, callingPid, callingUid, startSeq);
+        ...
+    }
+}
+
+
+frameworks/base/services/core/java/com/android/server/am/ActivityManagerService.java
+private boolean attachApplicationLocked(@NonNull IApplicationThread thread,
+            int pid, int callingUid, long startSeq) {
+     ...
+     if (app.isolatedEntryPoint != null) {
+           ...
+     } else if (instr2 != null) {
+           ...
+     } else {
+           thread.bindApplication(...);
+     }
+     ...
+     // See if the top visible activity is waiting to run in this process...
+     if (normalMode) {
+          try {
+            didSomething = mAtmInternal.attachApplication(app.getWindowProcessController());
+          } catch (Exception e) {
+            ...
+          }
+      }
+}
+
+frameworks/base/core/java/android/app/ActivityThread.java
+private class ApplicationThread extends IApplicationThread.Stub {
+      @Override
+      public final void bindApplication(...) {
+            ...
+            AppBindData data = new AppBindData();
+            data.processName = processName;
+            data.appInfo = appInfo;
+            ...
+            // 向应用进程主线程Handler发送BIND_APPLICATION消息，触发在应用主线程执行handleBindApplication初始化动作
+            sendMessage(H.BIND_APPLICATION, data);
+      }
+      ...
+}
+
+frameworks/base/core/java/android/app/ActivityThread.java
+class H extends Handler {
+      ...
+      public void handleMessage(Message msg) {
+           switch (msg.what) {
+                case BIND_APPLICATION:
+                    Trace.traceBegin(Trace.TRACE_TAG_ACTIVITY_MANAGER, "bindApplication");
+                    AppBindData data = (AppBindData)msg.obj;
+                    // 在应用主线程执行handleBindApplication初始化动作
+                    handleBindApplication(data);
+                    Trace.traceEnd(Trace.TRACE_TAG_ACTIVITY_MANAGER);
+                    break;
+                    ...
+           }
+      }
+      ...
+}
+
+frameworks/base/core/java/android/app/ActivityThread.java
+private void handleBindApplication(AppBindData data) {
+    ...
+}
+```
+
+从上面的代码流程可以看出：AMS 服务在执行应用的 attachApplication 注册请求过程中，会用应用进程ActivityThread#IApplicationThread的 bindApplication 接口，而 bindApplication 接口函数实现中又会通过往应用主线程消息队列 post BIND_APPLICATION 消息触发执行handleBindApplication 初始化函数，从 Perfetto 看如下图所示：
+
+![](/learn-android/aosp/pause-activity-14.png)
+
+我们继续结合代码看看 handleBindApplication 的简化关键流程：
+
+```java
+frameworks/base/core/java/android/app/ActivityThread.java
+private void handleBindApplication(AppBindData data) {
+    ...
+    // 1.创建应用的LoadedApk对象
+    data.info = getPackageInfoNoCheck(data.appInfo, data.compatInfo);
+    ...
+    // 2.创建应用Application的Context、触发Art虚拟机加载应用APK的Dex文件到内存中，并加载应用APK的Resource资源
+    final ContextImpl appContext = ContextImpl.createAppContext(this, data.info);
+    ...
+    // 3.调用LoadedApk的makeApplication函数，实现创建应用的Application对象
+    app = data.info.makeApplication(data.restrictedBackupMode, null);
+    ...
+    // 4.执行应用Application#onCreate生命周期函数
+    mInstrumentation.onCreate(data.instrumentationArgs);
+    ...
+}
+```
+
+在 ActivityThread#handleBindApplication 初始化过程中在应用主线程中主要完成如下几件事件**：
+
+- 根据框架传入的 ApplicationInfo 息创建应用 APK 对应的 LoadedApk 对象;
+- 创建应用 Application 的 Context 对象；
+- 创建类加载器 ClassLoader 对象并触发 Art 虚拟机执行 OpenDexFilesFromOat 动作加载应用 APK 的 Dex 文件；
+- 通过 LoadedApk 加载应用 APK 的 Resource 资源；
+- 调用 LoadedApk 的 makeApplication 函数，创建应用的 Application 对象;
+- 执行应用 Application#onCreate 生命周期函数（APP应用开发者能控制的第一行代码）;
+
+下面我们结合代码重点看看 APK Dex 文件的加载和 Resource 资源的加载流程。
+
+### 应用APK的Dex文件加载
+
+```java
+frameworks/base/core/java/android/app/ContextImpl.java
+static ContextImpl createAppContext(ActivityThread mainThread, LoadedApk packageInfo,
+            String opPackageName) {
+    if (packageInfo == null) throw new IllegalArgumentException("packageInfo");
+    // 1.创建应用Application的Context对象
+    ContextImpl context = new ContextImpl(null, mainThread, packageInfo, null, null, null, null,
+                0, null, opPackageName);
+    // 2.触发加载APK的DEX文件和Resource资源
+    context.setResources(packageInfo.getResources());
+    context.mIsSystemOrSystemUiContext = isSystemOrSystemUI(context);
+    return context;
+}
+
+frameworks/base/core/java/android/app/LoadedApk.java
+public Resources getResources() {
+     if (mResources == null) {
+         ...
+         // 加载APK的Resource资源
+         mResources = ResourcesManager.getInstance().getResources(null, mResDir,
+                    splitPaths, mOverlayDirs, mApplicationInfo.sharedLibraryFiles,
+                    Display.DEFAULT_DISPLAY, null, getCompatibilityInfo(),
+                    getClassLoader()/*触发加载APK的DEX文件*/, null);
+      }
+      return mResources;
+}
+
+public ClassLoader getClassLoader() {
+     synchronized (this) {
+         if (mClassLoader == null) {
+             createOrUpdateClassLoaderLocked(null /*addedPaths*/);
+          }
+          return mClassLoader;
+     }
+}
+
+private void createOrUpdateClassLoaderLocked(List<String> addedPaths) {
+     ...
+     if (mDefaultClassLoader == null) {
+          ...
+          // 创建默认的mDefaultClassLoader对象，触发art虚拟机加载dex文件
+          mDefaultClassLoader = ApplicationLoaders.getDefault().getClassLoaderWithSharedLibraries(
+                    zip, mApplicationInfo.targetSdkVersion, isBundledApp, librarySearchPath,
+                    libraryPermittedPath, mBaseClassLoader,
+                    mApplicationInfo.classLoaderName, sharedLibraries);
+          ...
+     }
+     ...
+     if (mClassLoader == null) {
+         // 赋值给mClassLoader对象
+         mClassLoader = mAppComponentFactory.instantiateClassLoader(mDefaultClassLoader,
+                    new ApplicationInfo(mApplicationInfo));
+     }
+}
+
+frameworks/base/core/java/android/app/ApplicationLoaders.java
+ClassLoader getClassLoaderWithSharedLibraries(...) {
+    // For normal usage the cache key used is the same as the zip path.
+    return getClassLoader(zip, targetSdkVersion, isBundled, librarySearchPath,
+                              libraryPermittedPath, parent, zip, classLoaderName, sharedLibraries);
+}
+
+private ClassLoader getClassLoader(String zip, ...) {
+        ...
+        synchronized (mLoaders) {
+            ...
+            if (parent == baseParent) {
+                ...
+                // 1.创建BootClassLoader加载系统框架类，并增加相应的systrace tag
+                Trace.traceBegin(Trace.TRACE_TAG_ACTIVITY_MANAGER, zip);
+                ClassLoader classloader = ClassLoaderFactory.createClassLoader(
+                        zip,  librarySearchPath, libraryPermittedPath, parent,
+                        targetSdkVersion, isBundled, classLoaderName, sharedLibraries);
+                Trace.traceEnd(Trace.TRACE_TAG_ACTIVITY_MANAGER);
+                ...
+                return classloader;
+            }
+            // 2.创建PathClassLoader加载应用APK的Dex类，并增加相应的systrace tag
+            Trace.traceBegin(Trace.TRACE_TAG_ACTIVITY_MANAGER, zip);
+            ClassLoader loader = ClassLoaderFactory.createClassLoader(
+                    zip, null, parent, classLoaderName, sharedLibraries);
+            Trace.traceEnd(Trace.TRACE_TAG_ACTIVITY_MANAGER);
+            return loader;
+        }
+}
+
+frameworks/base/core/java/com/android/internal/os/ClassLoaderFactory.java
+public static ClassLoader createClassLoader(...) {
+        // 通过new的方式创建ClassLoader对象，最终会触发art虚拟机加载APK的dex文件
+        ClassLoader[] arrayOfSharedLibraries = (sharedLibraries == null)
+                ? null
+                : sharedLibraries.toArray(new ClassLoader[sharedLibraries.size()]);
+        if (isPathClassLoaderName(classloaderName)) {
+            return new PathClassLoader(dexPath, librarySearchPath, parent, arrayOfSharedLibraries);
+        }
+        ...
+}
+```
+
+从以上代码可以看出：在创建Application的Context对象后会立马尝试去加载APK的Resource资源，而在这之前需要通过LoadedApk去创建类加载器ClassLoader对象，而这个过程最终就会触发Art虚拟机加载应用APK的dex文件。
+
+![](/learn-android/aosp/pause-activity-14.png)
+
+### 应用APK的Resource资源加载
+
+```java
+frameworks/base/core/java/android/app/LoadedApk.java
+public Resources getResources() {
+     if (mResources == null) {
+         ...
+         // 加载APK的Resource资源
+         mResources = ResourcesManager.getInstance().getResources(null, mResDir,
+                    splitPaths, mOverlayDirs, mApplicationInfo.sharedLibraryFiles,
+                    Display.DEFAULT_DISPLAY, null, getCompatibilityInfo(),
+                    getClassLoader()/*触发加载APK的DEX文件*/, null);
+      }
+      return mResources;
+}
+
+frameworks/base/core/java/android/app/ResourcesManager.java
+public @Nullable Resources getResources(...) {
+      try {
+          // 原生Resource资源加载的systrace tag
+          Trace.traceBegin(Trace.TRACE_TAG_RESOURCES, "ResourcesManager#getResources");
+          ...
+          return createResources(activityToken, key, classLoader, assetsSupplier);
+      } finally {
+          Trace.traceEnd(Trace.TRACE_TAG_RESOURCES);
+      }
+}
+
+private @Nullable Resources createResources(...) {
+      synchronized (this) {
+            ...
+            // 执行创建Resources资源对象
+            ResourcesImpl resourcesImpl = findOrCreateResourcesImplForKeyLocked(key, apkSupplier);
+            if (resourcesImpl == null) {
+                return null;
+            }
+            ...
+     }
+}
+
+private @Nullable ResourcesImpl findOrCreateResourcesImplForKeyLocked(
+            @NonNull ResourcesKey key, @Nullable ApkAssetsSupplier apkSupplier) {
+      ...
+      impl = createResourcesImpl(key, apkSupplier);
+      ...
+}
+
+private @Nullable ResourcesImpl createResourcesImpl(@NonNull ResourcesKey key,
+            @Nullable ApkAssetsSupplier apkSupplier) {
+        ...
+        // 创建AssetManager对象，真正实现的APK文件加载解析动作
+        final AssetManager assets = createAssetManager(key, apkSupplier);
+        ...
+}
+
+private @Nullable AssetManager createAssetManager(@NonNull final ResourcesKey key,
+            @Nullable ApkAssetsSupplier apkSupplier) {
+        ...
+        for (int i = 0, n = apkKeys.size(); i < n; i++) {
+            final ApkKey apkKey = apkKeys.get(i);
+            try {
+                // 通过loadApkAssets实现应用APK文件的加载
+                builder.addApkAssets(
+                        (apkSupplier != null) ? apkSupplier.load(apkKey) : loadApkAssets(apkKey));
+            } catch (IOException e) {
+                ...
+            }
+        }
+        ...   
+}
+
+private @NonNull ApkAssets loadApkAssets(@NonNull final ApkKey key) throws IOException {
+        ...
+        if (key.overlay) {
+            ...
+        } else {
+            // 通过ApkAssets从APK文件所在的路径去加载
+            apkAssets = ApkAssets.loadFromPath(key.path,
+                    key.sharedLib ? ApkAssets.PROPERTY_DYNAMIC : 0);
+        }
+        ...
+    }
+
+frameworks/base/core/java/android/content/res/ApkAssets.java
+public static @NonNull ApkAssets loadFromPath(@NonNull String path, @PropertyFlags int flags)
+            throws IOException {
+        return new ApkAssets(FORMAT_APK, path, flags, null /* assets */);
+}
+
+private ApkAssets(@FormatType int format, @NonNull String path, @PropertyFlags int flags,
+            @Nullable AssetsProvider assets) throws IOException {
+        ...
+        // 通过JNI调用Native层的系统system/lib/libandroidfw.so库中的相关C函数实现对APK文件压缩包的解析与加载
+        mNativePtr = nativeLoad(format, path, flags, assets);
+        ...
+}
+```
+
+从以上代码可以看出：系统对于应用APK文件资源的加载过程其实就是创建应用进程中的 Resources 资源对象的过程，其中真正实现 APK 资源文件的I/O解析作，最终是借助于 AssetManager 中通过 JNI 调用系统 Native 层的相关 C 函数实现。整个过程从上 Perfetto 看如下图所示：
+
+![](/learn-android/aosp/pause-activity-15.png)
+
+## Activity的创建与初始化
+
+看看AMS在收到应用进程的attachApplication注册请求后，先通过应用及进程的IApplicationThread#bindApplication接口，触发应用进程在主线程执行 handleBindApplication 初始化操作，然后继续执行启动应用 Activity 的操作，下面我们来看看系统是如何启动创建应用 Activity 的，简化代码流程如下：
+
+![](/learn-android/aosp/pause-activity-16.png)
+
+```java
+frameworks/base/services/core/java/com/android/server/wm/ActivityTaskManagerService.java
+public boolean attachApplication(WindowProcessController wpc) throws RemoteException {
+    synchronized (mGlobalLockWithoutBoost) {
+        if (Trace.isTagEnabled(TRACE_TAG_WINDOW_MANAGER)) {
+            Trace.traceBegin(TRACE_TAG_WINDOW_MANAGER, "attachApplication:" + wpc.mName);
+        }
+        try {
+            return mRootWindowContainer.attachApplication(wpc);
+        } finally {
+            Trace.traceEnd(TRACE_TAG_WINDOW_MANAGER);
+        }
+    }
+}
+
+frameworks/base/services/core/java/com/android/server/wm/RootWindowContainer.java
+boolean attachApplication(WindowProcessController app) throws RemoteException {
+    try {
+        return mAttachApplicationHelper.process(app);
+    } finally {
+        mAttachApplicationHelper.reset();
+    }
+}
+
+frameworks/base/services/core/java/com/android/server/wm/RootWindowContainer.java
+boolean process(WindowProcessController app) throws RemoteException {
+    mApp = app;
+    for (int displayNdx = getChildCount() - 1; displayNdx >= 0; --displayNdx) {
+        getChildAt(displayNdx).forAllRootTasks(this);
+        if (mRemoteException != null) {
+            throw mRemoteException;
+        }
+    }
+    if (!mHasActivityStarted) {
+        ensureActivitiesVisible(null /* starting */, 0 /* configChanges */,
+                false /* preserveWindows */);
+    }
+    return mHasActivityStarted;
+}
+
+frameworks/base/services/core/java/com/android/server/wm/WindowContainer.java
+void forAllRootTasks(Consumer<Task> callback) {
+    forAllRootTasks(callback, true /* traverseTopToBottom */);
+}
+void forAllRootTasks(Consumer<Task> callback, boolean traverseTopToBottom) {
+    int count = mChildren.size();
+    if (traverseTopToBottom) {
+        for (int i = count - 1; i >= 0; --i) {
+            mChildren.get(i).forAllRootTasks(callback, traverseTopToBottom);
+        }
+    } else {
+        for (int i = 0; i < count; i++) {
+            mChildren.get(i).forAllRootTasks(callback, traverseTopToBottom);
+            // Root tasks may be removed from this display. Ensure each task will be processed
+            // and the loop will end.
+            int newCount = mChildren.size();
+            i -= count - newCount;
+            count = newCount;
+        }
+    }
+}
+
+frameworks/base/services/core/java/com/android/server/wm/Task.java
+void forAllRootTasks(Consumer<Task> callback, boolean traverseTopToBottom) {
+    if (isRootTask()) {
+        callback.accept(this);
+    }
+}
+
+@accept:3600, RootWindowContainer$AttachApplicationHelper (com.android.server.wm)
+public void accept(Task rootTask) {
+    if (mRemoteException != null) {
+        return;
+    }
+    if (rootTask.getVisibility(null /* starting */)
+            == TASK_FRAGMENT_VISIBILITY_INVISIBLE) {
+        return;
+    }
+    mTop = rootTask.topRunningActivity();
+    rootTask.forAllActivities(this);
+}
+
+forAllActivities:1678, WindowContainer (com.android.server.wm)
+boolean forAllActivities(Predicate<ActivityRecord> callback) {
+    return forAllActivities(callback, true /*traverseTopToBottom*/);
+}
+
+forAllActivities:1684, WindowContainer (com.android.server.wm)
+boolean forAllActivities(Predicate<ActivityRecord> callback, boolean traverseTopToBottom) {
+    if (traverseTopToBottom) {
+        for (int i = mChildren.size() - 1; i >= 0; --i) {
+            if (mChildren.get(i).forAllActivities(callback, traverseTopToBottom)) return true;
+        }
+    } else {
+        final int count = mChildren.size();
+        for (int i = 0; i < count; i++) {
+            if (mChildren.get(i).forAllActivities(callback, traverseTopToBottom)) return true;
+        }
+    }
+
+    return false;
+}
+
+forAllActivities:4585, ActivityRecord (com.android.server.wm)
+boolean forAllActivities(Predicate<ActivityRecord> callback, boolean traverseTopToBottom) {
+    return callback.test(this);
+}
+
+
+test:3612, RootWindowContainer$AttachApplicationHelper (com.android.server.wm)
+public boolean test(ActivityRecord r) {
+    if (r.finishing || !r.showToCurrentUser() || !r.visibleIgnoringKeyguard
+            || r.app != null || mApp.mUid != r.info.applicationInfo.uid
+            || !mApp.mName.equals(r.processName)) {
+        return false;
+    }
+
+    try {
+        if (mTaskSupervisor.realStartActivityLocked(r, mApp,
+                mTop == r && r.getTask().canBeResumed(r) /* andResume */,
+                true /* checkConfig */)) {
+            mHasActivityStarted = true;
+        }
+    } catch (RemoteException e) {
+        Slog.w(TAG, "Exception in new application when starting activity " + mTop, e);
+        mRemoteException = e;
+        return true;
+    }
+    return false;
+}
+
+realStartActivityLocked:769, ActivityTaskSupervisor (com.android.server.wm)
+boolean realStartActivityLocked(ActivityRecord r, WindowProcessController proc,
+            boolean andResume, boolean checkConfig) throws RemoteException {
+         ...
+        // 1.先通过LaunchActivityItem封装Binder通知应用进程执行Launch Activity动作       
+         clientTransaction.addCallback(LaunchActivityItem.obtain(...);
+         // Set desired final state.
+         final ActivityLifecycleItem lifecycleItem;
+         if (andResume) {
+                // 2.再通过ResumeActivityItem封装Binder通知应用进程执行Launch Resume动作        
+                lifecycleItem = ResumeActivityItem.obtain(dc.isNextTransitionForward());
+         }
+         ...
+         clientTransaction.setLifecycleStateRequest(lifecycleItem);
+         // 执行以上封装的Binder调用
+         mService.getLifecycleManager().scheduleTransaction(clientTransaction);
+         ...
+}
+```
+
+从以上代码分析可以看到，框架 system_server 进程最终是通过 ActivityStackSupervisor#realStartActivityLocked 函数中，通过 LaunchActivityItem 和 ResumeActivityItem 两个类的封装，依次实现 binder 调用通知应用进程这边执行 Activity 的 Launch 和 Resume 动作的，我们继续往下看相关代码流程：
+
+
+```java
+
+core/java/android/app/servertransaction/LaunchActivityItem.java
+public void execute(ClientTransactionHandler client, IBinder token,
+        PendingTransactionActions pendingActions) {
+    Trace.traceBegin(TRACE_TAG_ACTIVITY_MANAGER, "activityStart");
+    ActivityClientRecord r = new ActivityClientRecord(token, mIntent, mIdent, mInfo,
+            mOverrideConfig, mCompatInfo, mReferrer, mVoiceInteractor, mState, mPersistentState,
+            mPendingResults, mPendingNewIntents, mActivityOptions, mIsForward, mProfilerInfo,
+            client, mAssistToken, mShareableActivityToken, mLaunchedFromBubble,
+            mTaskFragmentToken);
+    client.handleLaunchActivity(r, pendingActions, null /* customIntent */);
+    Trace.traceEnd(TRACE_TAG_ACTIVITY_MANAGER);
+}
+```
 
 
 ## 其他
