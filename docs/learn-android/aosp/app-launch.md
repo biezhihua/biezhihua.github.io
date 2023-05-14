@@ -1379,8 +1379,109 @@ public void execute(ClientTransactionHandler client, IBinder token,
     client.handleLaunchActivity(r, pendingActions, null /* customIntent */);
     Trace.traceEnd(TRACE_TAG_ACTIVITY_MANAGER);
 }
+
+/**
+ * Extended implementation of activity launch. Used when server requests a launch or relaunch.
+ */
+core/java/android/app/ActivityThread.java
+public Activity handleLaunchActivity(ActivityClientRecord r,
+        PendingTransactionActions pendingActions, Intent customIntent) {
+    ...
+
+    final Activity a = performLaunchActivity(r, customIntent);
+
+    ...
+
+    return a;
+}
+
+    /**  Core implementation of activity launch. */
+private Activity performLaunchActivity(ActivityClientRecord r, Intent customIntent) {
+        ...
+        // 1.创建Activity的Context
+        ContextImpl appContext = createBaseContextForActivity(r);
+        try {
+            //2.反射创建Activity对象
+            activity = mInstrumentation.newActivity(
+                    cl, component.getClassName(), r.intent);
+            ...
+        } catch (Exception e) {
+            ...
+        }
+        try {
+            ...
+            if (activity != null) {
+                ...
+                // 3.执行Activity的attach动作
+                activity.attach(...);
+                ...
+                // 4.执行应用Activity的onCreate生命周期函数,并在setContentView调用中创建DecorView对象
+                mInstrumentation.callActivityOnCreate(activity, r.state);
+                ...
+            }
+            ...
+        } catch (SuperNotCalledException e) {
+            ...
+        }
+}
+
+frameworks/base/core/java/android/app/Activity.java
+final void attach(...) {
+    ...
+    // 1.创建表示应用窗口的PhoneWindow对象
+    mWindow = new PhoneWindow(this, window, activityConfigCallback);
+    ...
+    // 2.为PhoneWindow配置WindowManager
+    mWindow.setWindowManager(
+            (WindowManager)context.getSystemService(Context.WINDOW_SERVICE),
+            mToken, mComponent.flattenToString(),
+            (info.flags & ActivityInfo.FLAG_HARDWARE_ACCELERATED) != 0);
+    ...
+}
+
+
+public void callActivityOnCreate(Activity activity, Bundle icicle) {
+    ...
+
+    activity.performCreate(icicle);
+
+    ...
+}
+
+core/java/android/app/Activity.java
+final void performCreate(Bundle icicle) {
+    performCreate(icicle, null);
+}
+
+core/java/android/app/Activity.java
+final void performCreate(Bundle icicle, PersistableBundle persistentState) {
+    if (Trace.isTagEnabled(Trace.TRACE_TAG_WINDOW_MANAGER)) {
+        Trace.traceBegin(Trace.TRACE_TAG_WINDOW_MANAGER, "performCreate:"
+                + mComponent.getClassName());
+    }
+    
+    ...
+
+    if (persistentState != null) {
+        onCreate(icicle, persistentState);
+    } else {
+        onCreate(icicle);
+    }
+   
+    ...
+    
+    Trace.traceEnd(Trace.TRACE_TAG_WINDOW_MANAGER);
+}
 ```
 
+从上面代码可以看出，应用进程这边在收到系统 binder 调用后，在主线程中创建 Activity 的流程主要步骤如下：
+
+- 创建Activity的Context；
+- 通过反射创建Activity对象；
+- 执行Activity的attach动作，其中会创建应用窗口的PhoneWindow对象并设置WindowManage；
+- 执行应用Activity的onCreate生命周期函数，并在setContentView中创建窗口的DecorView对象；
+
+![](/learn-android/aosp/pause-activity-16.png)
 
 ## 其他
 
