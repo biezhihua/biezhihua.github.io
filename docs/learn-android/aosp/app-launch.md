@@ -1207,6 +1207,8 @@ private ApkAssets(@FormatType int format, @NonNull String path, @PropertyFlags i
 
 ## Activity的创建与初始化
 
+### Activity Create
+
 看看AMS在收到应用进程的attachApplication注册请求后，先通过应用及进程的IApplicationThread#bindApplication接口，触发应用进程在主线程执行 handleBindApplication 初始化操作，然后继续执行启动应用 Activity 的操作，下面我们来看看系统是如何启动创建应用 Activity 的，简化代码流程如下：
 
 ![](/learn-android/aosp/pause-activity-16.png)
@@ -1364,7 +1366,6 @@ boolean realStartActivityLocked(ActivityRecord r, WindowProcessController proc,
 
 从以上代码分析可以看到，框架 system_server 进程最终是通过 ActivityStackSupervisor#realStartActivityLocked 函数中，通过 LaunchActivityItem 和 ResumeActivityItem 两个类的封装，依次实现 binder 调用通知应用进程这边执行 Activity 的 Launch 和 Resume 动作的，我们继续往下看相关代码流程：
 
-
 ```java
 
 core/java/android/app/servertransaction/LaunchActivityItem.java
@@ -1482,6 +1483,340 @@ final void performCreate(Bundle icicle, PersistableBundle persistentState) {
 - 执行应用Activity的onCreate生命周期函数，并在setContentView中创建窗口的DecorView对象；
 
 ![](/learn-android/aosp/pause-activity-16.png)
+
+### Activity Resume
+
+```java
+frameworks/base/core/java/android/app/servertransaction/ResumeActivityItem.java
+@Override
+public void execute(ClientTransactionHandler client, IBinder token,
+            PendingTransactionActions pendingActions) {
+   // 原生标识Activity Resume的systrace tag
+   Trace.traceBegin(TRACE_TAG_ACTIVITY_MANAGER, "activityResume");
+   client.handleResumeActivity(token, true /* finalStateRequest */, mIsForward,
+                "RESUME_ACTIVITY");
+   Trace.traceEnd(TRACE_TAG_ACTIVITY_MANAGER);
+}
+
+frameworks/base/core/java/android/app/ActivityThread.java
+ @Override
+public void handleResumeActivity(...){
+    ...
+    // 1.执行performResumeActivity流程,执行应用Activity的onResume生命周期函数
+    final ActivityClientRecord r = performResumeActivity(token, finalStateRequest, reason);
+    ...
+    if (r.window == null && !a.mFinished && willBeVisible) {
+            ...
+            if (a.mVisibleFromClient) {
+                if (!a.mWindowAdded) {
+                    ...
+                    // 2.执行WindowManager#addView动作开启视图绘制逻辑
+                    wm.addView(decor, l);
+                } else {
+                  ...
+                }
+            }
+     }
+    ...
+}
+
+core/java/android/app/ActivityThread.java
+public boolean performResumeActivity(ActivityClientRecord r, boolean finalStateRequest,
+        String reason) {
+    ...
+    try {
+        ...
+        r.activity.performResume(r.startsNotResumed, reason);
+
+       ...
+    } catch (Exception e) {
+        ...
+    }
+    return true;
+}
+
+core/java/android/view/WindowManagerImpl.java
+public void addView(@NonNull View view, @NonNull ViewGroup.LayoutParams params) {
+    mGlobal.addView(view, params, mContext.getDisplayNoVerify(), mParentWindow,
+            mContext.getUserId());
+}
+
+
+frameworks/base/core/java/android/view/WindowManagerGlobal.java
+public void addView(View view, ViewGroup.LayoutParams params,
+        Display display, Window parentWindow, int userId) {
+    ...
+
+    ViewRootImpl root;
+    View panelParentView = null;
+
+    synchronized (mLock) {
+        ...
+
+        if (windowlessSession == null) {
+            root = new ViewRootImpl(view.getContext(), display);
+        } else {
+            root = new ViewRootImpl(view.getContext(), display,
+                    windowlessSession, new WindowlessWindowLayout());
+        }
+
+        view.setLayoutParams(wparams);
+
+        mViews.add(view);
+        mRoots.add(root);
+        mParams.add(wparams);
+
+        // do this last because it fires off messages to start doing things
+        try {
+            root.setView(view, wparams, panelParentView, userId);
+        } catch (RuntimeException e) {
+            ...
+        }
+    }
+}
+
+core/java/android/view/ViewRootImpl.java
+public void setView(View view, WindowManager.LayoutParams attrs, View panelParentView,
+        int userId) {
+    synchronized (this) {
+        if (mView == null) {
+            mView = view;
+
+            ...
+
+            // Schedule the first layout -before- adding to the window
+            // manager, to make sure we do the relayout before receiving
+            // any other events from the system.
+            requestLayout();
+
+            ...
+
+            ...
+        }
+    }
+}
+```
+
+从上面代码可以看出，应用进程这边在接收到系统Binder调用请求后，在主线程中 Activity Resume 的流程主要步骤如下：
+
+- 执行应用Activity的onResume生命周期函数;
+- 执行WindowManager的addView动作开启视图绘制逻辑;
+- 创建Activity的ViewRootImpl对象;
+- 执行ViewRootImpl的setView函数开启UI界面绘制动作；
+
+从 Perfetto 上看整个过程如下图所示：
+
+![](/learn-android/aosp/pause-activity-18.png)
+
+## 应用UI布局与绘制
+
+接上一节的分析，应用主线程中在执行Activity的Resume流程的最后，会创建ViewRootImpl对象并调用其setView函数，从此并开启了应用界面UI布局与绘制的流程。在开始讲解这个过程之前，我们先来整理一下前面代码中讲到的这些概念，如Activity、PhoneWindow、DecorView、ViewRootImpl、WindowManager它们之间的关系与职责，因为这些核心类基本构成了Android系统的GUI显示系统在应用进程侧的核心架构，其整体架构如下图所示：
+
+![](/learn-android/aosp/pause-activity-19.webp)
+
+- Window是一个抽象类，通过控制DecorView提供了一些标准的UI方案，比如背景、标题、虚拟按键等，而PhoneWindow是Window的唯一实现类，在Activity创建后的attach流程中创建，应用启动显示的内容装载到其内部的mDecor（DecorView）；
+
+- DecorView是整个界面布局View控件树的根节点，通过它可以遍历访问到整个View控件树上的任意节点；
+
+- WindowManager是一个接口，继承自ViewManager接口，提供了View的基本操作方法；WindowManagerImp实现了WindowManager接口，内部通过组合方式持有WindowManagerGlobal，用来操作View；
+
+- WindowManagerGlobal是一个全局单例，内部可以通过ViewRootImpl将View添加至窗口中；
+
+- ViewRootImpl是所有View的Parent，用来总体管理View的绘制以及与系统WMS窗口管理服务的IPC交互从而实现窗口的开辟；ViewRootImpl是应用进程运转的发动机，可以看到ViewRootImpl内部包含mView（就是DecorView）、mSurface、Choregrapher，mView代表整个控件树，mSurfacce代表画布，应用的UI渲染会直接放到mSurface中，Choregorapher使得应用请求vsync信号，接收信号后开始渲染流程；
+
+我们从ViewRootImpl的setView流程继续结合代码往下看：
+
+```java
+/*frameworks/base/core/java/android/view/ViewRootImpl.java*/
+public void setView(View view, WindowManager.LayoutParams attrs, View panelParentView,
+            int userId) {
+      synchronized (this) {
+         if (mView == null) {
+             mView = view;
+         }
+         ...
+         // 开启绘制硬件加速，初始化RenderThread渲染线程运行环境
+         enableHardwareAcceleration(attrs);
+         ...
+         // 1.触发绘制动作
+         requestLayout();
+         ...
+         inputChannel = new InputChannel();
+         ...
+         // 2.Binder调用访问系统窗口管理服务WMS接口，实现addWindow添加注册应用窗口的操作,并传入inputChannel用于接收触控事件
+         res = mWindowSession.addToDisplayAsUser(mWindow, mSeq, mWindowAttributes,
+                            getHostVisibility(), mDisplay.getDisplayId(), userId, mTmpFrame,
+                            mAttachInfo.mContentInsets, mAttachInfo.mStableInsets,
+                            mAttachInfo.mDisplayCutout, inputChannel,
+                            mTempInsets, mTempControls);
+         ...
+         // 3.创建WindowInputEventReceiver对象，实现应用窗口接收触控事件
+         mInputEventReceiver = new WindowInputEventReceiver(inputChannel,
+                            Looper.myLooper());
+         ...
+         // 4.设置DecorView的mParent为ViewRootImpl
+         view.assignParent(this);
+         ...
+      }
+}
+```
+
+从以上代码可以看出ViewRootImpl的setView内部关键流程如下：
+
+- requestLayout()通过一系列调用触发界面绘制（measure、layout、draw）动作，下文会详细展开分析；
+
+- 通过Binder调用访问系统窗口管理服务WMS的addWindow接口，实现添加、注册应用窗口的操作，并传入本地创建inputChannel对象用于后续接收系统的触控事件，这一步执行完我们的View就可以显示到屏幕上了。关于WMS的内部实现流程也非常复杂，由于篇幅有限本文就不详细展开分析了。
+
+- 创建WindowInputEventReceiver对象，封装实现应用窗口接收系统触控事件的逻辑；
+
+- 执行view.assignParent(this)，设置DecorView的mParent为ViewRootImpl。所以，虽然ViewRootImpl不是一个View,但它是所有View的顶层Parent。
+
+我们顺着ViewRootImpl的requestLayout动作继续往下看界面绘制的流程代码:
+
+```java
+/*frameworks/base/core/java/android/view/ViewRootImpl.java*/
+public void requestLayout() {
+    if (!mHandlingLayoutInLayoutRequest) {
+         // 检查当前UI绘制操作是否发生在主线程，如果发生在子线程则会抛出异常
+         checkThread();
+         mLayoutRequested = true;
+         // 触发绘制操作
+         scheduleTraversals();
+    }
+}
+
+@UnsupportedAppUsage
+void scheduleTraversals() {
+    if (!mTraversalScheduled) {
+         ...
+         // 注意此处会往主线程的MessageQueue消息队列中添加同步栏删，因为系统绘制消息属于异步消息，需要更高优先级的处理
+         mTraversalBarrier = mHandler.getLooper().getQueue().postSyncBarrier();
+         // 通过Choreographer往主线程消息队列添加CALLBACK_TRAVERSAL绘制类型的待执行消息，用于触发后续UI线程真正实现绘制动作
+         mChoreographer.postCallback(
+                    Choreographer.CALLBACK_TRAVERSAL, mTraversalRunnable, null);
+         ...
+     }
+}
+```
+
+Choreographer 的引入，主要是配合系统Vsync垂直同步机制（Android“黄油计划”中引入的机制之一，协调APP生成UI数据和SurfaceFlinger合成图像，避免Tearing画面撕裂的现象），给上层 App 的渲染提供一个稳定的 Message 处理的时机，也就是 Vsync 到来的时候 ，系统通过对 Vsync 信号周期的调整，来控制每一帧绘制操作的时机。Choreographer 扮演 Android 渲染链路中承上启下的角色：
+
+- 承上：负责接收和处理 App 的各种更新消息和回调，等到 Vsync 到来的时候统一处理。比如集中处理 Input(主要是 Input 事件的处理) 、Animation(动画相关)、Traversal(包括 measure、layout、draw 等操作) ，判断卡顿掉帧情况，记录 CallBack 耗时等；
+
+- 启下：负责请求和接收 Vsync 信号。接收 Vsync 事件回调(通过 FrameDisplayEventReceiver.onVsync )，请求 Vsync(FrameDisplayEventReceiver.scheduleVsync) 。
+
+Choreographer在收到CALLBACK_TRAVERSAL类型的绘制任务后，其内部的工作流程如下图所示：
+
+![](/learn-android/aosp/pause-activity-20.webp)
+
+![](/learn-android/aosp/pause-activity-22.png)
+
+从以上流程图可以看出：ViewRootImpl调用Choreographer的postCallback接口放入待执行的绘制消息后，Choreographer会先向系统申请APP 类型的vsync信号，然后等待系统vsync信号到来后，去回调到ViewRootImpl的doTraversal函数中执行真正的绘制动作（measure、layout、draw）。这个绘制过程从 Perfetto 上看如下图所示：
+
+![](/learn-android/aosp/pause-activity-21.png)
+
+我们接着ViewRootImpl的doTraversal函数的简化代码流程往下看：
+
+```java
+frameworks/base/core/java/android/view/ViewRootImpl.java
+void doTraversal() {
+     if (mTraversalScheduled) {
+         mTraversalScheduled = false;
+         // 调用removeSyncBarrier及时移除主线程MessageQueue中的Barrier同步栏删，以避免主线程发生“假死”
+         mHandler.getLooper().getQueue().removeSyncBarrier(mTraversalBarrier);
+         ...
+         // 执行具体的绘制任务
+         performTraversals();
+         ...
+    }
+}
+
+private void performTraversals() {
+     ...
+     // 1.从DecorView根节点出发，遍历整个View控件树，完成整个View控件树的measure测量操作
+     windowSizeMayChange |= measureHierarchy(...);
+     ...
+     if (mFirst...) {
+    // 2.第一次执行traversals绘制任务时，Binder调用访问系统窗口管理服务WMS的relayoutWindow接口，实现WMS计算应用窗口尺寸并向系统surfaceflinger正式申请Surface“画布”操作
+         relayoutResult = relayoutWindow(params, viewVisibility, insetsPending);
+     }
+     ...
+     // 3.从DecorView根节点出发，遍历整个View控件树，完成整个View控件树的layout测量操作
+     performLayout(lp, mWidth, mHeight);
+     ...
+     // 4.从DecorView根节点出发，遍历整个View控件树，完成整个View控件树的draw测量操作
+     performDraw();
+     ...
+}
+
+private int relayoutWindow(WindowManager.LayoutParams params, int viewVisibility,
+            boolean insetsPending) throws RemoteException {
+        ...
+        // 通过Binder IPC访问系统WMS服务的relayout接口，申请Surface“画布”操作
+        int relayoutResult = mWindowSession.relayout(mWindow, mSeq, params,
+                (int) (mView.getMeasuredWidth() * appScale + 0.5f),
+                (int) (mView.getMeasuredHeight() * appScale + 0.5f), viewVisibility,
+                insetsPending ? WindowManagerGlobal.RELAYOUT_INSETS_PENDING : 0, frameNumber,
+                mTmpFrame, mTmpRect, mTmpRect, mTmpRect, mPendingBackDropFrame,
+                mPendingDisplayCutout, mPendingMergedConfiguration, mSurfaceControl, mTempInsets,
+                mTempControls, mSurfaceSize, mBlastSurfaceControl);
+        if (mSurfaceControl.isValid()) {
+            if (!useBLAST()) {
+                // 本地Surface对象获取指向远端分配的Surface的引用
+                mSurface.copyFrom(mSurfaceControl);
+            } else {
+               ...
+            }
+        }
+        ...
+}
+
+private void performMeasure(int childWidthMeasureSpec, int childHeightMeasureSpec) {
+        ...
+        // 原生标识View树的measure测量过程的trace tag
+        Trace.traceBegin(Trace.TRACE_TAG_VIEW, "measure");
+        try {
+            // 从mView指向的View控件树的根节点DecorView出发，遍历访问整个View树，并完成整个布局View树的测量工作
+            mView.measure(childWidthMeasureSpec, childHeightMeasureSpec);
+        } finally {
+            Trace.traceEnd(Trace.TRACE_TAG_VIEW);
+        }
+}
+
+private void performDraw() {
+     ...
+     boolean canUseAsync = draw(fullRedrawNeeded);
+     ...
+}
+
+private boolean draw(boolean fullRedrawNeeded) {
+    ...
+    if (mAttachInfo.mThreadedRenderer != null && mAttachInfo.mThreadedRenderer.isEnabled()) {
+        ...
+        // 如果开启并支持硬件绘制加速，则走硬件绘制的流程（从Android 4.+开始，默认情况下都是支持跟开启了硬件加速的）
+        mAttachInfo.mThreadedRenderer.draw(mView, mAttachInfo, this);
+    } else {
+        // 否则走drawSoftware软件绘制的流程
+        if (!drawSoftware(surface, mAttachInfo, xOffset, yOffset,
+                        scalingRequired, dirty, surfaceInsets)) {
+                    return false;
+         }
+    }
+}
+```
+
+从上面的代码流程可以看出，ViewRootImpl中负责的整个应用界面绘制的主要流程如下：
+
+从界面View控件树的根节点DecorView出发，递归遍历整个View控件树，完成对整个View控件树的measure测量操作，由于篇幅所限，本文就不展开分析这块的详细流程；
+界面第一次执行绘制任务时，会通过Binder IPC访问系统窗口管理服务WMS的relayout接口，实现窗口尺寸的计算并向系统申请用于本地绘制渲染的Surface“画布”的操作（具体由SurfaceFlinger负责创建应用界面对应的BufferQueueLayer对象，并通过内存共享的方式通过Binder将地址引用透过WMS回传给应用进程这边），由于篇幅所限，本文就不展开分析这块的详细流程；
+从界面View控件树的根节点DecorView出发，递归遍历整个View控件树，完成对整个View控件树的layout测量操作；
+从界面View控件树的根节点DecorView出发，递归遍历整个View控件树，完成对整个View控件树的draw测量操作，如果开启并支持硬件绘制加速（从Android 4.X开始谷歌已经默认开启硬件加速），则走GPU硬件绘制的流程，否则走CPU软件绘制的流程；
+
+![](/learn-android/aosp/pause-activity-22.png)
+
+借用一张图来总结应用UI绘制的流程，如下所示：
+
+![](/learn-android/aosp/pause-activity-23.webp)
 
 ## 其他
 
