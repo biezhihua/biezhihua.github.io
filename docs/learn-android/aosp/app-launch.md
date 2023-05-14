@@ -772,7 +772,7 @@ class H extends Handler {
 
 主线程初始化完成后，主线程就进入阻塞状态，等待 Message，一旦有 Message 发过来，主线程就会被唤醒，处理 Message，处理完成之后，如果没有其他的 Message 需要处理，那么主线程就会进入休眠阻塞状态继续等待。可以说Android系统的运行是受消息机制驱动的，而整个消息机制是由上面所说的四个关键角色相互配合实现的（Handler、Looper、MessageQueue、Message），其运行原理如下图所示：
 
-![](/learn-android/aosp/pause-activity-11.png)
+![](/learn-android/aosp/create-app11.png)
 
 ```java
 /**
@@ -882,9 +882,9 @@ int Looper::pollInner(int timeoutMillis) {
 
 应用进程启动初始化执行 ActivityThread#main 函数过程中，在开启主线程loop 消息循环之前，会通过 Binder 调用系统核心服务 AMS 的 attachApplication 接口将自己注册到 AMS 中。下面我们接着这个流程往下看，我们先从Perfetto上看看 AMS 服务的 attachApplication 接口是如何处理应用进程的 attach 注册请求的：
 
-![](/learn-android/aosp/pause-activity-12.png)
+![](/learn-android/aosp/create-app12.png)
 
-![](/learn-android/aosp/pause-activity-13.png)
+![](/learn-android/aosp/create-app13.png)
 
 我们继续来看相关代码的简化流程：
 
@@ -964,7 +964,7 @@ private void handleBindApplication(AppBindData data) {
 
 从上面的代码流程可以看出：AMS 服务在执行应用的 attachApplication 注册请求过程中，会用应用进程ActivityThread#IApplicationThread的 bindApplication 接口，而 bindApplication 接口函数实现中又会通过往应用主线程消息队列 post BIND_APPLICATION 消息触发执行handleBindApplication 初始化函数，从 Perfetto 看如下图所示：
 
-![](/learn-android/aosp/pause-activity-14.png)
+![](/learn-android/aosp/create-app-14.png)
 
 我们继续结合代码看看 handleBindApplication 的简化关键流程：
 
@@ -1101,7 +1101,7 @@ public static ClassLoader createClassLoader(...) {
 
 从以上代码可以看出：在创建Application的Context对象后会立马尝试去加载APK的Resource资源，而在这之前需要通过LoadedApk去创建类加载器ClassLoader对象，而这个过程最终就会触发Art虚拟机加载应用APK的dex文件。
 
-![](/learn-android/aosp/pause-activity-14.png)
+![](/learn-android/aosp/create-app-14.png)
 
 ### 应用APK的Resource资源加载
 
@@ -1203,7 +1203,7 @@ private ApkAssets(@FormatType int format, @NonNull String path, @PropertyFlags i
 
 从以上代码可以看出：系统对于应用APK文件资源的加载过程其实就是创建应用进程中的 Resources 资源对象的过程，其中真正实现 APK 资源文件的I/O解析作，最终是借助于 AssetManager 中通过 JNI 调用系统 Native 层的相关 C 函数实现。整个过程从上 Perfetto 看如下图所示：
 
-![](/learn-android/aosp/pause-activity-15.png)
+![](/learn-android/aosp/create-app-15.png)
 
 ## Activity的创建与初始化
 
@@ -1211,7 +1211,7 @@ private ApkAssets(@FormatType int format, @NonNull String path, @PropertyFlags i
 
 看看AMS在收到应用进程的attachApplication注册请求后，先通过应用及进程的IApplicationThread#bindApplication接口，触发应用进程在主线程执行 handleBindApplication 初始化操作，然后继续执行启动应用 Activity 的操作，下面我们来看看系统是如何启动创建应用 Activity 的，简化代码流程如下：
 
-![](/learn-android/aosp/pause-activity-16.png)
+![](/learn-android/aosp/create-app-16.png)
 
 ```java
 frameworks/base/services/core/java/com/android/server/wm/ActivityTaskManagerService.java
@@ -1482,7 +1482,7 @@ final void performCreate(Bundle icicle, PersistableBundle persistentState) {
 - 执行Activity的attach动作，其中会创建应用窗口的PhoneWindow对象并设置WindowManage；
 - 执行应用Activity的onCreate生命周期函数，并在setContentView中创建窗口的DecorView对象；
 
-![](/learn-android/aosp/pause-activity-16.png)
+![](/learn-android/aosp/create-app-16.png)
 
 ### Activity Resume
 
@@ -1606,13 +1606,13 @@ public void setView(View view, WindowManager.LayoutParams attrs, View panelParen
 
 从 Perfetto 上看整个过程如下图所示：
 
-![](/learn-android/aosp/pause-activity-18.png)
+![](/learn-android/aosp/create-app-18.png)
 
 ## 应用UI布局与绘制
 
 接上一节的分析，应用主线程中在执行Activity的Resume流程的最后，会创建ViewRootImpl对象并调用其setView函数，从此并开启了应用界面UI布局与绘制的流程。在开始讲解这个过程之前，我们先来整理一下前面代码中讲到的这些概念，如Activity、PhoneWindow、DecorView、ViewRootImpl、WindowManager它们之间的关系与职责，因为这些核心类基本构成了Android系统的GUI显示系统在应用进程侧的核心架构，其整体架构如下图所示：
 
-![](/learn-android/aosp/pause-activity-19.webp)
+![](/learn-android/aosp/create-app-19.webp)
 
 - Window是一个抽象类，通过控制DecorView提供了一些标准的UI方案，比如背景、标题、虚拟按键等，而PhoneWindow是Window的唯一实现类，在Activity创建后的attach流程中创建，应用启动显示的内容装载到其内部的mDecor（DecorView）；
 
@@ -1707,13 +1707,15 @@ Choreographer 的引入，主要是配合系统Vsync垂直同步机制（Android
 
 Choreographer在收到CALLBACK_TRAVERSAL类型的绘制任务后，其内部的工作流程如下图所示：
 
-![](/learn-android/aosp/pause-activity-20.webp)
+![](/learn-android/aosp/create-app-20.webp)
 
-![](/learn-android/aosp/pause-activity-22.png)
+![](/learn-android/aosp/create-app-22.png)
+
+![](/learn-android/aosp/create-app-24.png)
 
 从以上流程图可以看出：ViewRootImpl调用Choreographer的postCallback接口放入待执行的绘制消息后，Choreographer会先向系统申请APP 类型的vsync信号，然后等待系统vsync信号到来后，去回调到ViewRootImpl的doTraversal函数中执行真正的绘制动作（measure、layout、draw）。这个绘制过程从 Perfetto 上看如下图所示：
 
-![](/learn-android/aosp/pause-activity-21.png)
+![](/learn-android/aosp/create-app-21.png)
 
 我们接着ViewRootImpl的doTraversal函数的简化代码流程往下看：
 
@@ -1812,11 +1814,399 @@ private boolean draw(boolean fullRedrawNeeded) {
 从界面View控件树的根节点DecorView出发，递归遍历整个View控件树，完成对整个View控件树的layout测量操作；
 从界面View控件树的根节点DecorView出发，递归遍历整个View控件树，完成对整个View控件树的draw测量操作，如果开启并支持硬件绘制加速（从Android 4.X开始谷歌已经默认开启硬件加速），则走GPU硬件绘制的流程，否则走CPU软件绘制的流程；
 
-![](/learn-android/aosp/pause-activity-22.png)
+![](/learn-android/aosp/create-app-22.png)
 
 借用一张图来总结应用UI绘制的流程，如下所示：
 
-![](/learn-android/aosp/pause-activity-23.webp)
+![](/learn-android/aosp/create-app-23.webp)
+
+## RenderThread渲染
+
+截止到目前，在ViewRootImpl中完成了对界面的measure、layout和draw等绘制流程后，用户依然还是看不到屏幕上显示的应用界面内容，因为整个Android系统的显示流程除了前面讲到的UI线程的绘制外，界面还需要经过RenderThread线程的渲染处理，渲染完成后，还需要通过Binder调用“上帧”交给surfaceflinger进程中进行合成后送显才能最终显示到屏幕上。本小节中，我们将接上一节中ViewRootImpl中最后draw的流程继续往下分析开启硬件加速情况下，RenderThread渲染线程的工作流程。由于目前Android 4.X之后系统默认界面是开启硬件加速的，所以本文我们重点分析硬件加速条件下的界面渲染流程，我们先分析一下简化的代码流程：
+
+```java
+void doTraversal() {
+    if (mTraversalScheduled) {
+        ...
+
+        performTraversals();
+
+        ...
+    }
+}
+
+private void performTraversals() {
+        ...
+
+        if (!isViewVisible) {
+            ...
+        } else if (cancelAndRedraw) {
+            ...
+        } else {
+            ...
+
+            if (!performDraw() && mSyncBufferCallback != null) {
+                mSyncBufferCallback.onBufferReady(null);
+            }
+        }
+
+        ...
+}
+
+private boolean performDraw() {
+    ...
+
+    try {
+        boolean canUseAsync = draw(fullRedrawNeeded, usingAsyncReport && mSyncBuffer);
+        ...
+    } finally {
+       ...
+        Trace.traceEnd(Trace.TRACE_TAG_VIEW);
+    }
+
+    ...
+
+    return true;
+}
+
+private boolean draw(boolean fullRedrawNeeded, boolean forceDraw) {
+    ...
+
+    if (!dirty.isEmpty() || mIsAnimating || accessibilityFocusDirty) {
+        if (isHardwareEnabled()) {
+            ...
+
+            
+            mAttachInfo.mThreadedRenderer.draw(mView, mAttachInfo, this);
+        } else {
+            ...
+        }
+    }
+
+    ...
+    return useAsyncReport;
+}
+
+core/java/android/view/ThreadedRenderer.java
+void draw(View view, AttachInfo attachInfo, DrawCallbacks callbacks) {
+    attachInfo.mViewRootImpl.mViewFrameInfo.markDrawStart();
+
+    // 1.从DecorView根节点出发，递归遍历View控件树，记录每个View节点的绘制操作命令，完成绘制操作命令树的构建
+    updateRootDisplayList(view, callbacks);
+
+    ...
+    \
+    // 2.JNI调用同步Java层构建的绘制命令树到Native层的RenderThread渲染线程，并唤醒渲染线程利用OpenGL执行渲染任务；
+    int syncResult = syncAndDrawFrame(frameInfo);
+
+    ...
+}
+
+public int syncAndDrawFrame(@NonNull FrameInfo frameInfo) {
+    return nSyncAndDrawFrame(mNativeProxy, frameInfo.frameInfo, frameInfo.frameInfo.length);
+}
+```
+
+![](/learn-android/aosp/create-app-25.png)
+
+从上面的代码可以看出，硬件加速绘制主要包括两个阶段：
+
+- 从DecorView根节点出发，递归遍历View控件树，记录每个View节点的drawOp绘制操作命令，完成绘制操作命令树的构建；
+
+- JNI调用同步Java层构建的绘制命令树到Native层的RenderThread渲染线程，并唤醒渲染线程利用OpenGL执行渲染任务；
+
+### 构建绘制命令树
+
+我们先来看看第一阶段构建绘制命令树的代码简化流程：
+
+```java
+/*frameworks/base/core/java/android/view/ThreadedRenderer.java*/
+private void updateRootDisplayList(View view, DrawCallbacks callbacks) {
+        // 原生标记构建View绘制操作命令树过程的systrace tag
+        Trace.traceBegin(Trace.TRACE_TAG_VIEW, "Record View#draw()");
+        // 递归子View的updateDisplayListIfDirty实现构建DisplayListOp
+        updateViewTreeDisplayList(view);
+        ...
+        if (mRootNodeNeedsUpdate || !mRootNode.hasDisplayList()) {
+            // 获取根View的SkiaRecordingCanvas
+            RecordingCanvas canvas = mRootNode.beginRecording(mSurfaceWidth, mSurfaceHeight);
+            try {
+                ...
+                // 利用canvas缓存DisplayListOp绘制命令
+                canvas.drawRenderNode(view.updateDisplayListIfDirty());
+                ...
+            } finally {
+                // 将所有DisplayListOp绘制命令填充到RootRenderNode中
+                mRootNode.endRecording();
+            }
+        }
+        Trace.traceEnd(Trace.TRACE_TAG_VIEW);
+}
+
+private void updateViewTreeDisplayList(View view) {
+        ...
+        // 从DecorView根节点出发，开始递归调用每个View树节点的updateDisplayListIfDirty函数
+        view.updateDisplayListIfDirty();
+        ...
+}
+
+/*frameworks/base/core/java/android/view/View.java*/
+public RenderNode updateDisplayListIfDirty() {
+     ...
+     // 1.利用`View`对象构造时创建的`RenderNode`获取一个`SkiaRecordingCanvas`“画布”；
+     final RecordingCanvas canvas = renderNode.beginRecording(width, height);
+     try {
+         ...
+         if ((mPrivateFlags & PFLAG_SKIP_DRAW) == PFLAG_SKIP_DRAW) {
+              // 如果仅仅是ViewGroup，并且自身不用绘制，直接递归子View
+              dispatchDraw(canvas);
+              ...
+         } else {
+              // 2.利用SkiaRecordingCanvas，在每个子View控件的onDraw绘制函数中调用drawLine、drawRect等绘制操作时，创建对应的DisplayListOp绘制命令，并缓存记录到其内部的SkiaDisplayList持有的DisplayListData中；
+              draw(canvas);
+         }
+     } finally {
+         // 3.将包含有`DisplayListOp`绘制命令缓存的`SkiaDisplayList`对象设置填充到`RenderNode`中；
+         renderNode.endRecording();
+         ...
+     }
+     ...
+}
+
+public void draw(Canvas canvas) {
+    ...
+    // draw the content(View自己实现的onDraw绘制，由应用开发者自己实现)
+    onDraw(canvas);
+    ...
+    // draw the children
+    dispatchDraw(canvas);
+    ...
+}
+
+/*frameworks/base/graphics/java/android/graphics/RenderNode.java*/
+public void endRecording() {
+        ...
+        // 从SkiaRecordingCanvas中获取SkiaDisplayList对象
+        long displayList = canvas.finishRecording();
+        // 将SkiaDisplayList对象填充到RenderNode中
+        nSetDisplayList(mNativeRenderNode, displayList);
+        canvas.recycle();
+}
+```
+
+
+从以上代码可以看出，构建绘制命令树的过程是从View控件树的根节点DecorView触发，递归调用每个子View节点的updateDisplayListIfDirty函数，最终完成绘制树的创建，简述流程如下：
+
+- 利用View对象构造时创建的RenderNode获取一个SkiaRecordingCanvas“画布”；
+- 利用SkiaRecordingCanvas，在每个子View控件的onDraw绘制函数中调用drawLine、drawRect等绘制操作时，创建对应的DisplayListOp绘制命令，并缓存记录到其内部的SkiaDisplayList持有的DisplayListData中；
+- 将包含有DisplayListOp绘制命令缓存的SkiaDisplayList对象设置填充到RenderNode中；
+- 最后将根View的缓存DisplayListOp设置到RootRenderNode中，完成构建。
+
+![](/learn-android/aosp/create-app-26.png)
+![](/learn-android/aosp/create-app-27.webp)
+
+
+### 执行渲染绘制任务
+
+经过上一小节中的分析，应用在UI线程中从根节点DecorView出发，递归遍历每个子View节点，搜集其drawXXX绘制动作并转换成DisplayListOp命令，将其记录到DisplayListData并填充到RenderNode中，最终完成整个View绘制命令树的构建。从此UI线程的绘制任务就完成了。下一步UI线程将唤醒RenderThread渲染线程，触发其利用OpenGL执行界面的渲染任务，本小节中我们将重点分析这个流程。我们还是先看看这块代码的简化流程：
+
+```java
+/*frameworks/base/graphics/java/android/graphics/HardwareRenderer.java*/
+public int syncAndDrawFrame(@NonNull FrameInfo frameInfo) {
+    // JNI调用native层的相关函数
+    return nSyncAndDrawFrame(mNativeProxy, frameInfo.frameInfo, frameInfo.frameInfo.length);
+}
+
+/*frameworks/base/libs/hwui/jni/android_graphics_HardwareRenderer.cpp*/
+static int android_view_ThreadedRenderer_syncAndDrawFrame(JNIEnv* env, jobject clazz,
+        jlong proxyPtr, jlongArray frameInfo, jint frameInfoSize) {
+    ...
+    RenderProxy* proxy = reinterpret_cast<RenderProxy*>(proxyPtr);
+    env->GetLongArrayRegion(frameInfo, 0, frameInfoSize, proxy->frameInfo());
+    return proxy->syncAndDrawFrame();
+}
+
+/*frameworks/base/libs/hwui/renderthread/RenderProxy.cpp*/
+int RenderProxy::syncAndDrawFrame() {
+    // 唤醒RenderThread渲染线程，执行DrawFrame绘制任务
+    return mDrawFrameTask.drawFrame();
+}
+
+/*frameworks/base/libs/hwui/renderthread/DrawFrameTask.cpp*/
+int DrawFrameTask::drawFrame() {
+    ...
+    postAndWait();
+    ...
+}
+
+void DrawFrameTask::postAndWait() {
+    AutoMutex _lock(mLock);
+    // 向RenderThread渲染线程的MessageQueue消息队列放入一个待执行任务，以将其唤醒执行run函数
+    mRenderThread->queue().post([this]() { run(); });
+    // UI线程暂时进入wait等待状态
+    mSignal.wait(mLock);
+}
+
+void DrawFrameTask::run() {
+    // 原生标识一帧渲染绘制任务的systrace tag
+    ATRACE_NAME("DrawFrame");
+    ...
+    {
+        TreeInfo info(TreeInfo::MODE_FULL, *mContext);
+        //1.将UI线程构建的DisplayListOp绘制命令树同步到RenderThread渲染线程
+        canUnblockUiThread = syncFrameState(info);
+        ...
+    }
+    ...
+    // 同步完成后则可以唤醒UI线程
+    if (canUnblockUiThread) {
+        unblockUiThread();
+    }
+    ...
+    if (CC_LIKELY(canDrawThisFrame)) {
+        // 2.执行draw渲染绘制动作
+        context->draw();
+    } else {
+        ...
+    }
+    ...
+}
+
+bool DrawFrameTask::syncFrameState(TreeInfo& info) {
+    ATRACE_CALL();
+    ...
+    // 调用CanvasContext的prepareTree函数实现绘制命令树同步的流程
+    mContext->prepareTree(info, mFrameInfo, mSyncQueued, mTargetNode);
+    ...
+}
+
+/*frameworks/base/libs/hwui/renderthread/CanvasContext.cpp*/
+void CanvasContext::prepareTree(TreeInfo& info, int64_t* uiFrameInfo, int64_t syncQueued,
+                                RenderNode* target) {
+     ...
+     for (const sp<RenderNode>& node : mRenderNodes) {
+        ...
+        // 递归调用各个子View对应的RenderNode执行prepareTree动作
+        node->prepareTree(info);
+        ...
+    }
+    ...
+}
+
+/*frameworks/base/libs/hwui/RenderNode.cpp*/
+void RenderNode::prepareTree(TreeInfo& info) {
+    ATRACE_CALL();
+    ...
+    prepareTreeImpl(observer, info, false);
+    ...
+}
+
+void RenderNode::prepareTreeImpl(TreeObserver& observer, TreeInfo& info, bool functorsNeedLayer) {
+    ...
+    if (info.mode == TreeInfo::MODE_FULL) {
+        // 同步绘制命令树
+        pushStagingDisplayListChanges(observer, info);
+    }
+    if (mDisplayList) {
+        // 遍历调用各个子View对应的RenderNode的prepareTreeImpl
+        bool isDirty = mDisplayList->prepareListAndChildren(
+                observer, info, childFunctorsNeedLayer,
+                [](RenderNode* child, TreeObserver& observer, TreeInfo& info,
+                   bool functorsNeedLayer) {
+                    child->prepareTreeImpl(observer, info, functorsNeedLayer);
+                });
+        ...
+    }
+    ...
+}
+
+void RenderNode::pushStagingDisplayListChanges(TreeObserver& observer, TreeInfo& info) {
+    ...
+    syncDisplayList(observer, &info);
+    ...
+}
+
+void RenderNode::syncDisplayList(TreeObserver& observer, TreeInfo* info) {
+    ...
+    // 完成赋值同步DisplayList对象
+    mDisplayList = mStagingDisplayList;
+    mStagingDisplayList = nullptr;
+    ...
+}
+
+void CanvasContext::draw() {
+    ...
+    // 1.调用OpenGL库使用GPU，按照构建好的绘制命令完成界面的渲染
+    bool drew = mRenderPipeline->draw(frame, windowDirty, dirty, mLightGeometry, &mLayerUpdateQueue,
+                                      mContentDrawBounds, mOpaque, mLightInfo, mRenderNodes,
+                                      &(profiler()));
+    ...
+    // 2.将前面已经绘制渲染好的图形缓冲区Binder上帧给SurfaceFlinger合成和显示
+    bool didSwap =
+            mRenderPipeline->swapBuffers(frame, drew, windowDirty, mCurrentFrameInfo, &requireSwap);
+    ...
+}
+```
+
+从以上代码可以看出：UI线程利用RenderProxy向RenderThread线程发送一个DrawFrameTask任务请求，RenderThread被唤醒，开始渲染，大致流程如下：
+
+- syncFrameState中遍历View树上每一个RenderNode，执行prepareTreeImpl函数，实现同步绘制命令树的操作；
+
+- 调用OpenGL库API使用GPU，按照构建好的绘制命令完成界面的渲染（具体过程，由于本文篇幅所限，暂不展开分析）；
+
+- 将前面已经绘制渲染好的图形缓冲区Binder上帧给SurfaceFlinger合成和显示；
+
+![](/learn-android/aosp/create-app-28.webp)
+
+从 Perfetto 这个过程如下图所示：
+
+![](/learn-android/aosp/create-app-29.png)
+
+## SurfaceFlinger合成显示
+
+SurfaceFlinger合成显示部分完全属于Android系统GUI中图形显示的内容，逻辑结构也比较复杂，但不属于本文介绍内容的重点。所以本小节中只是总体上介绍一下其工作原理与思想，不再详细分析源码，感兴趣的读者可以关注笔者后续的文章再来详细分析讲解。简单的说SurfaceFlinger作为系统中独立运行的一个Native进程，借用Android官网的描述，其职责就是负责接受来自多个来源的数据缓冲区，对它们进行合成，然后发送到显示设备。如下图所示：
+
+![](/learn-android/aosp/create-app-30.webp)
+
+
+从上图可以看出，其实SurfaceFlinger在Android系统的整个图形显示系统中是起到一个承上启下的作用：
+
+- 对上：通过Surface与不同的应用进程建立联系，接收它们写入Surface中的绘制缓冲数据，对它们进行统一合成。
+
+- 对下：通过屏幕的后缓存区与屏幕建立联系，发送合成好的数据到屏幕显示设备。
+
+图形的传递是通过Buffer作为载体，Surface是对Buffer的进一步封装，也就是说Surface内部具有多个Buffer供上层使用，如何管理这些Buffer呢？答案就是BufferQueue ，下面我们来看看BufferQueue的工作原理：
+
+### BufferQueue机制
+
+借用一张经典的图来描述BufferQueue的工作原理：
+
+![](/learn-android/aosp/create-app-31.webp)
+
+BufferQueue是一个典型的生产者-消费者模型中的数据结构。在Android应用的渲染流程中，应用扮演的就是“生产者”的角色，而SurfaceFlinger扮演的则是“消费者”的角色，其配合工作的流程如下：
+
+- 应用进程中在开始界面的绘制渲染之前，需要通过Binder调用dequeueBuffer接口从SurfaceFlinger进程中管理的BufferQueue 中申请一张处于free状态的可用Buffer，如果此时没有可用Buffer则阻塞等待；
+
+- 应用进程中拿到这张可用的Buffer之后，选择使用CPU软件绘制渲染或GPU硬件加速绘制渲染，渲染完成后再通过Binder调用queueBuffer接口将缓存数据返回给应用进程对应的BufferQueue（如果是 GPU 渲染的话，这里还有个 GPU处理的过程，所以这个 Buffer 不会马上可用，需要等 GPU 渲染完成的Fence信号），并申请sf类型的Vsync以便唤醒“消费者”SurfaceFlinger进行消费；
+
+- SurfaceFlinger 在收到 Vsync 信号之后，开始准备合成，使用 acquireBuffer获取应用对应的 BufferQueue 中的 Buffer 并进行合成操作；
+
+- 合成结束后，SurfaceFlinger 将通过调用 releaseBuffer将 Buffer 置为可用的free状态，返回到应用对应的 BufferQueue中。
+
+### Vsync同步机制
+
+Vysnc垂直同步是Android在“黄油计划”中引入的一个重要机制，本质上是为了协调BufferQueue的应用生产者生成UI数据动作和SurfaceFlinger消费者的合成消费动作，避免出现画面撕裂的Tearing现象。Vysnc信号分为两种类型：
+
+- app类型的Vsync：app类型的Vysnc信号由上层应用中的Choreographer根据绘制需求进行注册和接收，用于控制应用UI绘制上帧的生产节奏。根据第7小结中的分析：应用在UI线程中调用invalidate刷新界面绘制时，需要先透过Choreographer向系统申请注册app类型的Vsync信号，待Vsync信号到来后，才能往主线程的消息队列放入待绘制任务进行真正UI的绘制动作；
+
+- sf类型的Vsync:sf类型的Vsync是用于控制SurfaceFlinger的合成消费节奏。应用完成界面的绘制渲染后，通过Binder调用queueBuffer接口将缓存数据返还给应用对应的BufferQueue时，会申请sf类型的Vsync，待SurfaceFlinger 在其UI线程中收到 Vsync 信号之后，便开始进行界面的合成操作。
+
+
+Vsync信号的生成是参考屏幕硬件的刷新周期的，其架构如下图所示：
+
+![](/learn-android/aosp/create-app-32.webp)
+
+本小节所描述的流程，从 Perfetto 上看SurfaceFlinger处理应用上帧工作的流程如下图所示：
 
 ## 其他
 
