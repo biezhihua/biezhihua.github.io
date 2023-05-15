@@ -719,6 +719,46 @@ VsyncDispatch的注册函数就会往mCallbacks注册封装了callbackFn的Vsync
 - 当VsyncDispatch发送VSYNC-sf的信号时，会走到MessageQueue类注册的回调函数。
 
 ```c++
+
+ScheduleResult VSyncDispatchTimerQueue::schedule(CallbackToken token,
+                                                 ScheduleTiming scheduleTiming) {
+    ScheduleResult result;
+    {
+        ...
+
+        if (callback->wakeupTime() < mIntendedWakeupTime - mTimerSlack) {
+            rearmTimerSkippingUpdateFor(now, it);
+        }
+    }
+
+    return result;
+}
+
+
+void VSyncDispatchTimerQueue::setTimer(nsecs_t targetTime, nsecs_t /*now*/) {
+    mIntendedWakeupTime = targetTime;
+    mTimeKeeper->alarmAt(std::bind(&VSyncDispatchTimerQueue::timerCallback, this),
+                         mIntendedWakeupTime);
+    mLastTimerSchedule = mTimeKeeper->now();
+}
+
+void VSyncDispatchTimerQueue::timerCallback() {
+    struct Invocation {
+        std::shared_ptr<VSyncDispatchTimerQueueEntry> callback;
+        nsecs_t vsyncTimestamp;
+        nsecs_t wakeupTimestamp;
+        nsecs_t deadlineTimestamp;
+    };
+    std::vector<Invocation> invocations;
+
+    ...
+
+    for (auto const& invocation : invocations) {
+        invocation.callback->callback(invocation.vsyncTimestamp, invocation.wakeupTimestamp,
+                                      invocation.deadlineTimestamp);
+    }
+}
+
 void MessageQueue::vsyncCallback(nsecs_t vsyncTime, nsecs_t targetWakeupTime, nsecs_t readyTime) {
     ATRACE_CALL();
     // Trace VSYNC-sf
