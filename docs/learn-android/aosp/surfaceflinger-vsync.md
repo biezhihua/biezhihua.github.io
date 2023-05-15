@@ -784,6 +784,19 @@ void MessageQueue::Handler::dispatchFrame(int64_t vsyncId, nsecs_t expectedVsync
     }
 }
 
+
+handleMessage的函数调用栈：
+thread #1, name = 'surfaceflinger', stop reason = step over
+frame #0: 0x0000566eac668d7d surfaceflinger`android::impl::MessageQueue::Handler::handleMessage(this=0x00007a3974b6aac0, (null)=<unavailable>) at MessageQueue.cpp:48:31
+frame #1: 0x00007a3bcbff84b0 libutils.so`android::Looper::pollInner(this=0x00007a39e4b59b10, timeoutMillis=<unavailable>) at Looper.cpp:333:26
+frame #2: 0x00007a3bcbff828f libutils.so`android::Looper::pollOnce(this=0x00007a39e4b59b10, timeoutMillis=-1, outFd=0x0000000000000000, outEvents=0x0000000000000000, outData=0x0000000000000000) at Looper.cpp:213:18
+frame #3: 0x0000566eac669442 surfaceflinger`android::impl::MessageQueue::waitMessage() [inlined] android::Looper::pollOnce(this=<unavailable>, timeoutMillis=-1) at Looper.h:270:16
+frame #4: 0x0000566eac669431 surfaceflinger`android::impl::MessageQueue::waitMessage(this=0x00007a3a44b593c0) at MessageQueue.cpp:145:32
+frame #5: 0x0000566eac672709 surfaceflinger`android::scheduler::Scheduler::run(this=0x00007a3a44b593c0) at Scheduler.cpp:131:9
+frame #6: 0x0000566eac6d6b2b surfaceflinger`main [inlined] android::SurfaceFlinger::run(this=<unavailable>) at SurfaceFlinger.cpp:483:17
+frame #7: 0x0000566eac6d6b1f surfaceflinger`main((null)=1, (null)=<unavailable>) at main_surfaceflinger.cpp:167:14
+frame #8: 0x00007a3bc9670cca libc.so`::__libc_init(raw_args=<unavailable>, onexit=<unavailable>, slingshot=(surfaceflinger`main at main_surfaceflinger.cpp:79), structors=<unavailable>)(), int (*)(int, char **, char **), const structors_array_t *const) at libc_init_dynamic.cpp:157:8
+
 void MessageQueue::Handler::handleMessage(const Message&) {
     mFramePending.store(false);
 

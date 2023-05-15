@@ -158,3 +158,11 @@ Android init 脚本使用一种名为 `init` 的简单语言编写，该语言�
 在 Android 源代码中，每个模块都有一个相应的 `Android.bp` 文件，用于描述该模块的构建规则。这些模块包括 Android 系统本身、应用程序、共享库、静态库、插件等。开发者可以修改这些 `Android.bp` 文件来增加、删除或修改模块的构建规则，以满足自己的需求。
 
 总之，`Android.bp` 文件是 AOSP 中描述如何构建 Android 应用程序、库和模块的核心文件，它是 Soong 构建系统的核心组件之一。
+
+## emplace
+
+<https://en.cppreference.com/w/cpp/utility/optional/emplace>
+
+## emplace_back
+
+<https://en.cppreference.com/w/cpp/container/vector/emplace_back>

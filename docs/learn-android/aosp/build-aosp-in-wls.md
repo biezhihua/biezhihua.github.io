@@ -692,9 +692,62 @@ continue 让进程继续执行
 
 增加断点：
 
-```
+```bash
 breakpoint set -M SurfaceFlinger::onComposerHalVsync
+```
+
+打印调用栈
+```bash
+bt
 ```
 
 - <https://source.android.com/docs/core/tests/debug/gdb?hl=zh-cn>
 - <https://lldb.llvm.org/>
+
+##  **init**() got an unexpected keyword argument 'text'
+
+```
+➜  aosp lldbclient.py -p 3696  --setup-forwarding vscode-lldb
+Traceback (most recent call last):
+  File "/home/biezhihua/projects/aosp/development/scripts/lldbclient.py", line 426, in <module>
+    main()
+  File "/home/biezhihua/projects/aosp/development/scripts/lldbclient.py", line 418, in main
+    do_main()
+  File "/home/biezhihua/projects/aosp/development/scripts/lldbclient.py", line 352, in do_main
+    clang_version = read_toolchain_config(root)
+  File "/home/biezhihua/projects/aosp/development/scripts/lldbclient.py", line 41, in read_toolchain_config
+    text=True)
+  File "/usr/lib/python3.6/subprocess.py", line 356, in check_output
+    **kwargs).stdout
+  File "/usr/lib/python3.6/subprocess.py", line 423, in run
+    with Popen(*popenargs, **kwargs) as process:
+TypeError: **init**() got an unexpected keyword argument 'text'
+```
+
+这个错误发生在运行 `lldbclient.py` 脚本时。原因是在您使用的 Python 版本（3.6）中，`subprocess` 模块的 `Popen` 类的 `__init__()` 方法不支持 `text` 关键字参数。`text` 参数在 Python 3.7 及更高版本的 `subprocess` 模块中引入，用于替代过时的 `universal_newlines` 参数。
+
+为了解决这个问题，您可以执行以下操作：
+
+1. 更新 Python 版本。建议安装 Python 3.7 或更高版本。这可以通过使用您的包管理器或从 [Python 官方网站](https://www.python.org/downloads/) 下载并安装新版本来完成。
+
+2. 如果您不希望或不能更新 Python，可以尝试修改 `lldbclient.py` 脚本。在脚本的第 41 行，将以下代码：
+
+```python
+text=True
+```
+
+替换为：
+
+```python
+universal_newlines=True
+```
+
+这会在旧版本的 `subprocess` 模块中使用 `universal_newlines` 参数，实现与 `text` 参数相同的功能。
+
+保存更改后，再次运行 `lldbclient.py` 脚本，问题应该得到解决。
+
+## other
+
+```bash
+adb shell ps -A | grep surfaceflinger
+```
