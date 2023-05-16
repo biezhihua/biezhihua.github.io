@@ -393,7 +393,7 @@ private:
 
 那么从上面的代码逻辑中，我们可以知道节拍器线程（心跳）一共绑定了3个Callback，分别是"app" ,"appSf","sf"。
 
-### VSYNC-sf/VSYNC-app的申请与投递
+## VSYNC-sf/VSYNC-app的申请与投递
 
 我们先看看通道的建立过程，也是从源代码开始看起。
 
@@ -629,7 +629,7 @@ bool Timer::dispatch() {
 
 - timerfd配合epoll函数使用，如果定时器时间到了，就会执行上图中alarmAt函数传入的函数指针，这个函数指针是VsyncDispatchTimerQueue.cpp类的timerCallback()函数，而这个函数中，就是对注册的callback执行回调。
 
-#### SF向VsyncDispatch注册回调的过程
+### SF向VsyncDispatch注册回调的过程
 
 下面，我们跟踪下SF是如何注册自己的回调函数。
 
@@ -818,7 +818,7 @@ void MessageQueue::Handler::handleMessage(const Message&) {
 
 可见，MessageQueue是接收VSYNC-SF信号的，将VsyncDispatch发送的VSYNC-SF信号通过自身转到SF，驱动SF执行合成操作。
 
-#### DispSyncSource是VsyncDispatch与EventThread之间的桥梁
+### DispSyncSource是VsyncDispatch与EventThread之间的桥梁
 
 DispSyncSource是对标准SW VSYNC的细分，产生VSYNC-app，它可以认为是信号源，仍然需要触发下游组件来接受信号，对DisplaySyncSource来说，它的下游组件就是EventThread。所以说DispSyncSource是VsyncDispatch与EventThread之间通讯的纽带。
 
@@ -1042,7 +1042,479 @@ void EventThread::onVSyncEvent(nsecs_t timestamp, VSyncSource::VSyncData vsyncDa
 
 ```
 
-### dumpsys SurfaceFlinger
+### App向EventThread注册Connection
+
+如果有App关心VSYN-APP，则需要向appEventThread注册Connection，可能有多个App同时关注VSYNC-app信号，所以在EventThread的内部有一个mDisplayEventConnections来保存着Connection，Connection是一个Bn对象，因为要与APP进行binder通讯。
+
+```c++
+ /frameworks/native/services/surfaceflinger/Scheduler/EventThread.h
+ 
+
+class EventThread : public android::EventThread, private VSyncSource::Callback {
+    ...
+
+    std::vector<wp<EventThreadConnection>> mDisplayEventConnections GUARDED_BY(mMutex);
+
+    ....
+};
+
+status_t EventThread::registerDisplayEventConnection(const sp<EventThreadConnection>& connection) {
+    std::lock_guard<std::mutex> lock(mMutex);
+
+    // this should never happen
+    auto it = std::find(mDisplayEventConnections.cbegin(),
+            mDisplayEventConnections.cend(), connection);
+    if (it != mDisplayEventConnections.cend()) {
+        ALOGW("DisplayEventConnection %p already exists", connection.get());
+        mCondition.notify_all();
+        return ALREADY_EXISTS;
+    }
+
+    mDisplayEventConnections.push_back(connection);
+    mCondition.notify_all();
+    return NO_ERROR;
+}
+
+void EventThread::removeDisplayEventConnectionLocked(const wp<EventThreadConnection>& connection) {
+    auto it = std::find(mDisplayEventConnections.cbegin(),
+            mDisplayEventConnections.cend(), connection);
+    if (it != mDisplayEventConnections.cend()) {
+        mDisplayEventConnections.erase(it);
+    }
+}
+
+```
+
+以上贴的三段代码，分别是定义Connection的集合对象，往appEventThread注册Connection和删除Connection。
+
+```c++
+ConnectionHandle Scheduler::createConnection(std::unique_ptr<EventThread> eventThread) {
+    const ConnectionHandle handle = ConnectionHandle{mNextConnectionHandleId++};
+    ALOGV("Creating a connection handle with ID %" PRIuPTR, handle.id);
+
+    auto connection = createConnectionInternal(eventThread.get());
+
+    std::lock_guard<std::mutex> lock(mConnectionsLock);
+    mConnections.emplace(handle, Connection{connection, std::move(eventThread)});
+    return handle;
+}
+
+sp<EventThreadConnection> Scheduler::createConnectionInternal(
+        EventThread* eventThread, ISurfaceComposer::EventRegistrationFlags eventRegistration) {
+    return eventThread->createEventConnection([&] { resync(); }, eventRegistration);
+}
+
+sp<EventThreadConnection> EventThread::createEventConnection(
+        ResyncCallback resyncCallback,
+        ISurfaceComposer::EventRegistrationFlags eventRegistration) const {
+    return new EventThreadConnection(const_cast<EventThread*>(this),
+                                     IPCThreadState::self()->getCallingUid(),
+                                     std::move(resyncCallback), eventRegistration);
+}
+
+```
+
+## SF请求VSYNC-sf
+
+### scheduleFrame
+
+当应用上帧的时候，也就是当BufferQueue有新的Graphic Buffer到达时，应用会通过binder通讯，调用到SurfaceFlinger的setTransactionState方法，再去调用setTransactionFlags方法，通知SF有新的Graphic Buffer到达：
+
+SF的scheduleCommit方法中调用MessageQueue的scheduleFrame方法。
+
+scheduleFrame方法就是SF去申请一次性的VSYNC。
+
+```c++
+应用上帧的调用栈
+
+thread #17, name = 'binder:458_5', stop reason = breakpoint 1.3
+frame #0: 0x000058e7b49e4022 surfaceflinger`android::SurfaceFlinger::setTransactionFlags(unsigned int, android::scheduler::TransactionSchedule, android::sp<android::IBinder> const&, android::SurfaceFlinger::FrameHint) [inlined] android::SurfaceFlinger::scheduleCommit(this=0x00006ffc7adad8c0, hint=kActive) at SurfaceFlinger.cpp:1827:14
+frame #1: 0x000058e7b49e4022 surfaceflinger`android::SurfaceFlinger::setTransactionFlags(this=0x00006ffc7adad8c0, mask=16, schedule=<unavailable>, applyToken=<unavailable>, frameHint=kActive) at SurfaceFlinger.cpp:3705:9
+frame #2: 0x000058e7b49fd042 surfaceflinger`android::SurfaceFlinger::setTransactionState(android::FrameTimelineInfo const&, android::Vector<android::ComposerState> const&, android::Vector<android::DisplayState> const&, unsigned int, android::sp<android::IBinder> const&, android::InputWindowCommands const&, long, bool, android::client_cache_t const&, bool, std::__1::vector<android::ListenerCallbacks, std::__1::allocator<android::ListenerCallbacks> > const&, unsigned long) [inlined] android::SurfaceFlinger::queueTransaction(this=0x00006ffc7adad8c0, state=0x00006ffae5e532a0) at SurfaceFlinger.cpp:4112:5
+frame #3: 0x000058e7b49fce58 surfaceflinger`android::SurfaceFlinger::setTransactionState(this=<unavailable>, frameTimelineInfo=0x00006ffae5e53560, states=0x00006ffae5e53530, displays=0x00006ffae5e53500, flags=<unavailable>, applyToken=0x00006ffae5e534f0, inputWindowCommands=0x00006ffae5e53580, desiredPresentTime=0, isAutoTimestamp=<unavailable>, uncacheBuffer=0x00006ffae5e534c0, hasListenerCallbacks=<unavailable>, listenerCallbacks=size=0, transactionId=2508260901263) at SurfaceFlinger.cpp:4187:5
+frame #4: 0x00006ffd830e74da libgui.so`android::BnSurfaceComposer::onTransact(this=0x00006ffc7adad8c0, code=<unavailable>, data=0x00006ffae5e53b00, reply=<unavailable>, flags=<unavailable>) at ISurfaceComposer.cpp:1100:20
+frame #5: 0x000058e7b4a04351 surfaceflinger`android::SurfaceFlinger::onTransact(this=0x00006ffc7adad8c0, code=8, data=0x00006ffae5e53b00, reply=0x00006ffae5e53a80, flags=16) at SurfaceFlinger.cpp:5719:39
+frame #6: 0x00006ffd860b46f1 libbinder.so`android::BBinder::transact(this=0x00006ffc7adad8c0, code=8, data=0x00006ffae5e53b00, reply=0x00006ffae5e53a80, flags=16) at Binder.cpp:297:19
+frame #7: 0x00006ffd860bf834 libbinder.so`android::IPCThreadState::executeCommand(this=0x00006ffbcadac310, cmd=<unavailable>) at IPCThreadState.cpp:1293:68
+frame #8: 0x00006ffd860bf2be libbinder.so`android::IPCThreadState::getAndExecuteCommand(this=0x00006ffbcadac310) at IPCThreadState.cpp:563:18
+frame #9: 0x00006ffd860bfc90 libbinder.so`android::IPCThreadState::joinThreadPool(this=0x00006ffbcadac310, isMain=<unavailable>) at IPCThreadState.cpp:649:18
+frame #10: 0x00006ffd860ef9e8 libbinder.so`android::PoolThread::threadLoop(this=0x00006ffb6adb6a30) at ProcessState.cpp:72:33
+frame #11: 0x00006ffd8145be56 libutils.so`android::Thread::_threadLoop(user=0x00006ffb6adb6a30) at Mutex.h:0:12
+frame #12: 0x00006ffd7ae66d9b libc.so`__pthread_start(arg=0x00006ffae5e53cf0) at pthread_create.cpp:364:18
+frame #13: 0x00006ffd7adfad48 libc.so`::__start_thread(fn=(libc.so`__pthread_start(void*) at pthread_create.cpp:339), arg=0x00006ffae5e53cf0)(void *), void *) at clone.cpp:53:16
+```
+
+```c++
+
+status_t SurfaceFlinger::setTransactionState(
+        const FrameTimelineInfo& frameTimelineInfo, const Vector<ComposerState>& states,
+        const Vector<DisplayState>& displays, uint32_t flags, const sp<IBinder>& applyToken,
+        const InputWindowCommands& inputWindowCommands, int64_t desiredPresentTime,
+        bool isAutoTimestamp, const client_cache_t& uncacheBuffer, bool hasListenerCallbacks,
+        const std::vector<ListenerCallbacks>& listenerCallbacks, uint64_t transactionId) {
+    ...
+
+    queueTransaction(state);
+
+    ...
+
+    return NO_ERROR;
+}
+
+void SurfaceFlinger::queueTransaction(TransactionState& state) {
+    ...
+
+    setTransactionFlags(eTransactionFlushNeeded, schedule, state.applyToken, frameHint);
+}
+
+void SurfaceFlinger::setTransactionFlags(uint32_t mask, TransactionSchedule schedule,
+                                         const sp<IBinder>& applyToken, FrameHint frameHint) {
+    modulateVsync(&VsyncModulator::setTransactionSchedule, schedule, applyToken);
+
+    if (const bool scheduled = mTransactionFlags.fetch_or(mask) & mask; !scheduled) {
+        scheduleCommit(frameHint);
+    }
+}
+
+void SurfaceFlinger::scheduleCommit(FrameHint hint) {
+    if (hint == FrameHint::kActive) {
+        mScheduler->resetIdleTimer();
+    }
+    mPowerAdvisor->notifyDisplayUpdateImminent();
+    mScheduler->scheduleFrame();
+}
+
+
+void MessageQueue::scheduleFrame() {
+    ATRACE_CALL();
+
+    {
+        std::lock_guard lock(mInjector.mutex);
+        if (CC_UNLIKELY(mInjector.connection)) {
+            ALOGD("%s while injecting VSYNC", __FUNCTION__);
+            mInjector.connection->requestNextVsync();
+            return;
+        }
+    }
+
+    std::lock_guard lock(mVsync.mutex);
+    mVsync.scheduledFrameTime =
+            mVsync.registration->schedule({.workDuration = mVsync.workDuration.get().count(),
+                                           .readyDuration = 0,
+                                           .earliestVsync = mVsync.lastCallbackTime.count()});
+}
+```
+
+### schedule
+
+上面的代码是通过Vsync结构体的registration对象调用schedule方法。
+
+```c++
+aosp/frameworks/native/services/surfaceflinger/Scheduler/MessageQueue.h
+struct Vsync {
+    frametimeline::TokenManager* tokenManager = nullptr;
+    std::unique_ptr<scheduler::VSyncCallbackRegistration> registration;
+
+    mutable std::mutex mutex;
+    TracedOrdinal<std::chrono::nanoseconds> workDuration
+            GUARDED_BY(mutex) = {"VsyncWorkDuration-sf", std::chrono::nanoseconds(0)};
+    std::chrono::nanoseconds lastCallbackTime GUARDED_BY(mutex) = std::chrono::nanoseconds{0};
+    std::optional<nsecs_t> scheduledFrameTime GUARDED_BY(mutex);
+    TracedOrdinal<int> value = {"VSYNC-sf", 0};
+};
+```
+
+间接的调用到VsynDispatch的schedule方法。
+
+```c++
+aosp/frameworks/native/services/surfaceflinger/Scheduler/VSyncDispatchTimerQueue.cpp
+ScheduleResult VSyncCallbackRegistration::schedule(VSyncDispatch::ScheduleTiming scheduleTiming) {
+    if (!mValidToken) {
+        return std::nullopt;
+    }
+    return mDispatch.get().schedule(mToken, scheduleTiming);
+}
+
+/home/biezhihua/projects/aosp/frameworks/native/services/surfaceflinger/Scheduler/VSyncDispatchTimerQueue.cpp
+ScheduleResult VSyncDispatchTimerQueue::schedule(CallbackToken token,
+                                                 ScheduleTiming scheduleTiming) {
+    ScheduleResult result;
+    {
+        ...
+
+        result = callback->schedule(scheduleTiming, mTracker, now);
+        if (!result.has_value()) {
+            return result;
+        }
+
+        if (callback->wakeupTime() < mIntendedWakeupTime - mTimerSlack) {
+            rearmTimerSkippingUpdateFor(now, it);
+        }
+    }
+
+    return result;
+}
+
+void VSyncDispatchTimerQueue::rearmTimerSkippingUpdateFor(
+        nsecs_t now, CallbackMap::iterator const& skipUpdateIt) {
+    ...
+
+    if (min && min < mIntendedWakeupTime) {
+        ...
+        setTimer(*min, now);
+    } else {
+        ...
+    }
+}
+
+
+void VSyncDispatchTimerQueue::setTimer(nsecs_t targetTime, nsecs_t /*now*/) {
+    mIntendedWakeupTime = targetTime;
+    mTimeKeeper->alarmAt(std::bind(&VSyncDispatchTimerQueue::timerCallback, this),
+                         mIntendedWakeupTime);
+    mLastTimerSchedule = mTimeKeeper->now();
+}
+```
+
+其中的mToken是当初SF注册的到VsyncDispatch的索引，通过mToken可以找到注册到VsyncDispatch中的VsyncDispatchTimerQueueEntry对象，这个对象记录了很多信息，包括回调到SF的函数地址，下一次发送VSYNC信号的时间等等。
+
+## VSYNC-sf产生和发射
+
+
+从前面的代码可以看到，当应用上帧的时候，SurfaceFlinger就会去申请VSYNC-sf的信号，那申请的VSYNC-sf的信号，什么时候会发给SurfaceFlinger，去做合成的动作。从前面的代码，已经可以看到申请信息的时候，已经调用到VsyncDispatch的schedule的方法。
+
+要了解VSYNC-sf的发射路径，需要仔细阅读VsyncDispatch的子类的实现逻辑，查看VSyncDispatchTimerQueue.cpp的代码如下：
+
+```c++
+/home/biezhihua/projects/aosp/frameworks/native/services/surfaceflinger/Scheduler/VSyncDispatchTimerQueue.cpp
+ScheduleResult VSyncDispatchTimerQueue::schedule(CallbackToken token,
+                                                 ScheduleTiming scheduleTiming) {
+    ScheduleResult result;
+    {
+        std::lock_guard lock(mMutex);
+
+        auto it = mCallbacks.find(token);
+        if (it == mCallbacks.end()) {
+            return result;
+        }
+        auto& callback = it->second;
+        auto const now = mTimeKeeper->now();
+
+        /* If the timer thread will run soon, we'll apply this work update via the callback
+         * timer recalculation to avoid cancelling a callback that is about to fire. */
+        auto const rearmImminent = now > mIntendedWakeupTime;
+        if (CC_UNLIKELY(rearmImminent)) {
+            callback->addPendingWorkloadUpdate(scheduleTiming);
+            return getExpectedCallbackTime(mTracker, now, scheduleTiming);
+        }
+
+        result = callback->schedule(scheduleTiming, mTracker, now);
+        if (!result.has_value()) {
+            return result;
+        }
+
+        if (callback->wakeupTime() < mIntendedWakeupTime - mTimerSlack) {
+            rearmTimerSkippingUpdateFor(now, it);
+        }
+    }
+
+    return result;
+}
+```
+
+从上面的代码，token是编号，就是代表sf，app或者appSF注册到VsyncDispatch的索引值，VsyncDispatch中有一个集合记录这三个的回调信息，也就是mCallbacks，这个里面存储了一个对象VsyncDispatchtimerQueueEntry，这个类很关键，它保存了回调的函数指针，回调的名字和两个信号直接的误差值等等。
+
+```c++
+/frameworks/native/services/surfaceflinger/Scheduler/VSyncDispatch.h
+
+struct ScheduleTiming {
+    nsecs_t workDuration = 0;
+    nsecs_t readyDuration = 0;
+    nsecs_t earliestVsync = 0;
+
+     bool operator==(const ScheduleTiming& other) const {
+         return workDuration == other.workDuration && readyDuration == other.readyDuration &&
+                 earliestVsync == other.earliestVsync;
+     }
+
+     bool operator!=(const ScheduleTiming& other) const { return !(*this == other); }
+ };
+```
+
+这个类保存了几个关键信息，有一个ArmingInfo是参与计算Vsync唤醒的时间信息。当SurfaceFlinger申请Vsync-sf的信号，从上面的schedule方法传入一个ScheduleTiming结构体。
+
+```c++
+/frameworks/native/services/surfaceflinger/Scheduler/VSyncDispatch.h
+
+struct ScheduleTiming {
+    nsecs_t workDuration = 0;
+    nsecs_t readyDuration = 0;
+    nsecs_t earliestVsync = 0;
+
+     bool operator==(const ScheduleTiming& other) const {
+         return workDuration == other.workDuration && readyDuration == other.readyDuration &&
+                 earliestVsync == other.earliestVsync;
+     }
+
+     bool operator!=(const ScheduleTiming& other) const { return !(*this == other); }
+ };
+```
+
+这个结构体会记录三个值，workDuration，readyDuration。这两个值是固定的，而且这两个值在不同的刷新率下都是不一样的，都是参与计算Vsync信号发射的时间，我们这边只重点关注earliestVsync，这个是上一个Vsync发射的时间。 这个值是很关键的，根据这个值，再通过一个软件模型校准的值，获得下一次Vsync发射的时间值。
+
+前面的schedule方法中，假如是sf的token来申请Vsync信息，会调用callback->schedule这个方法，这个方法很重要，主要是根据上一次的vysnc发射时间计算下一次的Vsync发射时间。
+
+```c++
+/home/biezhihua/projects/aosp/frameworks/native/services/surfaceflinger/Scheduler/VSyncDispatchTimerQueue.cpp
+ScheduleResult VSyncDispatchTimerQueueEntry::schedule(VSyncDispatch::ScheduleTiming timing,
+                                                      VSyncTracker& tracker, nsecs_t now) {
+    auto nextVsyncTime = tracker.nextAnticipatedVSyncTimeFrom(
+            std::max(timing.earliestVsync, now + timing.workDuration + timing.readyDuration));
+    auto nextWakeupTime = nextVsyncTime - timing.workDuration - timing.readyDuration;
+
+    bool const wouldSkipAVsyncTarget =
+            mArmedInfo && (nextVsyncTime > (mArmedInfo->mActualVsyncTime + mMinVsyncDistance));
+    bool const wouldSkipAWakeup =
+            mArmedInfo && ((nextWakeupTime > (mArmedInfo->mActualWakeupTime + mMinVsyncDistance)));
+    if (wouldSkipAVsyncTarget && wouldSkipAWakeup) {
+        return getExpectedCallbackTime(nextVsyncTime, timing);
+    }
+
+    bool const alreadyDispatchedForVsync = mLastDispatchTime &&
+            ((*mLastDispatchTime + mMinVsyncDistance) >= nextVsyncTime &&
+             (*mLastDispatchTime - mMinVsyncDistance) <= nextVsyncTime);
+    if (alreadyDispatchedForVsync) {
+        nextVsyncTime =
+                tracker.nextAnticipatedVSyncTimeFrom(*mLastDispatchTime + mMinVsyncDistance);
+        nextWakeupTime = nextVsyncTime - timing.workDuration - timing.readyDuration;
+    }
+
+    auto const nextReadyTime = nextVsyncTime - timing.readyDuration;
+    mScheduleTiming = timing;
+    mArmedInfo = {nextWakeupTime, nextVsyncTime, nextReadyTime};
+    return getExpectedCallbackTime(nextVsyncTime, timing);
+}
+
+```
+
+
+这个是最核心的逻辑，从上面代码可以看到下面几个点的逻辑顺序。
+
+- 先传入之前的Vsync发射的时间，timeing这个对象，就是sf上一次发射信息的时间信息，这边有三个值，workDuration和readyDuration的值在不同刷新率下是不一样的，而且sf和app的配置也是不一样的，这两个值在参与计算值感觉只是一个阈值，并没有什么实际作用。 我们先举例这两个值都是0，在解释下上面的代码，我们先判断当前时间和上一次Vsync-sf发射的时间的最大值。
+
+- 把最大值传递个VsyncTracker中的nextAnticipatedVsyncTimeFrom方法中，从传入的参数根据这个方法名字，可以获得下一次Vsync发射的时间，如果获取的发射时间大于mArmedInfo中记录的上一次发射的时间，需要把这次的申请的发射时间跳过不处理，还是用之前的发射时间。
+
+- 如果还记录着最后一次vsync发射的时间，这个时间和下一次vsync发射的时间在一定的误差之中，重新校正下一次发发射时间，拿上一次最后发射的时间传到VsyncTracker中，获取下一次Vsync发射时间。
+然后把发射时间，减去固定的值，保存到mArmedInfo中，用于后面的设置定时器。
+
+```c++
+/frameworks/native/services/surfaceflinger/Scheduler/VSyncDispatchTimerQueue.cpp
+
+if (callback->wakeupTime() < mIntendedWakeupTime - mTimerSlack) {
+    rearmTimerSkippingUpdateFor(now, it);//发射Vsync信号
+}
+```
+
+这个方法执行完毕之后，会判断下一次发射的时间，和上一次设置的发射的时间做比较，如果小于这个值，需要把最近的发射时间重新设置到定时器中，这个mIntendedWakeupTiem变量在每次正常发射之后，这个值通常会设置为默认值，是int 8个字节的最大值 9223372036854775807，所以通常就会走到rearmTimerSkippingUpdateFor的函数中。
+
+```c++
+void VSyncDispatchTimerQueue::rearmTimerSkippingUpdateFor(
+        nsecs_t now, CallbackMap::iterator const& skipUpdateIt) {
+    std::optional<nsecs_t> min;
+    std::optional<nsecs_t> targetVsync;
+    std::optional<std::string_view> nextWakeupName;
+    for (auto it = mCallbacks.begin(); it != mCallbacks.end(); it++) {
+        auto& callback = it->second;
+        if (!callback->wakeupTime() && !callback->hasPendingWorkloadUpdate()) {
+            continue;
+        }
+
+        if (it != skipUpdateIt) {
+            callback->update(mTracker, now);
+        }
+        auto const wakeupTime = *callback->wakeupTime();
+        if (!min || *min > wakeupTime) {
+            nextWakeupName = callback->name();
+            min = wakeupTime;
+            targetVsync = callback->targetVsync();
+        }
+    }
+
+    if (min && min < mIntendedWakeupTime) {
+        if (ATRACE_ENABLED() && nextWakeupName && targetVsync) {
+            ftl::Concat trace(ftl::truncated<5>(*nextWakeupName), " alarm in ", ns2us(*min - now),
+                              "us; VSYNC in ", ns2us(*targetVsync - now), "us");
+            ATRACE_NAME(trace.c_str());
+        }
+        setTimer(*min, now);
+    } else {
+        ATRACE_NAME("cancel timer");
+        cancelTimer();
+    }
+}
+```
+
+从上面的函数中，可以很明显的看出来，SurfaceFlinger申请的Vsync-sf发射时间，把下一次唤醒的时间传入这个函数中，首先在mCallbacks中查找有没有发现发射更早的时间，假如app申请的发射时间在处理中，如果传过来的是Vsync-sf的发射时间，会把app或者appSf的发射时间更新下，然后从中找一个最近的，最快的发射时间设置到定时器中。
+
+```c++
+void VSyncDispatchTimerQueue::setTimer(nsecs_t targetTime, nsecs_t /*now*/) {
+    mIntendedWakeupTime = targetTime;
+    mTimeKeeper->alarmAt(std::bind(&VSyncDispatchTimerQueue::timerCallback, this),
+                         mIntendedWakeupTime);
+    mLastTimerSchedule = mTimeKeeper->now();
+}
+
+```
+
+定时器就是前面介绍的mTimer，我们把下次发射的时间设置到定时器中，会在对应的时间内回调到VsynDispatchTimerQueue的timerCallback方法中。然后把最近的一次发射时间设置给mIntendedWakerupTime这个变量。
+
+假如Vsync-sf的定时器设置给Timer之后，接下来就是Vsync-sf的发射过程，假如Timer的定时器到时间之后，会调用到VsynDispatchTimerQueue的timerCallback中，这个timerCallback方法很重要。是分发SW-VSYNC的地方。
+
+```c++
+void VSyncDispatchTimerQueue::timerCallback() {
+    struct Invocation {
+        std::shared_ptr<VSyncDispatchTimerQueueEntry> callback;
+        nsecs_t vsyncTimestamp;
+        nsecs_t wakeupTimestamp;
+        nsecs_t deadlineTimestamp;
+    };
+    std::vector<Invocation> invocations;
+    {
+        std::lock_guard lock(mMutex);
+        auto const now = mTimeKeeper->now();
+        mLastTimerCallback = now;
+        for (auto it = mCallbacks.begin(); it != mCallbacks.end(); it++) {
+            auto& callback = it->second;
+            auto const wakeupTime = callback->wakeupTime();
+            if (!wakeupTime) {
+                continue;
+            }
+
+            auto const readyTime = callback->readyTime();
+
+            auto const lagAllowance = std::max(now - mIntendedWakeupTime, static_cast<nsecs_t>(0));
+            if (*wakeupTime < mIntendedWakeupTime + mTimerSlack + lagAllowance) {
+                callback->executing();
+                invocations.emplace_back(Invocation{callback, *callback->lastExecutedVsyncTarget(),
+                                                    *wakeupTime, *readyTime});
+            }
+        }
+
+        mIntendedWakeupTime = kInvalidTime;
+        rearmTimer(mTimeKeeper->now());
+    }
+
+    for (auto const& invocation : invocations) {
+        invocation.callback->callback(invocation.vsyncTimestamp, invocation.wakeupTimestamp,
+                                      invocation.deadlineTimestamp);
+    }
+}
+```
+
+从上面的代码流程中，可以看到当发射的时间回调这个方法中，会在mCallbacks的集合中查找符合这次发射的时间的匹配者， 先判断该对象中的发射时间是否有效，如果有效的话，获取当前的时间信息和发射时间的差值。因为设置给定时器的唤醒时间，和当前时间按理是一致的，但是因为软件实现肯定是有偏差值的，所以拿发射的时间值，和真正的发射的时间值有个校验。如果符合发射的时间，则把需要发射的对象放到invocation的集合中。然后遍历这个集合挨个把Vsync信号发射给对应的代码。
+
+
+## dumpsys SurfaceFlinger
 
 ```text
 VsyncDispatch:
