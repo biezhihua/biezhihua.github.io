@@ -1280,7 +1280,6 @@ void VSyncDispatchTimerQueue::setTimer(nsecs_t targetTime, nsecs_t /*now*/) {
 
 ## VSYNC-sf产生和发射
 
-
 从前面的代码可以看到，当应用上帧的时候，SurfaceFlinger就会去申请VSYNC-sf的信号，那申请的VSYNC-sf的信号，什么时候会发给SurfaceFlinger，去做合成的动作。从前面的代码，已经可以看到申请信息的时候，已经调用到VsyncDispatch的schedule的方法。
 
 要了解VSYNC-sf的发射路径，需要仔细阅读VsyncDispatch的子类的实现逻辑，查看VSyncDispatchTimerQueue.cpp的代码如下：
@@ -1397,7 +1396,6 @@ ScheduleResult VSyncDispatchTimerQueueEntry::schedule(VSyncDispatch::ScheduleTim
 
 ```
 
-
 这个是最核心的逻辑，从上面代码可以看到下面几个点的逻辑顺序。
 
 - 先传入之前的Vsync发射的时间，timeing这个对象，就是sf上一次发射信息的时间信息，这边有三个值，workDuration和readyDuration的值在不同刷新率下是不一样的，而且sf和app的配置也是不一样的，这两个值在参与计算值感觉只是一个阈值，并没有什么实际作用。 我们先举例这两个值都是0，在解释下上面的代码，我们先判断当前时间和上一次Vsync-sf发射的时间的最大值。
@@ -1512,6 +1510,314 @@ void VSyncDispatchTimerQueue::timerCallback() {
 ```
 
 从上面的代码流程中，可以看到当发射的时间回调这个方法中，会在mCallbacks的集合中查找符合这次发射的时间的匹配者， 先判断该对象中的发射时间是否有效，如果有效的话，获取当前的时间信息和发射时间的差值。因为设置给定时器的唤醒时间，和当前时间按理是一致的，但是因为软件实现肯定是有偏差值的，所以拿发射的时间值，和真正的发射的时间值有个校验。如果符合发射的时间，则把需要发射的对象放到invocation的集合中。然后遍历这个集合挨个把Vsync信号发射给对应的代码。
+
+## Vsync-app的申请和发射
+
+### 应用向surfaceflinger注册connection
+
+前面讲了Vsync-sf的发射，为什么这两块要分开说，因为再Android S版本之前的版本，Vsync-app和Vsync-sf都是EventThread的形式，在12版本上Vsync-sf的逻辑去掉EventThread的形式，谷歌做了重构，所以就剩下Vsync-app还是采用EventThead的形式。
+
+接下来我们讲下应用怎么去申请Vsync-app的信号，本章节主要讲解SurfaceFlinger里面的逻辑，针对应用怎么申请Vsync-app信息，简单的说下，就是通过Choreographer这个对象去申请Vsync-app的信号，然后通过其内部类FrameDisplayEventReceiver来接受vsync信号，也就是Vsync-app的发射最后到这个对象里面，来触发app刷新，核心就是FrameDisplayEventReceiver类，这个类的初始化在是Choreographer的构造函数中。
+
+```java
+/home/biezhihua/projects/aosp/frameworks/base/core/java/android/view/Choreographer.java
+private Choreographer(Looper looper, int vsyncSource) {
+    mLooper = looper;
+    mHandler = new FrameHandler(looper);
+    mDisplayEventReceiver = USE_VSYNC
+            ? new FrameDisplayEventReceiver(looper, vsyncSource)
+            : null;
+    mLastFrameTimeNanos = Long.MIN_VALUE;
+
+    mFrameIntervalNanos = (long)(1000000000 / getRefreshRate());
+
+    mCallbackQueues = new CallbackQueue[CALLBACK_LAST + 1];
+    for (int i = 0; i <= CALLBACK_LAST; i++) {
+        mCallbackQueues[i] = new CallbackQueue();
+    }
+    // b/68769804: For low FPS experiments.
+    setFPSDivisor(SystemProperties.getInt(ThreadedRenderer.DEBUG_FPS_DIVISOR, 1));
+}
+```
+
+FrameDisplayEventReceiver继承DisplayEventReceiver，在DisplayEventReceiver的构造方法中，调用nativeInit方法。
+
+```java
+private final class FrameDisplayEventReceiver extends DisplayEventReceiver
+        implements Runnable {
+        ...
+}
+
+/**
+ * Creates a display event receiver.
+ *
+ * @param looper The looper to use when invoking callbacks.
+ * @param vsyncSource The source of the vsync tick. Must be on of the VSYNC_SOURCE_* values.
+ * @param eventRegistration Which events to dispatch. Must be a bitfield consist of the
+ * EVENT_REGISTRATION_*_FLAG values.
+ */
+public DisplayEventReceiver(Looper looper, int vsyncSource, int eventRegistration) {
+    if (looper == null) {
+        throw new IllegalArgumentException("looper must not be null");
+    }
+
+    mMessageQueue = looper.getQueue();
+    mReceiverPtr = nativeInit(new WeakReference<DisplayEventReceiver>(this), mMessageQueue,
+            vsyncSource, eventRegistration);
+}
+```
+
+这个方法会在初始化NativeDisplayEventReceiver对象，NativeDisplayEventReceiver对象继承DisplayEventDispatcher对象，这个对象在初始化的时候，会初始化mReceiver对象，初始化这个mReceiver对象的时候会创建DisplayEventReceiver对象。
+
+```c++
+/home/biezhihua/projects/aosp/frameworks/native/libs/gui/DisplayEventReceiver.cpp
+
+DisplayEventReceiver::DisplayEventReceiver(
+        ISurfaceComposer::VsyncSource vsyncSource,
+        ISurfaceComposer::EventRegistrationFlags eventRegistration) {
+    sp<ISurfaceComposer> sf(ComposerService::getComposerService());
+    if (sf != nullptr) {
+        mEventConnection = sf->createDisplayEventConnection(vsyncSource, eventRegistration);
+        if (mEventConnection != nullptr) {
+            mDataChannel = std::make_unique<gui::BitTube>();
+            const auto status = mEventConnection->stealReceiveChannel(mDataChannel.get());
+            if (!status.isOk()) {
+                ALOGE("stealReceiveChannel failed: %s", status.toString8().c_str());
+                mInitError = std::make_optional<status_t>(status.transactionError());
+                mDataChannel.reset();
+                mEventConnection.clear();
+            }
+        }
+    }
+}
+```
+
+```c++
+/frameworks/native/services/surfaceflinger/Scheduler/EventThread.cpp
+
+EventThreadConnection::EventThreadConnection(
+        EventThread* eventThread, uid_t callingUid, ResyncCallback resyncCallback,
+        ISurfaceComposer::EventRegistrationFlags eventRegistration)
+      : resyncCallback(std::move(resyncCallback)),
+        mOwnerUid(callingUid),
+        mEventRegistration(eventRegistration),
+        mEventThread(eventThread),
+        mChannel(gui::BitTube::DefaultSize) {}
+
+binder::Status EventThreadConnection::stealReceiveChannel(gui::BitTube* outChannel) {
+    std::scoped_lock lock(mLock);
+    if (mChannel.initCheck() != NO_ERROR) {
+        return binder::Status::fromStatusT(NAME_NOT_FOUND);
+    }
+
+    outChannel->setReceiveFd(mChannel.moveReceiveFd());
+    outChannel->setSendFd(base::unique_fd(dup(mChannel.getSendFd())));
+    return binder::Status::ok();
+}
+
+void EventThreadConnection::onFirstRef() {
+    // NOTE: mEventThread doesn't hold a strong reference on us
+    mEventThread->registerDisplayEventConnection(this);
+}
+```
+
+这个构造方法中有很重要的步骤，具体如下：
+
+- 获取SurfaceFlinger的binder代理对象BpSurfaceComposer，就可以调用SurfaceFlinger binder服务端的接口
+
+- 调用SurfaceFlinger的binder接口创建一个connection，这个connection就是注册到EventThread中，用来判断是不是要接受Vsync-app信号。
+
+  - 在SurfaceFlinger创建这个这个connection是会走到EventThread的createEventConnection，在EventThreadConnection的构造方法中会创建一个sockert对象。这个mEventConnection也是一个binder对象，IDisplayEventConnection，SurfaceFlinger进程返回BpDisplayEventConnection赋值给mEventConection。而服务端就是EventThreadConnection。
+
+- 在DisplayEventReceiver构造方法中也会创建一个空的gui::BitTubet对象，并且调用connection的binder接口，把socket对象设置到EventThreadConnection对象中，这个操作就是把两边关联起来，从代码实现可以看出是讲SurfaceFlinger进程中服务端创建的gui::BitTube对象赋值给应用端空的gui::BitTube对象。
+
+- 然后EventThreadConnection初始化好之后，在第一次引用调用的时候，会把自己注册到EventThread的集合中mDisplayEventConnections。
+
+### Vsync-app的申请和发射
+
+接下来我们主要讲解app怎么向SurfaceFlinger申请Vsync-app的，然后Vsync-app的信号怎么发射到应用的。
+
+正常应用要申请Vsync信号，都是通过Choregrapher对象调用postFrameCallback方法，而应用在绘制的时候也会调用这个方法，就是ViewRootImpl中的scheduleTraversals方法，其实在函数实现中也是调用了Choregrapher的postFrameCallback方法。
+
+而postFrameCallback方法其实是调用Choreographer的scheduleFameLocked方法，调用到scheduleVsyncLocked方法，在调用到NativeDisplayEventReceiver的scheduleVsync方法中。因为继承关系查看DisplayEventDispather的scheduleVsync方法，可以看到是通过DisplayEventReceiver去请求下一个Vsync信号。
+
+我们看下DisplayEventReceiver的requestNextVsync方法
+
+```c++
+status_t DisplayEventReceiver::requestNextVsync() {
+    if (mEventConnection != nullptr) {
+        mEventConnection->requestNextVsync();
+        return NO_ERROR;
+    }
+    return mInitError.has_value() ? mInitError.value() : NO_INIT;
+}
+```
+
+会调用到mEeventConnection的requestNextVsync接口，mEventConnection是binder的代理，最终会调用到SurfaceFlinger进程的binder服务端EventThreadConnection的requestNextVsync，接下来就是申请Vsyn-app信号，SurfaceFlinger模块的代码逻辑了。
+
+```c++
+void EventThread::requestNextVsync(const sp<EventThreadConnection>& connection) {
+    if (connection->resyncCallback) {
+        connection->resyncCallback();
+    }
+
+    std::lock_guard<std::mutex> lock(mMutex);
+
+    if (connection->vsyncRequest == VSyncRequest::None) {
+        connection->vsyncRequest = VSyncRequest::Single;
+        mCondition.notify_all();
+    } else if (connection->vsyncRequest == VSyncRequest::SingleSuppressCallback) {
+        connection->vsyncRequest = VSyncRequest::Single;
+    }
+}
+```
+
+调用栈：
+
+```c++
+thread #17, name = 'binder:453_5', stop reason = step over
+frame #0: 0x00005d3dc1ab6b1e surfaceflinger`android::impl::EventThread::requestNextVsync(this=0x00007b0c11c8a250, connection=0x00007b0b38d058a0) at EventThread.cpp:338:9
+frame #1: 0x00005d3dc1ab5c8c surfaceflinger`android::EventThreadConnection::requestNextVsync(this=<unavailable>) at EventThread.cpp:197:19
+frame #2: 0x00005d3dc1b77a12 surfaceflinger`android::gui::BnDisplayEventConnection::onTransact(this=0x00007b0be1c8f8f0, _aidl_code=<unavailable>, _aidl_data=0x00007b0b38d05b00, _aidl_reply=0x00007b0b38d05a80, _aidl_flags=<unavailable>) at IDisplayEventConnection.cpp:214:44
+frame #3: 0x00007b0dd756d6f1 libbinder.so`android::BBinder::transact(this=0x00007b0be1c8f8f0, code=3, data=0x00007b0b38d05b00, reply=0x00007b0b38d05a80, flags=17) at Binder.cpp:297:19
+frame #4: 0x00007b0dd7578834 libbinder.so`android::IPCThreadState::executeCommand(this=0x00007b0c21c9dd40, cmd=<unavailable>) at IPCThreadState.cpp:1293:68
+frame #5: 0x00007b0dd75782be libbinder.so`android::IPCThreadState::getAndExecuteCommand(this=0x00007b0c21c9dd40) at IPCThreadState.cpp:563:18
+frame #6: 0x00007b0dd7578c90 libbinder.so`android::IPCThreadState::joinThreadPool(this=0x00007b0c21c9dd40, isMain=<unavailable>) at IPCThreadState.cpp:649:18
+frame #7: 0x00007b0dd75a89e8 libbinder.so`android::PoolThread::threadLoop(this=0x00007b0bc1c93140) at ProcessState.cpp:72:33
+frame #8: 0x00007b0dddfe4e56 libutils.so`android::Thread::_threadLoop(user=0x00007b0bc1c93140) at Mutex.h:0:12
+frame #9: 0x00007b0dd1d4ed9b libc.so`__pthread_start(arg=0x00007b0b38d05cf0) at pthread_create.cpp:364:18
+frame #10: 0x00007b0dd1ce2d48 libc.so`::__start_thread(fn=(libc.so`__pthread_start(void*) at pthread_create.cpp:339), arg=0x00007b0b38d05cf0)(void *), void *) at clone.cpp:53:16
+```
+
+从代码中可以看出来，会把当前的申请Vsync-app的Connection的vsyncRequest赋值为 VsyncRequest::Single。我们可以理解一个应用就代表一个Connection。
+
+如果某个应用的申请了Vsync-app信号，就会把对应的EventThreadConnection对象中的vsyncRequest变量进行重新赋值。
+
+接下来看看EventThread如何处理，我们要从EventThread的线程函数看起：
+
+```c++
+
+void EventThread::threadMain(std::unique_lock<std::mutex>& lock) {
+    DisplayEventConsumers consumers;
+
+    while (mState != State::Quit) {
+        std::optional<DisplayEventReceiver::Event> event;
+
+        // Determine next event to dispatch.
+        if (!mPendingEvents.empty()) {
+            event = mPendingEvents.front();
+            mPendingEvents.pop_front();
+
+            switch (event->header.type) {
+                case DisplayEventReceiver::DISPLAY_EVENT_HOTPLUG:
+                    if (event->hotplug.connected && !mVSyncState) {
+                        mVSyncState.emplace(event->header.displayId);
+                    } else if (!event->hotplug.connected && mVSyncState &&
+                               mVSyncState->displayId == event->header.displayId) {
+                        mVSyncState.reset();
+                    }
+                    break;
+
+                case DisplayEventReceiver::DISPLAY_EVENT_VSYNC:
+                    if (mInterceptVSyncsCallback) {
+                        mInterceptVSyncsCallback(event->header.timestamp);
+                    }
+                    break;
+            }
+        }
+
+        bool vsyncRequested = false;
+
+        // Find connections that should consume this event.
+        auto it = mDisplayEventConnections.begin();
+        while (it != mDisplayEventConnections.end()) {
+            if (const auto connection = it->promote()) {
+                vsyncRequested |= connection->vsyncRequest != VSyncRequest::None;
+
+                if (event && shouldConsumeEvent(*event, connection)) {
+                    consumers.push_back(connection);
+                }
+
+                ++it;
+            } else {
+                it = mDisplayEventConnections.erase(it);
+            }
+        }
+
+        if (!consumers.empty()) {
+            dispatchEvent(*event, consumers);
+            consumers.clear();
+        }
+
+        State nextState;
+        if (mVSyncState && vsyncRequested) {
+            nextState = mVSyncState->synthetic ? State::SyntheticVSync : State::VSync;
+        } else {
+            ALOGW_IF(!mVSyncState, "Ignoring VSYNC request while display is disconnected");
+            nextState = State::Idle;
+        }
+
+        if (mState != nextState) {
+            if (mState == State::VSync) {
+                mVSyncSource->setVSyncEnabled(false);
+            } else if (nextState == State::VSync) {
+                mVSyncSource->setVSyncEnabled(true);
+            }
+
+            mState = nextState;
+        }
+
+        if (event) {
+            continue;
+        }
+
+        // Wait for event or client registration/request.
+        if (mState == State::Idle) {
+            mCondition.wait(lock);
+        } else {
+            // Generate a fake VSYNC after a long timeout in case the driver stalls. When the
+            // display is off, keep feeding clients at 60 Hz.
+            const std::chrono::nanoseconds timeout =
+                    mState == State::SyntheticVSync ? 16ms : 1000ms;
+            if (mCondition.wait_for(lock, timeout) == std::cv_status::timeout) {
+                if (mState == State::VSync) {
+                    ALOGW("Faking VSYNC due to driver stall for thread %s", mThreadName);
+                    std::string debugInfo = "VsyncSource debug info:\n";
+                    mVSyncSource->dump(debugInfo);
+                    // Log the debug info line-by-line to avoid logcat overflow
+                    auto pos = debugInfo.find('\n');
+                    while (pos != std::string::npos) {
+                        ALOGW("%s", debugInfo.substr(0, pos).c_str());
+                        debugInfo = debugInfo.substr(pos + 1);
+                        pos = debugInfo.find('\n');
+                    }
+                }
+
+                LOG_FATAL_IF(!mVSyncState);
+                const auto now = systemTime(SYSTEM_TIME_MONOTONIC);
+                const auto deadlineTimestamp = now + timeout.count();
+                const auto expectedVSyncTime = deadlineTimestamp + timeout.count();
+                mPendingEvents.push_back(makeVSync(mVSyncState->displayId, now,
+                                                   ++mVSyncState->count, expectedVSyncTime,
+                                                   deadlineTimestamp));
+            }
+        }
+    }
+}
+
+```
+
+EventThread的线程函数循环调用，一方面检测是否有Vsync信号发送过来了mPendingEvent，一方面检查是否有app请求了Vsync信号，如果有Vsync信号，而且有app请求了Vsync，则通过Connection把Vsync事件发送到对端。
+
+从代码的的细节可以看出几个点：
+
+- 检查是否有VsyncDispatch是否发送Vsync过来，所以要要遍历mPendingEvent
+
+- 检查是否有app对Vsync感兴趣，所以要遍历EventThread的mDisplayEventConnections。
+
+- 如果有Vsyn事件过来，但是没人对它感兴趣，说们本次Vsync就可以关闭了，见上面的mVsyncSource->setVsyncEnabled(false)方法。
+
+- 如果有app申请了Vsync，但是没有接受到Vsync事件，可能是把之前的Vsync关了，所以要从新打开，并坐等下次Vsync的到来，但是为了保证安全，不能死等，所以设置一个timeout的时间。
 
 
 ## dumpsys SurfaceFlinger
