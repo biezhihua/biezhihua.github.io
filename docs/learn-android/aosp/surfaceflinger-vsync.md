@@ -2415,7 +2415,7 @@ void Scheduler::resync() {
 除了上面的这种情况，还有一种情况，就是SurfaceFlinger再进行合成的时候，会把上一帧的完成合成的fence的时间也会同时添加到VsyncTracker的的时间戳集合。这个集合再情况的情况下，除了会增加6个硬件采样之外，这个集合也会添加fence的时间信息。
 
 ```c++
-/home/biezhihua/projects/aosp/frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp
+aosp/frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp
 
 if (display && display->isInternal() && display->getPowerMode() == hal::PowerMode::ON &&
     mPreviousPresentFences[0].fenceTime->isValid()) {
