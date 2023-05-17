@@ -1235,7 +1235,7 @@ ScheduleResult VSyncCallbackRegistration::schedule(VSyncDispatch::ScheduleTiming
     return mDispatch.get().schedule(mToken, scheduleTiming);
 }
 
-/home/biezhihua/projects/aosp/frameworks/native/services/surfaceflinger/Scheduler/VSyncDispatchTimerQueue.cpp
+aosp/frameworks/native/services/surfaceflinger/Scheduler/VSyncDispatchTimerQueue.cpp
 ScheduleResult VSyncDispatchTimerQueue::schedule(CallbackToken token,
                                                  ScheduleTiming scheduleTiming) {
     ScheduleResult result;
@@ -1285,7 +1285,7 @@ void VSyncDispatchTimerQueue::setTimer(nsecs_t targetTime, nsecs_t /*now*/) {
 要了解VSYNC-sf的发射路径，需要仔细阅读VsyncDispatch的子类的实现逻辑，查看VSyncDispatchTimerQueue.cpp的代码如下：
 
 ```c++
-/home/biezhihua/projects/aosp/frameworks/native/services/surfaceflinger/Scheduler/VSyncDispatchTimerQueue.cpp
+aosp/frameworks/native/services/surfaceflinger/Scheduler/VSyncDispatchTimerQueue.cpp
 ScheduleResult VSyncDispatchTimerQueue::schedule(CallbackToken token,
                                                  ScheduleTiming scheduleTiming) {
     ScheduleResult result;
@@ -1364,7 +1364,7 @@ struct ScheduleTiming {
 前面的schedule方法中，假如是sf的token来申请Vsync信息，会调用callback->schedule这个方法，这个方法很重要，主要是根据上一次的vysnc发射时间计算下一次的Vsync发射时间。
 
 ```c++
-/home/biezhihua/projects/aosp/frameworks/native/services/surfaceflinger/Scheduler/VSyncDispatchTimerQueue.cpp
+aosp/frameworks/native/services/surfaceflinger/Scheduler/VSyncDispatchTimerQueue.cpp
 ScheduleResult VSyncDispatchTimerQueueEntry::schedule(VSyncDispatch::ScheduleTiming timing,
                                                       VSyncTracker& tracker, nsecs_t now) {
     auto nextVsyncTime = tracker.nextAnticipatedVSyncTimeFrom(
@@ -1520,7 +1520,7 @@ void VSyncDispatchTimerQueue::timerCallback() {
 接下来我们讲下应用怎么去申请Vsync-app的信号，本章节主要讲解SurfaceFlinger里面的逻辑，针对应用怎么申请Vsync-app信息，简单的说下，就是通过Choreographer这个对象去申请Vsync-app的信号，然后通过其内部类FrameDisplayEventReceiver来接受vsync信号，也就是Vsync-app的发射最后到这个对象里面，来触发app刷新，核心就是FrameDisplayEventReceiver类，这个类的初始化在是Choreographer的构造函数中。
 
 ```java
-/home/biezhihua/projects/aosp/frameworks/base/core/java/android/view/Choreographer.java
+aosp/frameworks/base/core/java/android/view/Choreographer.java
 private Choreographer(Looper looper, int vsyncSource) {
     mLooper = looper;
     mHandler = new FrameHandler(looper);
@@ -1570,7 +1570,7 @@ public DisplayEventReceiver(Looper looper, int vsyncSource, int eventRegistratio
 这个方法会在初始化NativeDisplayEventReceiver对象，NativeDisplayEventReceiver对象继承DisplayEventDispatcher对象，这个对象在初始化的时候，会初始化mReceiver对象，初始化这个mReceiver对象的时候会创建DisplayEventReceiver对象。
 
 ```c++
-/home/biezhihua/projects/aosp/frameworks/native/libs/gui/DisplayEventReceiver.cpp
+aosp/frameworks/native/libs/gui/DisplayEventReceiver.cpp
 
 DisplayEventReceiver::DisplayEventReceiver(
         ISurfaceComposer::VsyncSource vsyncSource,
@@ -1819,6 +1819,625 @@ EventThread的线程函数循环调用，一方面检测是否有Vsync信号发�
 
 - 如果有app申请了Vsync，但是没有接受到Vsync事件，可能是把之前的Vsync关了，所以要从新打开，并坐等下次Vsync的到来，但是为了保证安全，不能死等，所以设置一个timeout的时间。
 
+### setVsyncEnabled
+
+这个方法是开关Vsync-app信号的函数，从这个函数的实现，是间接调用mCallbackRepeater的start和stop方法。而CallbackRepeater是在创建DispSyncSource对象构造方法中创建的。
+
+```c++
+aosp/frameworks/native/services/surfaceflinger/Scheduler/DispSyncSource.cpp
+DispSyncSource::DispSyncSource(VSyncDispatch& vSyncDispatch, VSyncTracker& vSyncTracker,
+                               std::chrono::nanoseconds workDuration,
+                               std::chrono::nanoseconds readyDuration, bool traceVsync,
+                               const char* name)
+      : mName(name),
+        mValue(base::StringPrintf("VSYNC-%s", name), 0),
+        mTraceVsync(traceVsync),
+        mVsyncOnLabel(base::StringPrintf("VsyncOn-%s", name)),
+        mVSyncTracker(vSyncTracker),
+        mWorkDuration(base::StringPrintf("VsyncWorkDuration-%s", name), workDuration),
+        mReadyDuration(readyDuration) {
+    mCallbackRepeater =
+            std::make_unique<CallbackRepeater>(vSyncDispatch,
+                                               std::bind(&DispSyncSource::onVsyncCallback, this,
+                                                         std::placeholders::_1,
+                                                         std::placeholders::_2,
+                                                         std::placeholders::_3),
+                                               name, workDuration, readyDuration,
+                                               std::chrono::steady_clock::now().time_since_epoch());
+}
+
+void DispSyncSource::setVSyncEnabled(bool enable) {
+    std::lock_guard lock(mVsyncMutex);
+    if (enable) {
+        mCallbackRepeater->start(mWorkDuration, mReadyDuration);
+        // ATRACE_INT(mVsyncOnLabel.c_str(), 1);
+    } else {
+        mCallbackRepeater->stop();
+        // ATRACE_INT(mVsyncOnLabel.c_str(), 0);
+    }
+    mEnabled = enable;
+}
+```
+
+可以看出CallbackRepeater对象传入了几个参数，一个是VsyncDispatch对象，一个回调的函数，是为了接受Vsync-app发射的信号。而在CallbackRepeater对象中的构造方法会把CallbackRepeater的回调函数，初始化VsyncCallbackRegistration，这个是一个辅助类，在构造方法中会在VsyncDispatch注册回调函数和回调的名字等信息。可以这样理解，DispSyncSource是EventThread和VsyncDispatch的纽带。
+
+DispsyncSource中，VsyncCallbackRegistration是一个辅助类主要是帮助VsyncDispatch注册回调函数而且。
+
+所以app申请Vsycn-app信号，调用DispVsynSource的setVsyncEnabled的函数，是间接调用CallbackRepeater的start的函数，就是这个类封装了VsyncDispatch的操作，也就是调用VsyncDispatch的schedule函数。
+
+```c++
+void start(std::chrono::nanoseconds workDuration, std::chrono::nanoseconds readyDuration) {
+    std::lock_guard lock(mMutex);
+    mStarted = true;
+    mWorkDuration = workDuration;
+    mReadyDuration = readyDuration;
+
+    auto const scheduleResult =
+            mRegistration.schedule({.workDuration = mWorkDuration.count(),
+                                    .readyDuration = mReadyDuration.count(),
+                                    .earliestVsync = mLastCallTime.count()});
+    LOG_ALWAYS_FATAL_IF((!scheduleResult.has_value()), "Error scheduling callback");
+}
+void stop() {
+    std::lock_guard lock(mMutex);
+    LOG_ALWAYS_FATAL_IF(!mStarted, "DispSyncInterface misuse: callback already stopped");
+    mStarted = false;
+    mRegistration.cancel();
+}
+```
+
+从前面讲解Vsync-sf的申请和发射，我们知道了这个schedule函数是请求Vsync-app信号的函数，这块代码和Vsync-sf的申请是一样的，就是计算下一次Vsync-app唤醒的时间，通过timer机制，把这个Vsync-app信号回调到注册到VsyncDiaptch的函数。
+
+从Vsync-app的申请来看，最后会回调到CallbackRepeater的callback函数中，在这个函数中会调用mCallback函数，而这个函数的回调方法是DispSyncSource中的onVysncCallback函数中。
+
+```c++
+void DispSyncSource::onVsyncCallback(nsecs_t vsyncTime, nsecs_t targetWakeupTime,
+                                     nsecs_t readyTime) {
+    VSyncSource::Callback* callback;
+    {
+        std::lock_guard lock(mCallbackMutex);
+        callback = mCallback;
+    }
+
+    if (mTraceVsync) {
+        mValue = (mValue + 1) % 2;
+    }
+
+    if (callback != nullptr) {
+        callback->onVSyncEvent(targetWakeupTime, {vsyncTime, readyTime});
+    }
+}
+```
+
+在这个函数中，首先会在Vsync-app的trace上标记信息，也即是开头那张图片的信息，所以为什么是断断续续的，是因为Vsync-app申请本来就是随机的。
+
+然后调用callback的onVysncEvent函数，而callback就是EventThread对象，最终调用到EventThread的onVsyncEvent中。
+
+```c++
+aosp/frameworks/native/services/surfaceflinger/Scheduler/EventThread.cpp
+void EventThread::onVSyncEvent(nsecs_t timestamp, VSyncSource::VSyncData vsyncData) {
+    std::lock_guard<std::mutex> lock(mMutex);
+
+    LOG_FATAL_IF(!mVSyncState);
+    mPendingEvents.push_back(makeVSync(mVSyncState->displayId, timestamp, ++mVSyncState->count,
+                                       vsyncData.expectedPresentationTime,
+                                       vsyncData.deadlineTimestamp));
+    mCondition.notify_all();
+}
+```
+
+从代码中可以看到，Vsync-app的信号加入到mPendingEvents中，然后唤醒theadMain的线程循环，然后找到对应的申请的应用，然后调用dispatchEvent函数
+
+```c++
+void EventThread::dispatchEvent(const DisplayEventReceiver::Event& event,
+                                const DisplayEventConsumers& consumers) {
+    for (const auto& consumer : consumers) {
+        DisplayEventReceiver::Event copy = event;
+        if (event.header.type == DisplayEventReceiver::DISPLAY_EVENT_VSYNC) {
+            const int64_t frameInterval = mGetVsyncPeriodFunction(consumer->mOwnerUid);
+            copy.vsync.vsyncData.frameInterval = frameInterval;
+            generateFrameTimeline(copy.vsync.vsyncData, frameInterval, copy.header.timestamp,
+                                  event.vsync.vsyncData.preferredExpectedPresentationTime(),
+                                  event.vsync.vsyncData.preferredDeadlineTimestamp());
+        }
+        switch (consumer->postEvent(copy)) {
+            case NO_ERROR:
+                break;
+
+            case -EAGAIN:
+                // TODO: Try again if pipe is full.
+                ALOGW("Failed dispatching %s for %s", toString(event).c_str(),
+                      toString(*consumer).c_str());
+                break;
+
+            default:
+                // Treat EPIPE and other errors as fatal.
+                removeDisplayEventConnectionLocked(consumer);
+        }
+    }
+}
+
+```
+
+遍历DisplayEventConsumers的对象，挨个调用postEvent方法。
+
+这个DisplayEventConsumers就是connection的vector集合对象，然后通过connection对象把Vsync事件发送出去。后面应用怎么接受到这个Vsync-app的信号，本章节就不分析，大家有兴趣的话可以自己下来了解下。
+
+## SW VSYNC模型和校准
+
+在Android S之前的版本，开关硬件VSync开关是有一个线程都做的，在12版本上面都已经做了重构。
+
+### resyncToHardwareVsync
+
+在前面的根据上一次的发射时间获取下一次的发射时间，调用VsyncTracker的nextAnticipatedVsyncTimeFrom方法中。在这个模型中，我们要关注几个核心参数：
+
+- period: VSYNC周期
+
+- mTimestamps: 硬件的时间戳样本集合
+
+在开机的时候，SurfaceFlinger在初始化Display之后，会调用resyncToHardwareVsync方法与硬件VSYNC进行同步，调用链如下：
+
+```c++
+SurfaceFlinger::init()
+ └-->initializeDisplays()
+      └-->onInitializeDisplays()
+           └-->setPowerModeInternal()
+                 └-->resyncToHardwareVsync()
+```
+
+resyncToHardwareVsync的代码如下：
+
+```c++
+aosp/frameworks/native/services/surfaceflinger/Scheduler/Scheduler.cpp
+void Scheduler::resyncToHardwareVsync(bool makeAvailable, Fps refreshRate) {
+    {
+        std::lock_guard<std::mutex> lock(mHWVsyncLock);
+        if (makeAvailable) {
+            mHWVsyncAvailable = makeAvailable;
+        } else if (!mHWVsyncAvailable) {
+            // Hardware vsync is not currently available, so abort the resync
+            // attempt for now
+            return;
+        }
+    }
+
+    setVsyncPeriod(refreshRate.getPeriodNsecs());
+}
+
+```
+
+makeAvailable默认传入true，period传入的是当前屏幕刷新率的周期值，这个在SurfaceFlinger初始化的时候，把硬件支持的帧率和周期都一对一保存起来，例如fps是60，period是16.666666。fps是90，period是11.111111。再调用到setVsyncPeriod，从这个方法名字可以看到，当屏幕的刷新率发生变化，软件模型肯定要重新同步硬件的时间戳信息，重新计算当前屏幕刷新率对应的period值。
+
+```c++
+aosp/frameworks/native/services/surfaceflinger/Scheduler/Scheduler.cpp
+void Scheduler::setVsyncPeriod(nsecs_t period) {
+    if (period <= 0) return;
+
+    std::lock_guard<std::mutex> lock(mHWVsyncLock);
+    mVsyncSchedule->getController().startPeriodTransition(period);
+
+    if (!mPrimaryHWVsyncEnabled) {
+        mVsyncSchedule->getTracker().resetModel();
+        mSchedulerCallback.setVsyncEnabled(true);
+        mPrimaryHWVsyncEnabled = true;
+    }
+}
+
+```
+
+mPrimaryHWVsyncEnabled这个变量默认为false，就会走到下面的逻辑中，resetModel方法会清空软件模型的记录的硬件时间戳集合，setVsyncEnabled方法把硬件回调给SurfaceFlinger的开关打开，这个回调方法打开之后，硬件的Vsync信息会通过回调接口通知给SurfaceFlinger，在这个回调接口中，会把硬件的Vsync信息保存到VsyncTracker中。
+
+```c++
+aosp/frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp
+void SurfaceFlinger::onComposerHalVsync(hal::HWDisplayId hwcDisplayId, int64_t timestamp,
+                                        std::optional<hal::VsyncPeriodNanos> vsyncPeriod) {
+    const std::string tracePeriod = [vsyncPeriod]() {
+        if (ATRACE_ENABLED() && vsyncPeriod) {
+            std::stringstream ss;
+            ss << "(" << *vsyncPeriod << ")";
+            return ss.str();
+        }
+        return std::string();
+    }();
+    ATRACE_FORMAT("onComposerHalVsync%s", tracePeriod.c_str());
+
+    Mutex::Autolock lock(mStateLock);
+    const auto displayId = getHwComposer().toPhysicalDisplayId(hwcDisplayId);
+    if (displayId) {
+        const auto token = getPhysicalDisplayTokenLocked(*displayId);
+        const auto display = getDisplayDeviceLocked(token);
+        display->onVsync(timestamp);
+    }
+
+    if (!getHwComposer().onVsync(hwcDisplayId, timestamp)) {
+        return;
+    }
+
+    const bool isActiveDisplay =
+            displayId && getPhysicalDisplayTokenLocked(*displayId) == mActiveDisplayToken;
+    if (!isActiveDisplay) {
+        // For now, we don't do anything with non active display vsyncs.
+        return;
+    }
+
+    bool periodFlushed = false;
+    mScheduler->addResyncSample(timestamp, vsyncPeriod, &periodFlushed);
+    if (periodFlushed) {
+        modulateVsync(&VsyncModulator::onRefreshRateChangeCompleted);
+    }
+}
+
+```
+
+如代码所示，mScheduler->addResyncSample方法把硬件的时间戳信息timestamp保存起来。
+
+等于上面的代码干了三件事情：
+
+- 首先从HWC获取到硬件VSYNC的周期period，设置给VsyncController中。
+
+- VsyncTracker先清理之前记录的采样信息，准备开始硬件VSYNC采样
+
+- 通过mSchedulerCallback的setVsyncEnabled方法打开硬件VSYNC事件上报
+
+相关代码如下： resetModel方法
+
+```c++
+aosp/frameworks/native/services/surfaceflinger/Scheduler/VSyncPredictor.cpp
+
+void VSyncPredictor::resetModel() {
+    std::lock_guard lock(mMutex);
+    mRateMap[mIdealPeriod] = {mIdealPeriod, 0};
+    clearTimestamps();
+}
+
+void VSyncPredictor::clearTimestamps() {
+    if (!mTimestamps.empty()) {
+        auto const maxRb = *std::max_element(mTimestamps.begin(), mTimestamps.end());
+        if (mKnownTimestamp) {
+            mKnownTimestamp = std::max(*mKnownTimestamp, maxRb);
+        } else {
+            mKnownTimestamp = maxRb;
+        }
+
+        mTimestamps.clear();
+        mLastTimestampIndex = 0;
+    }
+}
+
+```
+
+会清空mRateMap对应period的value对象，这个是一个结构体Model，会记录软件模型计算出来的Vsync周期。
+
+### SW VSYNC模型更新与校准
+
+前面已经把硬件的VSYNC回调打开了，那么每次HW VSYNC事件上报时，会调用Schedule的 addResyncSample方法，也就是会调用VsyncController中的addHwVsynctimestamp，从方法的名字可以看出，把硬件VSYNC的时间戳信息添加这个对象中。
+
+```c++
+bool VSyncReactor::addHwVsyncTimestamp(nsecs_t timestamp, std::optional<nsecs_t> hwcVsyncPeriod,
+                                       bool* periodFlushed) {
+    assert(periodFlushed);
+
+    std::lock_guard lock(mMutex);
+    if (periodConfirmed(timestamp, hwcVsyncPeriod)) {
+        ATRACE_NAME("VSR: period confirmed");
+        if (mPeriodTransitioningTo) {
+            mTracker.setPeriod(*mPeriodTransitioningTo);
+            *periodFlushed = true;
+        }
+
+        if (mLastHwVsync) {
+            mTracker.addVsyncTimestamp(*mLastHwVsync);
+        }
+        mTracker.addVsyncTimestamp(timestamp);
+
+        endPeriodTransition();
+        mMoreSamplesNeeded = mTracker.needsMoreSamples();
+    } else if (mPeriodConfirmationInProgress) {
+        ATRACE_NAME("VSR: still confirming period");
+        mLastHwVsync = timestamp;
+        mMoreSamplesNeeded = true;
+        *periodFlushed = false;
+    } else {
+        ATRACE_NAME("VSR: adding sample");
+        *periodFlushed = false;
+        mTracker.addVsyncTimestamp(timestamp);
+        mMoreSamplesNeeded = mTracker.needsMoreSamples();
+    }
+
+    if (!mMoreSamplesNeeded) {
+        setIgnorePresentFencesInternal(false);
+    }
+    return mMoreSamplesNeeded;
+}
+```
+
+这个函数有三个操作，首先会把当前的硬件上报的时间戳信息和当前的屏幕刷新率对于的固定period传入periodConfirmed方法中。这个periodConfirmed，就是确认是否有新的period设置进来，就是有没有发生屏幕刷新率切换。如果没有发生切换，这个函数默认返回false，如果没有发生刷新率切换，就是在保持同一个刷新率的情况下，最后走到else的逻辑中。也就是把timestamp这个变量添加到VsyncTracker对象中，然后调用该对象的needsMoreSamples方法判断要不要更多的样本，这边默认是6个样本，所以如果样本个数还没有达到，是需要一直增加样本到6个。就不需要样本了，就会把HW SYNC的硬件上报开关关闭掉。
+
+可以说做2件事情：
+
+- mTracker.addVsyncTimestamp方法，把样本加入到VsycnTracker的子类VsyncPredictor对象中。
+
+- 通过needsMoreSamples方法，判断要不要获取更多的样本，如果样本足够，调用schedule的disableHardwareVsync函数，关闭硬件校准上报开关。
+
+#### addVsyncTimestamp
+
+```c++
+aosp/frameworks/native/services/surfaceflinger/Scheduler/VSyncPredictor.cpp
+bool VSyncPredictor::addVsyncTimestamp(nsecs_t timestamp) {
+    std::lock_guard lock(mMutex);
+
+    if (!validate(timestamp)) {
+        // VSR could elect to ignore the incongruent timestamp or resetModel(). If ts is ignored,
+        // don't insert this ts into mTimestamps ringbuffer. If we are still
+        // in the learning phase we should just clear all timestamps and start
+        // over.
+        if (mTimestamps.size() < kMinimumSamplesForPrediction) {
+            // Add the timestamp to mTimestamps before clearing it so we could
+            // update mKnownTimestamp based on the new timestamp.
+            mTimestamps.push_back(timestamp);
+            clearTimestamps();
+        } else if (!mTimestamps.empty()) {
+            mKnownTimestamp =
+                    std::max(timestamp, *std::max_element(mTimestamps.begin(), mTimestamps.end()));
+        } else {
+            mKnownTimestamp = timestamp;
+        }
+        return false;
+    }
+
+    if (mTimestamps.size() != kHistorySize) {
+        mTimestamps.push_back(timestamp);
+        mLastTimestampIndex = next(mLastTimestampIndex);
+    } else {
+        mLastTimestampIndex = next(mLastTimestampIndex);
+        mTimestamps[mLastTimestampIndex] = timestamp;
+    }
+
+    const size_t numSamples = mTimestamps.size();
+    if (numSamples < kMinimumSamplesForPrediction) {
+        mRateMap[mIdealPeriod] = {mIdealPeriod, 0};
+        return true;
+    }
+
+    // This is a 'simple linear regression' calculation of Y over X, with Y being the
+    // vsync timestamps, and X being the ordinal of vsync count.
+    // The calculated slope is the vsync period.
+    // Formula for reference:
+    // Sigma_i: means sum over all timestamps.
+    // mean(variable): statistical mean of variable.
+    // X: snapped ordinal of the timestamp
+    // Y: vsync timestamp
+    //
+    //         Sigma_i( (X_i - mean(X)) * (Y_i - mean(Y) )
+    // slope = -------------------------------------------
+    //         Sigma_i ( X_i - mean(X) ) ^ 2
+    //
+    // intercept = mean(Y) - slope * mean(X)
+    //
+    std::vector<nsecs_t> vsyncTS(numSamples);
+    std::vector<nsecs_t> ordinals(numSamples);
+
+    // Normalizing to the oldest timestamp cuts down on error in calculating the intercept.
+    const auto oldestTS = *std::min_element(mTimestamps.begin(), mTimestamps.end());
+    auto it = mRateMap.find(mIdealPeriod);
+    auto const currentPeriod = it->second.slope;
+
+    // The mean of the ordinals must be precise for the intercept calculation, so scale them up for
+    // fixed-point arithmetic.
+    constexpr int64_t kScalingFactor = 1000;
+
+    nsecs_t meanTS = 0;
+    nsecs_t meanOrdinal = 0;
+
+    for (size_t i = 0; i < numSamples; i++) {
+        traceInt64If("VSP-ts", mTimestamps[i]);
+
+        const auto timestamp = mTimestamps[i] - oldestTS;
+        vsyncTS[i] = timestamp;
+        meanTS += timestamp;
+
+        const auto ordinal = (vsyncTS[i] + currentPeriod / 2) / currentPeriod * kScalingFactor;
+        ordinals[i] = ordinal;
+        meanOrdinal += ordinal;
+    }
+
+    meanTS /= numSamples;
+    meanOrdinal /= numSamples;
+
+    for (size_t i = 0; i < numSamples; i++) {
+        vsyncTS[i] -= meanTS;
+        ordinals[i] -= meanOrdinal;
+    }
+
+    nsecs_t top = 0;
+    nsecs_t bottom = 0;
+    for (size_t i = 0; i < numSamples; i++) {
+        top += vsyncTS[i] * ordinals[i];
+        bottom += ordinals[i] * ordinals[i];
+    }
+
+    if (CC_UNLIKELY(bottom == 0)) {
+        it->second = {mIdealPeriod, 0};
+        clearTimestamps();
+        return false;
+    }
+
+    nsecs_t const anticipatedPeriod = top * kScalingFactor / bottom;
+    nsecs_t const intercept = meanTS - (anticipatedPeriod * meanOrdinal / kScalingFactor);
+
+    auto const percent = std::abs(anticipatedPeriod - mIdealPeriod) * kMaxPercent / mIdealPeriod;
+    if (percent >= kOutlierTolerancePercent) {
+        it->second = {mIdealPeriod, 0};
+        clearTimestamps();
+        return false;
+    }
+
+    traceInt64If("VSP-period", anticipatedPeriod);
+    traceInt64If("VSP-intercept", intercept);
+
+    it->second = {anticipatedPeriod, intercept};
+
+    ALOGV("model update ts: %" PRId64 " slope: %" PRId64 " intercept: %" PRId64, timestamp,
+          anticipatedPeriod, intercept);
+    return true;
+}
+```
+
+这块代码是SW 模型更新的核心，是最关键的部分，是通过硬件VSYNC的样本计算出当前屏幕刷新率对于的Vsync周期，在这个方法中，谷歌采用了简单一元线性回归分析预测法，回归分析是一种预测性的建模技术，它研究的是因变量和自变量之间的关系。它能够表明自多个自变量对一个因变量的影响强度。这种技术通常用于预测分析、时间序列模型以及发现变量之间的因果关系。回归分析是一种通过建立模型来研究变量之间相互关系的密切程度、结构状态及进行模型预测的有效工具，是建模和分析数据的重要工具。
+
+由于很多现象需要多个因素做全面分析，只有当众多因素中确实存在一个对因变量影响作用明显高于其他因素的变量，才能将它作为自变量，应用一元相关的回归分析进行预测，而谷歌采用的是回归算法中的最小二乘法。
+
+![](/learn-android/aosp/surfaceflinger-vsync-5.webp)
+
+在这个方程式中，b就是回归系数，a就是截距。
+
+如果提供了一组x因变量的一组数据，再提供一组y自变量的一组数据，就可以通过上面的方程式推导出回归系数b和截距a。
+
+回到代码，按照默认的流程分析这个函数，首先有一个集合mTimestamps会存储硬件的VSYNC样本，刚开始的时候这个样本集合会清空，最多采6个样本就可以进行计算，简单描述上述代码的流程如下：
+
+- 清空mTimestamps的样本集合，打开硬件VSYNC开关，开始采集样本。
+
+- 传入的时间戳会做一些校验工作，validate这个函数会对数据做一些处理，例如重复的数据等等。
+
+- 如果传入的数据没有问题，则会一直添加到mTimestamps集合中，直到采6个样本信息就关闭VSYNC开关。
+
+- 通过着6个样本，计算出x的因变量集合 ordinals，和y的自变量集合vsyncTS。通过6个样本把这两个集合的数据都计算出来，然后通过上面的方程式把回归系数和截距都计算出来，这块的回归系数就是Vsync的时间周期，前面我加过日志，我把这两个集合的内容可以贴出来看下，以下是90fps的vsync信息。
+
+x的集合内容 {0，1000，2000，3000，4000，5000} ，从集合的内容是vsync的个数信息。
+
+y的集合内容{0，11027000，22053000，33080000，44106000，55132000}，从代码中了解是硬件vsync时间戳的递增值，因为两个硬件vsync的时间戳的差值可以理解是一个vsync周期。
+
+- 从这两个集合数据计算出回归系数b，和截距a，保存到当前的屏幕刷新率作为key的mRateMap的value中，这个value是一个结构体，保存两个值，当前屏幕刷新率对于的回归系数和截距。
+
+#### nextAnticipatedVsyncTimeFromLocked
+
+有了这个回归系数和截距，就可以传入上一次app或者sf发射的时间，计算出下一次发射的时间 ，在前面讲解Vsync-sf的发射流程，有一个很重要的点就是要计算下一次发射的时间，就是调用VsyncTracker的nextAnticipatedVsyncTimeFromLocked方法。
+
+代码如下：
+
+```c++
+aosp/frameworks/native/services/surfaceflinger/Scheduler/VSyncPredictor.cpp
+nsecs_t VSyncPredictor::nextAnticipatedVSyncTimeFromLocked(nsecs_t timePoint) const {
+    auto const [slope, intercept] = getVSyncPredictionModelLocked();
+
+    if (mTimestamps.empty()) {
+        traceInt64If("VSP-mode", 1);
+        auto const knownTimestamp = mKnownTimestamp ? *mKnownTimestamp : timePoint;
+        auto const numPeriodsOut = ((timePoint - knownTimestamp) / mIdealPeriod) + 1;
+        return knownTimestamp + numPeriodsOut * mIdealPeriod;
+    }
+
+    auto const oldest = *std::min_element(mTimestamps.begin(), mTimestamps.end());
+
+    // See b/145667109, the ordinal calculation must take into account the intercept.
+    auto const zeroPoint = oldest + intercept;
+    auto const ordinalRequest = (timePoint - zeroPoint + slope) / slope;
+    auto const prediction = (ordinalRequest * slope) + intercept + oldest;
+
+    traceInt64If("VSP-mode", 0);
+    traceInt64If("VSP-timePoint", timePoint);
+    traceInt64If("VSP-prediction", prediction);
+
+    auto const printer = [&, slope = slope, intercept = intercept] {
+        std::stringstream str;
+        str << "prediction made from: " << timePoint << "prediction: " << prediction << " (+"
+            << prediction - timePoint << ") slope: " << slope << " intercept: " << intercept
+            << "oldestTS: " << oldest << " ordinal: " << ordinalRequest;
+        return str.str();
+    };
+
+    ALOGV("%s", printer().c_str());
+    LOG_ALWAYS_FATAL_IF(prediction < timePoint, "VSyncPredictor: model miscalculation: %s",
+                        printer().c_str());
+
+    return prediction;
+}
+```
+
+从上面的代码可以看到这个流程。
+
+- 先判断mTimestamps的集合是否为空，如果为空，则拿默认值，90的帧率就是11.11111us去参与计算，mKnownTimestamp是之前样本的最大值，和传入上一次发射的时间做差值除Vsync的周期时间，我们理解样本的时间是比上一次的发射时间大，因为surfaceflinger在做合成的时候会把之前的fence时间的时间戳也存到这个集合中，这边会固定计算出下一个vsync发射的时间。
+
+- 如果mTimestamps的集合不为空，通过这个集合的数据和传入的发射时间，算出一次线程回归方式的因变量x值，然后根据回归系数和截距，用方程式计算出自变量y值，而y值，也就是代码中的prediction，作为下一次vsync发射的时间。
+
+以上的两个函数是最核心的逻辑，然后有同学会问，什么时候会打硬件Vsync开关，什么时候会关闭。除了刚开机的时候，会打开硬件Vsync开关，如果模型校准完成之后，再关闭。还有切换刷新率的时候也会打开Vsycn开关。
+
+```c++
+void EventThread::requestNextVsync(const sp<EventThreadConnection>& connection) {
+    if (connection->resyncCallback) {
+        connection->resyncCallback();
+    }
+
+    std::lock_guard<std::mutex> lock(mMutex);
+
+    if (connection->vsyncRequest == VSyncRequest::None) {
+        connection->vsyncRequest = VSyncRequest::Single;
+        mCondition.notify_all();
+    } else if (connection->vsyncRequest == VSyncRequest::SingleSuppressCallback) {
+        connection->vsyncRequest = VSyncRequest::Single;
+    }
+}
+```
+
+它会先调用connection的resyncCallback的方法。这个方法是创建这个Connection的时候，传入的回调函数。
+
+```c++
+aosp/frameworks/native/services/surfaceflinger/Scheduler/Scheduler.cpp
+sp<EventThreadConnection> Scheduler::createConnectionInternal(
+        EventThread* eventThread, ISurfaceComposer::EventRegistrationFlags eventRegistration) {
+    return eventThread->createEventConnection([&] { resync(); }, eventRegistration);
+}
+```
+
+等于每次app要申请的时候，会走到resyncAndRefresh中，这个函数就会强制进行一次硬件的VSYNC校准。
+
+```c++
+aosp/frameworks/native/services/surfaceflinger/Scheduler/Scheduler.cpp
+void Scheduler::resync() {
+    static constexpr nsecs_t kIgnoreDelay = ms2ns(750);
+
+    const nsecs_t now = systemTime();
+    const nsecs_t last = mLastResyncTime.exchange(now);
+
+    if (now - last > kIgnoreDelay) {
+        const auto refreshRate = [&] {
+            std::scoped_lock lock(mRefreshRateConfigsLock);
+            return mRefreshRateConfigs->getActiveMode()->getFps();
+        }();
+        resyncToHardwareVsync(false, refreshRate);
+    }
+}
+```
+
+}
+这个红色框框的部分，就是通知VsyncControler告诉VsyncTracker把时间戳清空掉，然后开始添加新的VSYNC时间戳信息，然后再进行校准。
+
+除了上面的这种情况，还有一种情况，就是SurfaceFlinger再进行合成的时候，会把上一帧的完成合成的fence的时间也会同时添加到VsyncTracker的的时间戳集合。这个集合再情况的情况下，除了会增加6个硬件采样之外，这个集合也会添加fence的时间信息。
+
+```c++
+/home/biezhihua/projects/aosp/frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp
+
+if (display && display->isInternal() && display->getPowerMode() == hal::PowerMode::ON &&
+    mPreviousPresentFences[0].fenceTime->isValid()) {
+    mScheduler->addPresentFence(mPreviousPresentFences[0].fenceTime);
+}
+
+void Scheduler::addPresentFence(const std::shared_ptr<FenceTime>& fenceTime) {
+    if (mVsyncSchedule.controller->addPresentFence(fenceTime)) {
+        enableHardwareVsync();
+    } else {
+        disableHardwareVsync(false);
+    }
+}
+```
+
+如上图的代码所示，我们通过给VsyncController中添加fence的时间信息，也会判断当前要不要打开Vsync进行校准，但是默认都是不打开VSYNC校准的，因为每一帧的合成都会把fence的时间传入到这个VsyncTracker中的时间戳集合中，所以这个函数会每次合成的时候都会重新计算回归系数和截距。
+
+- 从HWC获取的display完成显示的fence， HW VSYNC就是display显示完成后发出来的，因此这个fence的时间戳可以看作是发射HW VSYNC的恰当时刻，虽然HW VSYNC可能已经关闭了。
+
+- 将fence样本加入到VsyncTracker中，会重新校准出新的Vsync周期，如果再校准中的过程中发生误差过大，会重新打开HW VSYNC进行校准，所谓的校准，就是重新采集HW VSYNC样本，重新计算出新的回归习系数（vsync周期）和截距。
+
+以上就是在SurfaceFlinger的postComposition中一直调用的方法。
 
 ## dumpsys SurfaceFlinger
 
