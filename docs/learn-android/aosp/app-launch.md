@@ -186,7 +186,7 @@ void startSpecificActivity(ActivityRecord r, boolean andResume, boolean checkCon
 接上一小节的分析可以知道，Android 应用进程的启动是被动式的，在桌面点击图标启动一个应用的组件如 Activity 时，如果 Activity 所在的进程不存在，就会创建并启动进程。Android 系统中一般应用进程的创建都是统一由 zygote 进程 fork 创建的，AMS 在需要创建应用进程时，会通过 socket 连接并通知到到 zygote 进程在开机阶段就创建好的 socket 服务端，然后由 zygote 进程 fork 创建出应用进程。整体架构如下图所示：
 
 ![](/learn-android/aosp/create-app-0.png)
-![](/learn-android/aosp/create-app-1.webp)
+![](/learn-android/aosp/create-app-1.png)
 ![](/learn-android/aosp/create-app-2.png)
 ![](/learn-android/aosp/create-app-4.png)
 ![](/learn-android/aosp/create-app-5.png)
@@ -772,7 +772,7 @@ class H extends Handler {
 
 主线程初始化完成后，主线程就进入阻塞状态，等待 Message，一旦有 Message 发过来，主线程就会被唤醒，处理 Message，处理完成之后，如果没有其他的 Message 需要处理，那么主线程就会进入休眠阻塞状态继续等待。可以说Android系统的运行是受消息机制驱动的，而整个消息机制是由上面所说的四个关键角色相互配合实现的（Handler、Looper、MessageQueue、Message），其运行原理如下图所示：
 
-![](/learn-android/aosp/create-app11.png)
+![](/learn-android/aosp/create-app-11.png)
 
 ```java
 /**
@@ -882,9 +882,9 @@ int Looper::pollInner(int timeoutMillis) {
 
 应用进程启动初始化执行 ActivityThread#main 函数过程中，在开启主线程loop 消息循环之前，会通过 Binder 调用系统核心服务 AMS 的 attachApplication 接口将自己注册到 AMS 中。下面我们接着这个流程往下看，我们先从Perfetto上看看 AMS 服务的 attachApplication 接口是如何处理应用进程的 attach 注册请求的：
 
-![](/learn-android/aosp/create-app12.png)
+![](/learn-android/aosp/create-app-12.png)
 
-![](/learn-android/aosp/create-app13.png)
+![](/learn-android/aosp/create-app-13.png)
 
 我们继续来看相关代码的简化流程：
 

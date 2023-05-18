@@ -13,6 +13,7 @@
   "scripts": {
     "docs:clean": "rm -rf ./docs/.vuepress/.cache && rm -rf ./docs/.vuepress/.temp",
     "docs:dev": "vuepress dev docs",
-    "docs:build": "vuepress build docs"
+    "docs:build": "vuepress build docs",
+    "docs:publish":"vuepress build docs && git add -A && git commit -m 'update' && git push origin main"
   }
 }
