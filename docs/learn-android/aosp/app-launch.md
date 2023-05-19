@@ -27,7 +27,7 @@ tag:
 - RenderThread 渲染
 - SurfaceFlinger 合成显示
 
-## Input 触控事件处理流程
+## 应用 Input 触控事件处理流程
 
 ### 系统机制分析
 
@@ -55,7 +55,7 @@ Android 系统是由事件驱动的，而 Input 是最常见的事件之一，�
 
 接着上面的流程继续往下分析：当 Input 触控事件传递到桌面应用进程后，Input 事件到来后先通过  `enqueueInputEvent` 函数放入 “aq” 本地待处理队列中，并唤醒应用的 UI 线程在 `deliverInputEvent` 的流程中进行 Input 事件的具体分发与处理。
 
-具体会先交给在应用界面 `Window` 创建时的 `ViewRootImpl#setView` 流程中创建的多个不同类型的  `InputStage` 中依次进行处理（比如对输入法处理逻辑的封装ImeInputStage），整个处理流程是按照责任链的设计模式进行。最后会交给 `ViewPostImeInputStage` 中具体进行处理，这里面会从 View 布局树的根节点 `DecorView` 开始遍历整个 `View` 树上的每一个子 `View` 或 `ViewGroup` 界面进行事件的分发、拦截、处理的逻辑。
+具体会先交给在应用界面 `Window` 创建时的 `ViewRootImpl#setView` 流程中创建的多个不同类型的  `InputStage` 中依次进行处理（比如对输入法处理逻辑的封装 `ImeInputStage` ），整个处理流程是按照责任链的设计模式进行。最后会交给 `ViewPostImeInputStage` 中具体进行处理，这里面会从 View 布局树的根节点 `DecorView` 开始遍历整个 `View` 树上的每一个子 `View` 或 `ViewGroup` 界面进行事件的分发、拦截、处理的逻辑。
 
 最后触控事件处理完成后会调用 `finishInputEvent` 结束应用对触控事件处理逻辑，这里面会通过 JNI 调用到 native 层 `InputConsumer` 的 `sendFinishedSignal` 函数通知 `InputDispatcher` 事件处理完成，从触发从 "wq" 队列中及时移除待处理事件以免报ANR异常。
 
@@ -63,7 +63,7 @@ Android 系统是由事件驱动的，而 Input 是最常见的事件之一，�
 
 ![](/learn-android/aosp/app-launch-4.png)
 
-桌面应用界面 `View` 中在连续处理一个 `ACTION_DOWN` 的 `TouchEvent` 触控事件和多个 `ACTION_MOVE`，直到最后出现一个`ACTION_UP` 的 `TouchEvent` 事件后，判断属于 `onClick` 点击事件，然后透过 `ActivityManager` Binder 调用 AMS 的 `startActivity` (system_server 进程，binder 线程，startActivityInner) 服务接口触发启动应用的逻辑。
+桌面应用界面 `View` 中在连续处理一个 `ACTION_DOWN` 的 `TouchEvent` 触控事件和多个 `ACTION_MOVE`，直到最后出现一个`ACTION_UP` 的 `TouchEvent` 事件后，判断属于 `onClick` 点击事件，然后透过 `ActivityManager` Binder 调用 AMS 的 `startActivity` 服务接口触发启动应用的逻辑。
 
 从Perfetto上看如下图所示：
 
@@ -74,7 +74,7 @@ Android 系统是由事件驱动的，而 Input 是最常见的事件之一，�
 
 ### Pause 桌面应用
 
-接着上一节继续往下看，桌面进程收到 Input 触控事件并处理后 binder 调用框架 AMS 的的 `startActivity` 接口启动应用，相关简化代码如下：
+桌面进程收到 Input 触控事件并处理后 binder 调用框架 AMS 的的 `startActivity` 接口启动应用，相关简化代码如下：
 
 ```java
 frameworks/base/services/core/java/com/android/server/wm/ActivityStarter.java
@@ -101,6 +101,7 @@ private int startActivityUnchecked(final ActivityRecord r, ActivityRecord source
 在执行 `startActivityInner` 启动应用逻辑中，AMS 中的 `Activity` 栈管理的逻辑，检查发现当前处于前台 Resume 状态的  `Activity` 是桌面应用，所以第一步需要通知桌面应用的 `Activity` 进入 `Paused` 状态，相关简化代码逻辑如下：
 
 ```java
+frameworks/base/services/core/java/com/android/server/wm/TaskFragment.java
 void schedulePauseActivity(ActivityRecord prev, boolean userLeaving,
         boolean pauseImmediately, boolean autoEnteringPip, String reason) {
     try {
@@ -116,8 +117,7 @@ void schedulePauseActivity(ActivityRecord prev, boolean userLeaving,
 桌面应用进程这边执行收到 pause 消息后执行 `Activity` 的 `onPause` 生命周期，并在执行完成后，会 binder 调用 AMS 的 `activityPaused` 接口通知系统执行完 `Activity` 的 pause 动作，相关代码如下：
 
 ```java
-
-@Override
+frameworks/base/services/core/java/com/android/server/wm/ActivityClientController.java
 public void activityPaused(IBinder token) {
     synchronized (mGlobalLock) {
         Trace.traceBegin(TRACE_TAG_WINDOW_MANAGER, "activityPaused");
@@ -129,6 +129,7 @@ public void activityPaused(IBinder token) {
     }
 }
 
+frameworks/base/services/core/java/com/android/server/wm/ActivityRecord.java
 void activityPaused(boolean timeout) {
     
     final TaskFragment taskFragment = getTaskFragment();
@@ -152,7 +153,13 @@ void activityPaused(boolean timeout) {
 }
 ```
 
+在Perfetto中表现为：
+
 ![](/learn-android/aosp/app-launch-7.png)
+
+![](/learn-android/aosp/app-launch-13.png)
+
+具体的调用链路如下图所示：
 
 ![](/learn-android/aosp/app-launch-8.png)
 
@@ -161,6 +168,7 @@ void activityPaused(boolean timeout) {
 AMS 这边收到应用的 `activityPaused` 调用后，继续执行启动应用的逻辑，判断需要启动的应用 `Activity` 所在的进程不存在，所以接下来需要先 `startProcessAsync` 创建应用进程，相关简化代码如下：
 
 ```java
+frameworks/base/services/core/java/com/android/server/wm/ActivityTaskSupervisor.java
 void startSpecificActivity(ActivityRecord r, boolean andResume, boolean checkConfig) {
     // Is this activity's application already running?
     final WindowProcessController wpc =
@@ -194,13 +202,13 @@ void startSpecificActivity(ActivityRecord r, boolean andResume, boolean checkCon
 
 接上一小节的分析可以知道，Android 应用进程的启动是被动式的，在桌面点击图标启动一个应用的组件如 Activity 时，如果 Activity 所在的进程不存在，就会创建并启动进程。Android 系统中一般应用进程的创建都是统一由 zygote 进程 fork 创建的，AMS 在需要创建应用进程时，会通过 socket 连接并通知到到 zygote 进程在开机阶段就创建好的 socket 服务端，然后由 zygote 进程 fork 创建出应用进程。整体架构如下图所示：
 
-![](/learn-android/aosp/create-app-0.png)
-![](/learn-android/aosp/create-app-1.png)
-![](/learn-android/aosp/create-app-2.png)
-![](/learn-android/aosp/create-app-4.png)
-![](/learn-android/aosp/create-app-5.png)
-![](/learn-android/aosp/create-app-6.png)
-![](/learn-android/aosp/create-app-7.png)
+![](/learn-android/aosp/app-launch-13.png)
+![](/learn-android/aosp/app-launch-14.png)
+![](/learn-android/aosp/app-launch-15.png)
+![](/learn-android/aosp/app-launch-16.png)
+![](/learn-android/aosp/app-launch-17.png)
+![](/learn-android/aosp/app-launch-18.png)
+![](/learn-android/aosp/app-launch-19.png)
 
 我们接着上节中的分析，继续从 `AMS#startProcessAsync` 创建进程函数入手，继续看一下应用进程创建相关简化流程代码：
 
