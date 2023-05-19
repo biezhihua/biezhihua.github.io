@@ -212,9 +212,10 @@ void startSpecificActivity(ActivityRecord r, boolean andResume, boolean checkCon
 
 我们接着上节中的分析，继续从 `AMS#startProcessAsync` 创建进程函数入手，继续看一下应用进程创建相关简化流程代码：
 
-#### AMS 发送socket请求
+#### AMS 发送 socket 请求
 
 ```java
+frameworks/base/services/core/java/com/android/server/wm/ActivityTaskManagerService.java
 void startProcessAsync(ActivityRecord activity, boolean knownToBeDead, boolean isTop,
         String hostingType) {
     try {
@@ -233,7 +234,7 @@ void startProcessAsync(ActivityRecord activity, boolean knownToBeDead, boolean i
     }
 }
 
-@Override
+frameworks/base/services/core/java/com/android/server/am/ActivityManagerService.java
 public void startProcess(String processName, ApplicationInfo info, boolean knownToBeDead,
         boolean isTop, String hostingType, ComponentName hostingName) {
     try {
@@ -255,7 +256,7 @@ public void startProcess(String processName, ApplicationInfo info, boolean known
     }
 }
 
-@GuardedBy("this")
+frameworks/base/services/core/java/com/android/server/am/ActivityManagerService.java
 final ProcessRecord startProcessLocked(String processName,
         ApplicationInfo info, boolean knownToBeDead, int intentFlags,
         HostingRecord hostingRecord, int zygotePolicyFlags, boolean allowWhileBooting,
@@ -268,6 +269,7 @@ final ProcessRecord startProcessLocked(String processName,
             null /* entryPointArgs */, null /* crashHandler */);
 }
 
+frameworks/base/services/core/java/com/android/server/am/ProcessList.java
 boolean startProcessLocked(HostingRecord hostingRecord, String entryPoint, ProcessRecord app,
         int uid, int[] gids, int runtimeFlags, int zygotePolicyFlags, int mountExternal,
         String seInfo, String requiredAbi, String instructionSet, String invokeWith,
@@ -291,6 +293,7 @@ boolean startProcessLocked(HostingRecord hostingRecord, String entryPoint, Proce
     }
 }
 
+frameworks/base/services/core/java/com/android/server/am/ProcessList.java
 private void handleProcessStart(final ProcessRecord app, final String entryPoint,
         final int[] gids, final int runtimeFlags, int zygotePolicyFlags,
         final int mountExternal, final String requiredAbi, final String instructionSet,
@@ -311,7 +314,7 @@ private void handleProcessStart(final ProcessRecord app, final String entryPoint
     ...
 }
 
-
+frameworks/base/services/core/java/com/android/server/am/ProcessList.java
 private Process.ProcessStartResult startProcess(HostingRecord hostingRecord, String entryPoint,
         ProcessRecord app, int uid, int[] gids, int runtimeFlags, int zygotePolicyFlags,
         int mountExternal, String seInfo, String requiredAbi, String instructionSet,
@@ -347,7 +350,39 @@ private Process.ProcessStartResult startProcess(HostingRecord hostingRecord, Str
     }
 }
 
+frameworks/base/core/java/android/os/Process.java
+public static ProcessStartResult start(@NonNull final String processClass,
+                                        @Nullable final String niceName,
+                                        int uid, int gid, @Nullable int[] gids,
+                                        int runtimeFlags,
+                                        int mountExternal,
+                                        int targetSdkVersion,
+                                        @Nullable String seInfo,
+                                        @NonNull String abi,
+                                        @Nullable String instructionSet,
+                                        @Nullable String appDataDir,
+                                        @Nullable String invokeWith,
+                                        @Nullable String packageName,
+                                        int zygotePolicyFlags,
+                                        boolean isTopApp,
+                                        @Nullable long[] disabledCompatChanges,
+                                        @Nullable Map<String, Pair<String, Long>>
+                                                pkgDataInfoMap,
+                                        @Nullable Map<String, Pair<String, Long>>
+                                                whitelistedDataInfoMap,
+                                        boolean bindMountAppsData,
+                                        boolean bindMountAppStorageDirs,
+                                        @Nullable String[] zygoteArgs) {
+    return ZYGOTE_PROCESS.start(processClass, niceName, uid, gid, gids,
+                runtimeFlags, mountExternal, targetSdkVersion, seInfo,
+                abi, instructionSet, appDataDir, invokeWith, packageName,
+                zygotePolicyFlags, isTopApp, disabledCompatChanges,
+                pkgDataInfoMap, whitelistedDataInfoMap, bindMountAppsData,
+                bindMountAppStorageDirs, zygoteArgs);
+}
 
+
+frameworks/base/core/java/android/os/ZygoteProcess.java
 public final Process.ProcessStartResult start(@NonNull final String processClass,
                                                 final String niceName,
                                                 int uid, int gid, @Nullable int[] gids,
@@ -383,7 +418,7 @@ public final Process.ProcessStartResult start(@NonNull final String processClass
     }
 }
 
-
+frameworks/base/core/java/android/os/ZygoteProcess.java
 private Process.ProcessStartResult startViaZygote(@NonNull final String processClass,
                                                     @Nullable final String niceName,
                                                     final int uid, final int gid,
@@ -508,12 +543,12 @@ seq=54
 `zygoteSendArgsAndGetResult` 发送 socket 请求参数，带上了创建的应用进程参数信息；
 return 返回的数据结构 `ProcessStartResult` 中会有新创建的进程的pid字段。
 
-#### Zygote 处理 socket 请求
+### Zygote 处理 socket 请求
 
 其实早在系统开机阶段，zygote 进程创建时，就会在 `ZygoteInit#main` 入口函数中创建服务端 socket，并预加载系统资源和框架类（加速应用进程启动速度），代码如下：
 
 ```java
-com.android.internal.os.ZygoteInit
+frameworks/base/core/java/com/android/internal/os/ZygoteInit.java
 public static void main(String[] argv) {
     ZygoteServer zygoteServer = null;
 
@@ -542,7 +577,7 @@ public static void main(String[] argv) {
 继续往下看 `ZygoteServer#runSelectLoop` 如何监听并处理AMS客户端的请求：
 
 ```java
-/*frameworks/base/core/java/com/android/internal/os/ZygoteServer.java*/
+frameworks/base/core/java/com/android/internal/os/ZygoteServer.java
 Runnable runSelectLoop(String abiList) {
     // 进入死循环监听
     while (true) {
@@ -560,6 +595,7 @@ Runnable runSelectLoop(String abiList) {
     }
 }
 
+frameworks/base/core/java/com/android/internal/os/ZygoteConnection.java
 Runnable processCommand(ZygoteServer zygoteServer, boolean multipleOK) {
         ...
         // 1.fork创建应用子进程
@@ -578,6 +614,7 @@ Runnable processCommand(ZygoteServer zygoteServer, boolean multipleOK) {
         }
 }
 
+frameworks/base/core/java/com/android/internal/os/ZygoteConnection.java
 private Runnable handleChildProc(ZygoteArguments parsedArgs,
         FileDescriptor pipeFd, boolean isZygote) {
     ...
@@ -601,9 +638,9 @@ private Runnable handleChildProc(ZygoteArguments parsedArgs,
 
 ### 应用进程初始化
 
-![](/learn-android/aosp/create-app-8.png)
+![](/learn-android/aosp/app-launch-20.png)
 
-接上一节中的分析，zygote 进程监听接收 AMS 的请求，fork 创建子应用进程，然后pid为0时进入子进程空间，然后在 ZygoteInit#zygoteInit 中完成进程的初始化动作，相关简化代码如下：
+接上一节中的分析，zygote 进程监听接收 AMS 的请求，fork 创建子应用进程，然后pid为0时进入子进程空间，然后在 `ZygoteInit#zygoteInit` 中完成进程的初始化动作，相关简化代码如下：
 
 ```java
 /*frameworks/base/core/java/com/android/internal/os/ZygoteInit.java*/
@@ -627,12 +664,12 @@ public static Runnable zygoteInit(int targetSdkVersion, long[] disabledCompatCha
 
 - 应用进程默认的 java 异常处理机制（可以实现监听、拦截应用进程所有的Java crash的逻辑）；
 - JNI调用启动进程的 binder 线程池（注意应用进程的binder线程池资源是自己创建的并非从 zygote 父进程继承的）；
-- 通过反射创建 ActivityThread 对象并调用其 “main” 入口方法。
+- 通过反射创建 `ActivityThread` 对象并调用其 `main` 入口方法。
 
-我们继续看 RuntimeInit#applicationInit 简化的代码流程：
+我们继续看 `RuntimeInit#applicationInit` 简化的代码流程：
 
 ```java
- /*frameworks/base/core/java/com/android/internal/os/RuntimeInit.java*/
+frameworks/base/core/java/com/android/internal/os/RuntimeInit.java
 protected static Runnable applicationInit(int targetSdkVersion, long[] disabledCompatChanges,
         String[] argv, ClassLoader classLoader) {
     ...
@@ -642,6 +679,7 @@ protected static Runnable applicationInit(int targetSdkVersion, long[] disabledC
     return findStaticMain(args.startClass, args.startArgs, classLoader);
 }
 
+frameworks/base/core/java/com/android/internal/os/RuntimeInit.java
 protected static Runnable findStaticMain(String className, String[] argv,
         ClassLoader classLoader) {
     Class<?> cl;
@@ -666,10 +704,10 @@ protected static Runnable findStaticMain(String className, String[] argv,
 }
 ```
 
-我们继续往下看 ActivityThread 的 main 函数中又干了什么：
+我们继续往下看 `ActivityThread` 的 `main` 函数中又干了什么：
 
 ```java
-/*frameworks/base/core/java/android/app/ActivityThread.java*/
+frameworks/base/core/java/android/app/ActivityThread.java
 public static void main(String[] args) {
      // 原生添加的标识进程ActivityThread初始化过程的systrace tag，名为“ActivityThreadMain”
      Trace.traceBegin(Trace.TRACE_TAG_ACTIVITY_MANAGER, "ActivityThreadMain");
@@ -686,6 +724,7 @@ public static void main(String[] args) {
      ...
 }
 
+frameworks/base/core/java/android/app/ActivityThread.java
 private void attach(boolean system, long startSeq) {
     ...
     if (!system) {
@@ -701,20 +740,21 @@ private void attach(boolean system, long startSeq) {
 }
 ```
 
-可以看到进程ActivityThread#main函数初始化的主要逻辑是：
+可以看到进程 `ActivityThread#main` 函数初始化的主要逻辑是：
 
-创建并启动主线程的loop消息循环；
-通过 binder 调用 AMS 的 attachApplication 接口将自己 attach 注册到 AMS 中。
+- 创建并启动主线程的loop消息循环；
+- 通过 binder 调用 AMS 的 `attachApplication` 接口将自己 attach 注册到 AMS 中。
 
-![](/learn-android/aosp/create-app-9.png)
-![](/learn-android/aosp/create-app-10.png)
+![](/learn-android/aosp/app-launch-22.png)
+
+![](/learn-android/aosp/app-launch-21.png)
 
 ## 应用主线程消息循环机制的建立
 
-接上一节的分析，我们知道应用进程创建后会通过反射创建 ActivityThread 对象并执行其 main 函数，进行主线程的初始化工作：
+接上一节的分析，我们知道应用进程创建后会通过反射创建 `ActivityThread` 对象并执行其 `main` 函数，进行主线程的初始化工作：
 
 ```java
-/*frameworks/base/core/java/android/app/ActivityThread.java*/
+frameworks/base/core/java/android/app/ActivityThread.java
 public static void main(String[] args) {
      ...
      // 1.创建Looper、MessageQueue
@@ -726,16 +766,31 @@ public static void main(String[] args) {
 }
 
 // 3.创建主线程Handler对象
-final H mH = new H();
+frameworks/base/core/java/android/app/ActivityThread.java
+public final class ActivityThread extends ClientTransactionHandler
+        implements ActivityThreadInternal {
+    ...
+    
+    final Looper mLooper = Looper.myLooper();
 
-class H extends Handler {
-  ...
+    final H mH = new H();
 }
 
-/*frameworks/base/core/java/android/os/Looper.java*/
+frameworks/base/core/java/android/app/ActivityThread.java
+class H extends Handler {
+        public static final int BIND_APPLICATION        = 110;
+        public static final int EXIT_APPLICATION        = 111;
+        public static final int RECEIVER                = 113;
+        public static final int CREATE_SERVICE          = 114;
+}
+
+frameworks/base/core/java/android/os/Looper.java
 public static void prepareMainLooper() {
+     
      // 准备主线程的Looper
      prepare(false);
+
+     // 
      synchronized (Looper.class) {
           if (sMainLooper != null) {
               throw new IllegalStateException("The main Looper has already been prepared.");
@@ -744,6 +799,7 @@ public static void prepareMainLooper() {
      }
 }
 
+frameworks/base/core/java/android/os/Looper.java
 private static void prepare(boolean quitAllowed) {
       if (sThreadLocal.get() != null) {
           throw new RuntimeException("Only one Looper may be created per thread");
@@ -752,6 +808,7 @@ private static void prepare(boolean quitAllowed) {
       sThreadLocal.set(new Looper(quitAllowed));
 }
 
+frameworks/base/core/java/android/os/Looper.java
 private Looper(boolean quitAllowed) {
       // 创建MessageQueue消息队列
       mQueue = new MessageQueue(quitAllowed);
@@ -759,17 +816,14 @@ private Looper(boolean quitAllowed) {
 }
 ```
 
-主线程初始化完成后，主线程就有了完整的 Looper、MessageQueue、Handler，此时 ActivityThread 的 Handler 就可以开始处理 Message，包括 Application、Activity、ContentProvider、Service、Broadcast 等组件的生命周期函数，都会以 Message 的形式，在主线程按照顺序处理，这就是 App 主线程的初始化和运行原理，部分处理的 Message 如下
+主线程初始化完成后，主线程就有了完整的 `Looper`、`MessageQueue`、`Handler`，此时 `ActivityThread` 的 `Handler` 就可以开始处理 `Message`，包括 `Application`、`Activity`、`ContentProvider`、`Service`、`Broadcast` 等组件的生命周期函数，都会以 `Message` 的形式，在主线程按照顺序处理，这就是 App 主线程的初始化和运行原理，部分处理的 Message 如下
 
 ```java
-/*frameworks/base/core/java/android/app/ActivityThread.java*/
+frameworks/base/core/java/android/app/ActivityThread.java
 class H extends Handler {
         public static final int BIND_APPLICATION        = 110;
-        @UnsupportedAppUsage
         public static final int RECEIVER                = 113;
-        @UnsupportedAppUsage
         public static final int CREATE_SERVICE          = 114;
-        @UnsupportedAppUsage
         public static final int BIND_SERVICE            = 121;
         
         public void handleMessage(Message msg) {
@@ -787,16 +841,12 @@ class H extends Handler {
 }
 ```
 
-主线程初始化完成后，主线程就进入阻塞状态，等待 Message，一旦有 Message 发过来，主线程就会被唤醒，处理 Message，处理完成之后，如果没有其他的 Message 需要处理，那么主线程就会进入休眠阻塞状态继续等待。可以说Android系统的运行是受消息机制驱动的，而整个消息机制是由上面所说的四个关键角色相互配合实现的（Handler、Looper、MessageQueue、Message），其运行原理如下图所示：
+主线程初始化完成后，主线程就进入阻塞状态，等待 `Message`，一旦有 `Message` 发过来，主线程就会被唤醒，处理 `Message`，处理完成之后，如果没有其他的 `Message` 需要处理，那么主线程就会进入休眠阻塞状态继续等待。可以说 Android 系统的运行是受消息机制驱动的，而整个消息机制是由上面所说的四个关键角色相互配合实现的（`Handler`、`Looper`、`MessageQueue`、`Message`），其运行原理如下图所示：
 
-![](/learn-android/aosp/create-app-11.png)
+![](/learn-android/aosp/app-launch-23.png)
 
 ```java
-/**
- * Run the message queue in this thread. Be sure to call
- * {@link #quit()} to end the loop.
- */
-@SuppressWarnings("AndroidFrameworkBinderIdentity")
+frameworks/base/core/java/android/os/Looper.java
 public static void loop() {
     final Looper me = myLooper();
     
@@ -809,8 +859,11 @@ public static void loop() {
     }
 }
 
+/home/biezhihua/projects/aosp/frameworks/base/core/java/android/os/Looper.java
 private static boolean loopOnce(final Looper me,
         final long ident, final int thresholdOverride) {
+
+    //
     Message msg = me.mQueue.next(); // might block
     
     ...
@@ -827,7 +880,7 @@ private static boolean loopOnce(final Looper me,
     return true;
 }
 
-@UnsupportedAppUsage
+/home/biezhihua/projects/aosp/frameworks/base/core/java/android/os/MessageQueue.java
 Message next() {
     ...
 
@@ -840,14 +893,14 @@ Message next() {
     }
 }
 
-// frameworks/base/core/jni/android_os_MessageQueue.cpp
+frameworks/base/core/jni/android_os_MessageQueue.cpp
 static void android_os_MessageQueue_nativePollOnce(JNIEnv* env, jobject obj,
         jlong ptr, jint timeoutMillis) {
     ...
     nativeMessageQueue->pollOnce(env, obj, timeoutMillis);
 }
 
-// frameworks/base/core/jni/android_os_MessageQueue.cpp
+frameworks/base/core/jni/android_os_MessageQueue.cpp
 void NativeMessageQueue::pollOnce(JNIEnv* env, jobject pollObj, int timeoutMillis) {
     ...
     mLooper->pollOnce(timeoutMillis);
@@ -870,7 +923,6 @@ int Looper::pollOnce(int timeoutMillis, int* outFd, int* outEvents, void** outDa
         ...
 
         result = pollInner(timeoutMillis);
-        result = pollInner(timeoutMillis);
     }
 }
 
@@ -888,10 +940,10 @@ int Looper::pollInner(int timeoutMillis) {
 
 ```
 
-- Handler : Handler 主要是用来处理 Message，应用可以在任何线程创建 Handler，只要在创建的时候指定对应的 Looper 即可，如果不指定，默认是在当前 Thread 对应的 Looper。
-- Looper : Looper 可以看成是一个循环器，其 loop 方法开启后，不断地从 MessageQueue 中获取 Message，对 Message 进行 Delivery 和 Dispatch，最终发给对应的 Handler 去处理。
-- **MessageQueue**：MessageQueue 就是一个 Message 管理器，队列中是 Message，在没有 Message 的时候，MessageQueue 借助 Linux 的 ePoll机制，阻塞休眠等待，直到有 Message 进入队列将其唤醒。
-- **Message**：Message 是传递消息的对象，其内部包含了要传递的内容，最常用的包括 what、arg、callback 等。
+- `Handler` : `Handler` 主要是用来处理 `Message`，应用可以在任何线程创建 `Handler`，只要在创建的时候指定对应的 `Looper` 即可，如果不指定，默认是在当前 `Thread` 对应的 `Looper`。
+- `Looper`: `Looper` 可以看成是一个循环器，其 `loop` 方法开启后，不断地从 `MessageQueue` 中获取 `Message`，对 `Message` 进行 `Delivery` 和 `Dispatch`，最终发给对应的 `Handler` 去处理。
+- `MessageQueue`：`MessageQueue` 就是一个 `Message` 管理器，队列中是 `Message`，在没有 `Message` 的时候，`MessageQueue` 借助 Linux 的 ePoll 机制，阻塞休眠等待，直到有 `Message` 进入队列将其唤醒。
+- `Message`：`Message` 是传递消息的对象，其内部包含了要传递的内容，最常用的包括 what、arg、callback 等。
 
 ## 应用 Application 和 Activity 组件创建与初始化
 
