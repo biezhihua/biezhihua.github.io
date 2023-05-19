@@ -4,7 +4,7 @@ tag:
   - aosp
 ---
 
-# Android | AOSP | 应用启动全流程分析（源码深度剖析）
+# Android | AOSP | 应用启动全流程分析 | 转载&加工
 
 ## 前言1
 
