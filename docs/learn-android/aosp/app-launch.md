@@ -12,67 +12,72 @@ tag:
 
 ## 前言2
 
+源码版本：android-13.0.0_r41
+
 结合Perfetto分析工具，基于最新Android 13 AOSP源码完整的分析一下这个从用户手指触控点击屏幕应用图标到应用界面展示到屏幕上的整个应用启动过程，也是对之前所做所学的一个总结与归纳。
 
 ## 大纲
 
-- Android触控事件处理机制
-- Zygote进程启动和应用进程创建流程
-- Handler消息机制
-- AMS的Activity组件管理
-- 应用Application和Activity组件创建与初始化
-- 应用UI布局与绘制
-- RenderThread渲染
-- SurfaceFlinger合成显示
+- Android 触控事件处理机制
+- Zygote 进程启动和应用进程创建流程
+- Handler 消息机制
+- AMS 的Activity 组件管理
+- 应用 Application 和 Activity 组件创建与初始化
+- 应用 UI 布局与绘制
+- RenderThread 渲染
+- SurfaceFlinger 合成显示
 
-## Input触控事件处理流程
+## Input 触控事件处理流程
 
 ### 系统机制分析
 
-Android 系统是由事件驱动的，而 input 是最常见的事件之一，用户的点击、滑动、长按等操作，都属于 input 事件驱动，其中的核心就是 InputReader 和 InputDispatcher。InputReader 和 InputDispatcher 是跑在 system_server 进程中的两个 native 循环线程，负责读取和分发 Input 事件。整个处理过程大致流程如下：
+Android 系统是由事件驱动的，而 Input 是最常见的事件之一，用户的点击、滑动、长按等操作，都属于 Input 事件驱动，其中的核心就是 `InputReader` 和 `InputDispatcher`。`InputReader` 和 `InputDispatcher` 是跑在 system_server 进程中的两个 native 循环线程，负责读取和分发 Input 事件。整个处理过程大致流程如下：
 
-- InputReader 负责从 EventHub 里面把 Input 事件读取出来，然后交给 InputDispatcher 进行事件分发；
-- InputDispatcher 在拿到 InputReader 获取的事件之后，对事件进行包装后，寻找并分发到目标窗口;
-- InboundQueue 队列（“iq”）中放着 InputDispatcher 从 InputReader 中拿到的 input 事件；
-- OutboundQueue（“oq”）队列里面放的是即将要被派发给各个目标窗口App的事件；
-- WaitQueue 队列里面记录的是已经派发给 App（“wq”），但是 App 还在处理没有返回处理成功的事件；
-- PendingInputEventQueue 队列（“aq”）中记录的是应用需要处理的 Input 事件，这里可以看到input事件已经传递到了应用进程；
-- deliverInputEvent 标识 App UI Thread 被 Input 事件唤醒；
-- InputResponse 标识 Input 事件区域，这里可以看到一个 Input_Down 事件 + 若干个 Input_Move 事件 + 一个 Input_Up 事件的处理阶段都被算到了这里；
+- `InputReader` 负责从 `EventHub` 里面把 Input 事件读取出来，然后交给 `InputDispatcher` 进行事件分发；
+- `InputDispatcher` 在拿到 `InputReader` 获取的事件之后，对事件进行包装后，寻找并分发到目标窗口;
+- `InboundQueue` 队列（“iq”）中放着 `InputDispatcher` 从 `InputReader` 中拿到的 Input 事件；
+- `OutboundQueue`（“oq”）队列里面放的是即将要被派发给各个目标窗口 App 的事件；
+- `WaitQueue` 队列里面记录的是已经派发给 App（“wq”），但是 App 还在处理没有返回处理成功的事件；
+- `PendingInputEventQueue` 队列（“aq”）中记录的是应用需要处理的 Input 事件，这里可以看到 Input 事件已经传递到了应用进程；
+- `deliverInputEvent` 标识 App UI Thread 被 Input 事件唤醒；
+- `InputResponse` 标识 Input 事件区域，这里可以看到一个 Input_Down 事件 + 若干个 Input_Move 事件 + 一个 Input_Up 事件的处理阶段都被算到了这里；
 - App 响应处理Input 事件，内部会在其界面View树中传递处理。
 
 用一张图描述整个过程大致如下：
 
-![](/learn-android/aosp/input-modal.webp)
+![](/learn-android/aosp/app-launch-1.png)
 
 ### 结合Perfetto分析
 
-从桌面点击应用图标启动应用，system_server 的 native 线程 InputReader 首先负责从 EventHub 中利用linux 的 epoll 机制监听并从屏幕驱动读取上报的触控事件，然后唤醒另外一条 native 线程InputDispatcher 负责进行进一步事件分发。InputDispatcher 中会先将事件放到 InboundQueue 也就是“iq”队列中，然后寻找具体处理 input 事件的目标应用窗口，并将事件放入对应的目标窗口 OutboundQueue 也就是“oq”队列中等待通过 SocketPair 双工信道发送到应用目标窗口中。最后当事件发送给具体的应用目标窗口后，会将事件移动到 WaitQueue也 就是“wq”中等待目标应用处理事件完成，并开启倒计时，如果目标应用窗口在5S内没有处理完成此次触控事件，就会向 system_server 报应用 ANR 异常事件。以上整个过程在 Android 系统源码中都加有相应的 trace，如下截图所示：
+从桌面点击应用图标启动应用，system_server 的 native 线程 `InputReader` 首先负责从 `EventHub` 中利用 linux 的 epoll 机制监听并从屏幕驱动读取上报的触控事件，然后唤醒另外一条 native 线程 `InputDispatcher` 负责进行进一步事件分发。`InputDispatcher` 中会先将事件放到 `InboundQueue` 也就是“iq”队列中，然后寻找具体处理 Input 事件的目标应用窗口，并将事件放入对应的目标窗口 `OutboundQueue` 也就是“oq”队列中等待通过 `SocketPair` 双工信道发送到应用目标窗口中。最后当事件发送给具体的应用目标窗口后，会将事件移动到 `WaitQueue` 也 就是 “wq” 中等待目标应用处理事件完成，并开启倒计时，如果目标应用窗口在 5S 内没有处理完成此次触控事件，就会向 system_server 报应用 ANR 异常事件。以上整个过程在 Android 系统源码中都加有相应的 trace，如下截图所示：
 
-![](/learn-android/aosp/input-1.jpeg)
+![](/learn-android/aosp/app-launch-2.png)
 
-接着上面的流程继续往下分析：当 input 触控事件传递到桌面应用进程后，Input 事件到来后先通过 enqueueInputEvent 函数放入“aq” 本地待处理队列中，并唤醒应用的 UI 线程在deliverInputEvent 的流程中进行 input 事件的具体分发与处理。具体会先交给在应用界面Window创建时的 ViewRootImpl#setView 流程中创建的多个不同类型的 InputStage 中依次进行处理（比如对输入法处理逻辑的封装ImeInputStage），整个处理流程是按照责任链的设计模式进行。最后会交给 ViewPostImeInputStage 中具体进行处理，这里面会从 View 布局树的根节点 DecorView 开始遍历整个 View 树上的每一个子 View 或 ViewGroup 界面进行事件的分发、拦截、处理的逻辑。最后触控事件处理完成后会调用finishInputEvent 结束应用对触控事件处理逻辑，这里面会通过 JNI 调用到 native 层 InputConsumer 的 sendFinishedSignal 函数通知 InputDispatcher 事件处理完成，从触发从 "wq" 队列中及时移除待处理事件以免报ANR异常。
+接着上面的流程继续往下分析：当 Input 触控事件传递到桌面应用进程后，Input 事件到来后先通过  `enqueueInputEvent` 函数放入 “aq” 本地待处理队列中，并唤醒应用的 UI 线程在 `deliverInputEvent` 的流程中进行 Input 事件的具体分发与处理。
 
-![](/learn-android/aosp/input-2.jpeg)
-![](/learn-android/aosp/input-2-1.jpeg)
+具体会先交给在应用界面 `Window` 创建时的 `ViewRootImpl#setView` 流程中创建的多个不同类型的  `InputStage` 中依次进行处理（比如对输入法处理逻辑的封装ImeInputStage），整个处理流程是按照责任链的设计模式进行。最后会交给 `ViewPostImeInputStage` 中具体进行处理，这里面会从 View 布局树的根节点 `DecorView` 开始遍历整个 `View` 树上的每一个子 `View` 或 `ViewGroup` 界面进行事件的分发、拦截、处理的逻辑。
 
-桌面应用界面 View 中在连续处理一个 ACTION_DOWN 的 TouchEvent 触控事件和多个 ACTION_MOVE，直到最后出现一个ACTION_UP 的 TouchEvent 事件后，判断属于 onClick 点击事件，然后透过 ActivityManager Binder 调用 AMS 的 startActivity (system_server进程，binder线程，startActivityInner) 服务接口触发启动应用的逻辑。从Perfetto上看如下图所示：
+最后触控事件处理完成后会调用 `finishInputEvent` 结束应用对触控事件处理逻辑，这里面会通过 JNI 调用到 native 层 `InputConsumer` 的 `sendFinishedSignal` 函数通知 `InputDispatcher` 事件处理完成，从触发从 "wq" 队列中及时移除待处理事件以免报ANR异常。
 
-![](/learn-android/aosp/input-3.jpeg)
-![](/learn-android/aosp/input-4.jpeg)
+![](/learn-android/aosp/app-launch-3.png)
+
+![](/learn-android/aosp/app-launch-4.png)
+
+桌面应用界面 `View` 中在连续处理一个 `ACTION_DOWN` 的 `TouchEvent` 触控事件和多个 `ACTION_MOVE`，直到最后出现一个`ACTION_UP` 的 `TouchEvent` 事件后，判断属于 `onClick` 点击事件，然后透过 `ActivityManager` Binder 调用 AMS 的 `startActivity` (system_server 进程，binder 线程，startActivityInner) 服务接口触发启动应用的逻辑。
+
+从Perfetto上看如下图所示：
+
+![](/learn-android/aosp/app-launch-5.png)
+![](/learn-android/aosp/app-launch-6.png)
 
 ## 应用进程的创建与启动
 
-### Pause桌面应用
+### Pause 桌面应用
 
-![](/learn-android/aosp/pause-activity-0.jpeg)
-
-![](/learn-android/aosp/pause-activity-1.png)
-
-接着上一节继续往下看，桌面进程收到 input 触控事件并处理后 binder 调用框架 AMS 的的 startActivity 接口启动应用，相关简化代码如下：
+接着上一节继续往下看，桌面进程收到 Input 触控事件并处理后 binder 调用框架 AMS 的的 `startActivity` 接口启动应用，相关简化代码如下：
 
 ```java
-/*frameworks/base/services/core/java/com/android/server/wm/ActivityStarter.java*/
+frameworks/base/services/core/java/com/android/server/wm/ActivityStarter.java
 private int startActivityUnchecked(final ActivityRecord r, ActivityRecord sourceRecord,
               IVoiceInteractionSession voiceSession, IVoiceInteractor voiceInteractor,
               int startFlags, boolean doResume, ActivityOptions options, Task inTask,
@@ -93,7 +98,7 @@ private int startActivityUnchecked(final ActivityRecord r, ActivityRecord source
   }
 ```
 
-在执行 startActivityInner 启动应用逻辑中，AMS 中的 Activity 栈管理的逻辑，检查发现当前处于前台Resume 状态的 Activity 是桌面应用，所以第一步需要通知桌面应用的 Activity 进入 Paused 状态，相关简化代码逻辑如下：
+在执行 `startActivityInner` 启动应用逻辑中，AMS 中的 `Activity` 栈管理的逻辑，检查发现当前处于前台 Resume 状态的  `Activity` 是桌面应用，所以第一步需要通知桌面应用的 `Activity` 进入 `Paused` 状态，相关简化代码逻辑如下：
 
 ```java
 void schedulePauseActivity(ActivityRecord prev, boolean userLeaving,
@@ -108,9 +113,8 @@ void schedulePauseActivity(ActivityRecord prev, boolean userLeaving,
 
 ```
 
-桌面应用进程这边执行收到 pause 消息后执行 Activity 的 onPause 生命周期，并在执行完成后，会 binder 调用 AMS 的 activityPaused 接口通知系统执行完 activity 的 pause 动作，相关代码如下：
+桌面应用进程这边执行收到 pause 消息后执行 `Activity` 的 `onPause` 生命周期，并在执行完成后，会 binder 调用 AMS 的 `activityPaused` 接口通知系统执行完 `Activity` 的 pause 动作，相关代码如下：
 
-![](/learn-android/aosp/pause-activity-2.png)
 
 ```java
 
@@ -149,13 +153,14 @@ void activityPaused(boolean timeout) {
 }
 ```
 
-![](/learn-android/aosp/start-activity-3.jpeg)
+![](/learn-android/aosp/app-launch-7.png)
 
-![](/learn-android/aosp/start-activity-1.png)
+![](/learn-android/aosp/app-launch-8.png)
 
-![](/learn-android/aosp/start-activity-2.png)
+![](/learn-android/aosp/app-launch-9.png)
 
-AMS 这边收到应用的 activityPaused 调用后，继续执行启动应用的逻辑，判断需要启动的应用 Activity 所在的进程不存在，所以接下来需要先 startProcessAsync 创建应用进程，相关简化代码如下：
+
+AMS 这边收到应用的 `activityPaused` 调用后，继续执行启动应用的逻辑，判断需要启动的应用 `Activity` 所在的进程不存在，所以接下来需要先 `startProcessAsync` 创建应用进程，相关简化代码如下：
 
 ```java
 void startSpecificActivity(ActivityRecord r, boolean andResume, boolean checkConfig) {
@@ -181,6 +186,12 @@ void startSpecificActivity(ActivityRecord r, boolean andResume, boolean checkCon
 }
 ```
 
+![](/learn-android/aosp/app-launch-10.png)
+
+![](/learn-android/aosp/app-launch-11.png)
+
+![](/learn-android/aosp/app-launch-12.png)
+
 ### 创建应用进程
 
 接上一小节的分析可以知道，Android 应用进程的启动是被动式的，在桌面点击图标启动一个应用的组件如 Activity 时，如果 Activity 所在的进程不存在，就会创建并启动进程。Android 系统中一般应用进程的创建都是统一由 zygote 进程 fork 创建的，AMS 在需要创建应用进程时，会通过 socket 连接并通知到到 zygote 进程在开机阶段就创建好的 socket 服务端，然后由 zygote 进程 fork 创建出应用进程。整体架构如下图所示：
@@ -193,7 +204,7 @@ void startSpecificActivity(ActivityRecord r, boolean andResume, boolean checkCon
 ![](/learn-android/aosp/create-app-6.png)
 ![](/learn-android/aosp/create-app-7.png)
 
-我们接着上节中的分析，继续从 AMS#startProcessAsync 创建进程函数入手，继续看一下应用进程创建相关简化流程代码：
+我们接着上节中的分析，继续从 `AMS#startProcessAsync` 创建进程函数入手，继续看一下应用进程创建相关简化流程代码：
 
 #### AMS 发送socket请求
 
@@ -485,15 +496,15 @@ seq=54
 
 ```
 
-在 ZygoteProcess#startViaZygote 中，最后创建应用进程的逻辑：
+在 `ZygoteProcess#startViaZygote` 中，最后创建应用进程的逻辑：
 
-openZygoteSocketIfNeeded 函数中打开本地 socket 客户端连接到 zygote 进程的 socket 服务端；
-zygoteSendArgsAndGetResult 发送 socket 请求参数，带上了创建的应用进程参数信息；
-return返 回的数据结构 ProcessStartResult 中会有新创建的进程的pid字段。
+`openZygoteSocketIfNeeded` 函数中打开本地 socket 客户端连接到 zygote 进程的 socket 服务端；
+`zygoteSendArgsAndGetResult` 发送 socket 请求参数，带上了创建的应用进程参数信息；
+return 返回的数据结构 `ProcessStartResult` 中会有新创建的进程的pid字段。
 
-#### Zygote 处理socket请求
+#### Zygote 处理 socket 请求
 
-其实早在系统开机阶段，zygote 进程创建时，就会在 ZygoteInit#main 入口函数中创建服务端 socket，并预加载系统资源和框架类（加速应用进程启动速度），代码如下：
+其实早在系统开机阶段，zygote 进程创建时，就会在 `ZygoteInit#main` 入口函数中创建服务端 socket，并预加载系统资源和框架类（加速应用进程启动速度），代码如下：
 
 ```java
 com.android.internal.os.ZygoteInit
@@ -522,7 +533,7 @@ public static void main(String[] argv) {
 
 ```
 
-继续往下看 ZygoteServer#runSelectLoop 如何监听并处理AMS客户端的请求：
+继续往下看 `ZygoteServer#runSelectLoop` 如何监听并处理AMS客户端的请求：
 
 ```java
 /*frameworks/base/core/java/com/android/internal/os/ZygoteServer.java*/
@@ -1994,7 +2005,6 @@ public void endRecording() {
 }
 ```
 
-
 从以上代码可以看出，构建绘制命令树的过程是从View控件树的根节点DecorView触发，递归调用每个子View节点的updateDisplayListIfDirty函数，最终完成绘制树的创建，简述流程如下：
 
 - 利用View对象构造时创建的RenderNode获取一个SkiaRecordingCanvas“画布”；
@@ -2004,7 +2014,6 @@ public void endRecording() {
 
 ![](/learn-android/aosp/create-app-26.png)
 ![](/learn-android/aosp/create-app-27.webp)
-
 
 ### 执行渲染绘制任务
 
@@ -2168,7 +2177,6 @@ SurfaceFlinger合成显示部分完全属于Android系统GUI中图形显示的�
 
 ![](/learn-android/aosp/create-app-30.webp)
 
-
 从上图可以看出，其实SurfaceFlinger在Android系统的整个图形显示系统中是起到一个承上启下的作用：
 
 - 对上：通过Surface与不同的应用进程建立联系，接收它们写入Surface中的绘制缓冲数据，对它们进行统一合成。
@@ -2200,7 +2208,6 @@ Vysnc垂直同步是Android在“黄油计划”中引入的一个重要机制�
 - app类型的Vsync：app类型的Vysnc信号由上层应用中的Choreographer根据绘制需求进行注册和接收，用于控制应用UI绘制上帧的生产节奏。根据第7小结中的分析：应用在UI线程中调用invalidate刷新界面绘制时，需要先透过Choreographer向系统申请注册app类型的Vsync信号，待Vsync信号到来后，才能往主线程的消息队列放入待绘制任务进行真正UI的绘制动作；
 
 - sf类型的Vsync:sf类型的Vsync是用于控制SurfaceFlinger的合成消费节奏。应用完成界面的绘制渲染后，通过Binder调用queueBuffer接口将缓存数据返还给应用对应的BufferQueue时，会申请sf类型的Vsync，待SurfaceFlinger 在其UI线程中收到 Vsync 信号之后，便开始进行界面的合成操作。
-
 
 Vsync信号的生成是参考屏幕硬件的刷新周期的，其架构如下图所示：
 
