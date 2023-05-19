@@ -47,7 +47,7 @@ Android 系统是由事件驱动的，而 Input 是最常见的事件之一，�
 
 ![](/learn-android/aosp/app-launch-1.png)
 
-### 结合Perfetto分析
+### 结合 Perfetto 分析
 
 从桌面点击应用图标启动应用，system_server 的 native 线程 `InputReader` 首先负责从 `EventHub` 中利用 linux 的 epoll 机制监听并从屏幕驱动读取上报的触控事件，然后唤醒另外一条 native 线程 `InputDispatcher` 负责进行进一步事件分发。`InputDispatcher` 中会先将事件放到 `InboundQueue` 也就是“iq”队列中，然后寻找具体处理 Input 事件的目标应用窗口，并将事件放入对应的目标窗口 `OutboundQueue` 也就是“oq”队列中等待通过 `SocketPair` 双工信道发送到应用目标窗口中。最后当事件发送给具体的应用目标窗口后，会将事件移动到 `WaitQueue` 也 就是 “wq” 中等待目标应用处理事件完成，并开启倒计时，如果目标应用窗口在 5S 内没有处理完成此次触控事件，就会向 system_server 报应用 ANR 异常事件。以上整个过程在 Android 系统源码中都加有相应的 trace，如下截图所示：
 
@@ -115,7 +115,6 @@ void schedulePauseActivity(ActivityRecord prev, boolean userLeaving,
 
 桌面应用进程这边执行收到 pause 消息后执行 `Activity` 的 `onPause` 生命周期，并在执行完成后，会 binder 调用 AMS 的 `activityPaused` 接口通知系统执行完 `Activity` 的 pause 动作，相关代码如下：
 
-
 ```java
 
 @Override
@@ -158,7 +157,6 @@ void activityPaused(boolean timeout) {
 ![](/learn-android/aosp/app-launch-8.png)
 
 ![](/learn-android/aosp/app-launch-9.png)
-
 
 AMS 这边收到应用的 `activityPaused` 调用后，继续执行启动应用的逻辑，判断需要启动的应用 `Activity` 所在的进程不存在，所以接下来需要先 `startProcessAsync` 创建应用进程，相关简化代码如下：
 
@@ -703,7 +701,7 @@ private void attach(boolean system, long startSeq) {
 ![](/learn-android/aosp/create-app-9.png)
 ![](/learn-android/aosp/create-app-10.png)
 
-## 应用主线程消息循环机制建立
+## 应用主线程消息循环机制的建立
 
 接上一节的分析，我们知道应用进程创建后会通过反射创建 ActivityThread 对象并执行其 main 函数，进行主线程的初始化工作：
 
@@ -887,9 +885,9 @@ int Looper::pollInner(int timeoutMillis) {
 - **MessageQueue**：MessageQueue 就是一个 Message 管理器，队列中是 Message，在没有 Message 的时候，MessageQueue 借助 Linux 的 ePoll机制，阻塞休眠等待，直到有 Message 进入队列将其唤醒。
 - **Message**：Message 是传递消息的对象，其内部包含了要传递的内容，最常用的包括 what、arg、callback 等。
 
-## 应用Application和Activity组件创建与初始化
+## 应用 Application 和 Activity 组件创建与初始化
 
-### Application的创建与初始化
+### Application 的创建与初始化
 
 应用进程启动初始化执行 ActivityThread#main 函数过程中，在开启主线程loop 消息循环之前，会通过 Binder 调用系统核心服务 AMS 的 attachApplication 接口将自己注册到 AMS 中。下面我们接着这个流程往下看，我们先从Perfetto上看看 AMS 服务的 attachApplication 接口是如何处理应用进程的 attach 注册请求的：
 
@@ -1216,7 +1214,7 @@ private ApkAssets(@FormatType int format, @NonNull String path, @PropertyFlags i
 
 ![](/learn-android/aosp/create-app-15.png)
 
-## Activity的创建与初始化
+## 应用 Activity 的创建与初始化
 
 ### Activity Create
 
@@ -1619,7 +1617,7 @@ public void setView(View view, WindowManager.LayoutParams attrs, View panelParen
 
 ![](/learn-android/aosp/create-app-18.png)
 
-## 应用UI布局与绘制
+## 应用 layout 与 draw
 
 接上一节的分析，应用主线程中在执行Activity的Resume流程的最后，会创建ViewRootImpl对象并调用其setView函数，从此并开启了应用界面UI布局与绘制的流程。在开始讲解这个过程之前，我们先来整理一下前面代码中讲到的这些概念，如Activity、PhoneWindow、DecorView、ViewRootImpl、WindowManager它们之间的关系与职责，因为这些核心类基本构成了Android系统的GUI显示系统在应用进程侧的核心架构，其整体架构如下图所示：
 
@@ -1831,7 +1829,7 @@ private boolean draw(boolean fullRedrawNeeded) {
 
 ![](/learn-android/aosp/create-app-23.webp)
 
-## RenderThread渲染
+## 应用 RenderThread 渲染
 
 截止到目前，在ViewRootImpl中完成了对界面的measure、layout和draw等绘制流程后，用户依然还是看不到屏幕上显示的应用界面内容，因为整个Android系统的显示流程除了前面讲到的UI线程的绘制外，界面还需要经过RenderThread线程的渲染处理，渲染完成后，还需要通过Binder调用“上帧”交给surfaceflinger进程中进行合成后送显才能最终显示到屏幕上。本小节中，我们将接上一节中ViewRootImpl中最后draw的流程继续往下分析开启硬件加速情况下，RenderThread渲染线程的工作流程。由于目前Android 4.X之后系统默认界面是开启硬件加速的，所以本文我们重点分析硬件加速条件下的界面渲染流程，我们先分析一下简化的代码流程：
 
@@ -2171,7 +2169,7 @@ void CanvasContext::draw() {
 
 ![](/learn-android/aosp/create-app-29.png)
 
-## SurfaceFlinger合成显示
+## SurfaceFlinger 合成显示
 
 SurfaceFlinger合成显示部分完全属于Android系统GUI中图形显示的内容，逻辑结构也比较复杂，但不属于本文介绍内容的重点。所以本小节中只是总体上介绍一下其工作原理与思想，不再详细分析源码，感兴趣的读者可以关注笔者后续的文章再来详细分析讲解。简单的说SurfaceFlinger作为系统中独立运行的一个Native进程，借用Android官网的描述，其职责就是负责接受来自多个来源的数据缓冲区，对它们进行合成，然后发送到显示设备。如下图所示：
 
