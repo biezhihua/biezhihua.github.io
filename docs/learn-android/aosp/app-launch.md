@@ -1728,24 +1728,24 @@ public void setView(View view, WindowManager.LayoutParams attrs, View panelParen
 
 ## 应用 布局与绘制
 
-接上一节的分析，应用主线程中在执行Activity的Resume流程的最后，会创建ViewRootImpl对象并调用其setView函数，从此并开启了应用界面UI布局与绘制的流程。在开始讲解这个过程之前，我们先来整理一下前面代码中讲到的这些概念，如Activity、PhoneWindow、DecorView、ViewRootImpl、WindowManager它们之间的关系与职责，因为这些核心类基本构成了Android系统的GUI显示系统在应用进程侧的核心架构，其整体架构如下图所示：
+接上一节的分析，应用主线程中在执行 `Activity`的 `Resume` 流程的最后，会创建 `ViewRootImpl` 对象并调用其 `setView` 函数，从此并开启了应用界面UI布局与绘制的流程。在开始讲解这个过程之前，我们先来整理一下前面代码中讲到的这些概念，如`Activity`、`PhoneWindow`、`DecorView`、`ViewRootImpl`、`WindowManager`它们之间的关系与职责，因为这些核心类基本构成了 Android 系统的GUI显示系统在应用进程侧的核心架构，其整体架构如下图所示：
 
-![](/learn-android/aosp/create-app-19.webp)
+![](/learn-android/aosp/app-launch-32.png)
 
-- Window是一个抽象类，通过控制DecorView提供了一些标准的UI方案，比如背景、标题、虚拟按键等，而PhoneWindow是Window的唯一实现类，在Activity创建后的attach流程中创建，应用启动显示的内容装载到其内部的mDecor（DecorView）；
+- `Window` 是一个抽象类，通过控制 `DecorView` 提供了一些标准的UI方案，比如背景、标题、虚拟按键等，而 `PhoneWindow` 是 `Window` 的唯一实现类，在 `Activity` 创建后的 `attach` 流程中创建，应用启动显示的内容装载到其内部的 `mDecor（DecorView）`；
 
-- DecorView是整个界面布局View控件树的根节点，通过它可以遍历访问到整个View控件树上的任意节点；
+- `DecorView` 是整个界面布局 `View` 控件树的根节点，通过它可以遍历访问到整个 `View` 控件树上的任意节点；
 
-- WindowManager是一个接口，继承自ViewManager接口，提供了View的基本操作方法；WindowManagerImp实现了WindowManager接口，内部通过组合方式持有WindowManagerGlobal，用来操作View；
+- `WindowManager` 是一个接口，继承自 `ViewManager` 接口，提供了 `View` 的基本操作方法；`WindowManagerImp` 实现了 `WindowManager` 接口，内部通过组合方式持有 `WindowManagerGlobal` ，用来操作 `View` ；
 
-- WindowManagerGlobal是一个全局单例，内部可以通过ViewRootImpl将View添加至窗口中；
+- `WindowManagerGlobal` 是一个全局单例，内部可以通过`ViewRootImpl` 将 `View` 添加至窗口中；
 
-- ViewRootImpl是所有View的Parent，用来总体管理View的绘制以及与系统WMS窗口管理服务的IPC交互从而实现窗口的开辟；ViewRootImpl是应用进程运转的发动机，可以看到ViewRootImpl内部包含mView（就是DecorView）、mSurface、Choregrapher，mView代表整个控件树，mSurfacce代表画布，应用的UI渲染会直接放到mSurface中，Choregorapher使得应用请求vsync信号，接收信号后开始渲染流程；
+- `ViewRootImpl` 是所有 `View` 的 Parent，用来总体管理 `View` 的绘制以及与系统WMS窗口管理服务的IPC交互从而实现窗口的开辟；`ViewRootImpl` 是应用进程运转的发动机，可以看到 `ViewRootImpl` 内部包含 `mView（就是DecorView）`、`mSurface`、`Choregrapher`，`mView` 代表整个控件树， `mSurface` 代表画布，应用的UI渲染会直接放到 `mSurface` 中，`Choreographer` 使得应用请求vsync信号，接收信号后开始渲染流程；
 
-我们从ViewRootImpl的setView流程继续结合代码往下看：
+我们从 `ViewRootImpl` 的 `setView` 流程继续结合代码往下看：
 
 ```java
-/*frameworks/base/core/java/android/view/ViewRootImpl.java*/
+frameworks/base/core/java/android/view/ViewRootImpl.java
 public void setView(View view, WindowManager.LayoutParams attrs, View panelParentView,
             int userId) {
       synchronized (this) {
@@ -1779,20 +1779,20 @@ public void setView(View view, WindowManager.LayoutParams attrs, View panelParen
 }
 ```
 
-从以上代码可以看出ViewRootImpl的setView内部关键流程如下：
+从以上代码可以看出 `ViewRootImpl` 的 `setView` 内部关键流程如下：
 
-- requestLayout()通过一系列调用触发界面绘制（measure、layout、draw）动作，下文会详细展开分析；
+- `requestLayout()` 通过一系列调用触发界面绘制（measure、layout、draw）动作，下文会详细展开分析；
 
-- 通过Binder调用访问系统窗口管理服务WMS的addWindow接口，实现添加、注册应用窗口的操作，并传入本地创建inputChannel对象用于后续接收系统的触控事件，这一步执行完我们的View就可以显示到屏幕上了。关于WMS的内部实现流程也非常复杂，由于篇幅有限本文就不详细展开分析了。
+- 通过Binder调用访问系统窗口管理服务WMS的 `addWindow` 接口，实现添加、注册应用窗口的操作，并传入本地创建 `inputChannel` 对象用于后续接收系统的触控事件，这一步执行完我们的View就可以显示到屏幕上了。关于WMS的内部实现流程也非常复杂，由于篇幅有限本文就不详细展开分析了。
 
-- 创建WindowInputEventReceiver对象，封装实现应用窗口接收系统触控事件的逻辑；
+- 创建 `WindowInputEventReceiver` 对象，封装实现应用窗口接收系统触控事件的逻辑；
 
-- 执行view.assignParent(this)，设置DecorView的mParent为ViewRootImpl。所以，虽然ViewRootImpl不是一个View,但它是所有View的顶层Parent。
+- 执行 `view.assignParent(this)`，设置 `DecorView` 的 `mParent` 为 `ViewRootImpl`。所以，虽然 `ViewRootImpl` 不是一个`View`, 但它是所有 `View` 的顶层 Parent。
 
-我们顺着ViewRootImpl的requestLayout动作继续往下看界面绘制的流程代码:
+我们顺着 `ViewRootImpl` 的 `requestLayout` 动作继续往下看界面绘制的流程代码:
 
 ```java
-/*frameworks/base/core/java/android/view/ViewRootImpl.java*/
+frameworks/base/core/java/android/view/ViewRootImpl.java
 public void requestLayout() {
     if (!mHandlingLayoutInLayoutRequest) {
          // 检查当前UI绘制操作是否发生在主线程，如果发生在子线程则会抛出异常
@@ -1803,7 +1803,7 @@ public void requestLayout() {
     }
 }
 
-@UnsupportedAppUsage
+frameworks/base/core/java/android/view/ViewRootImpl.java
 void scheduleTraversals() {
     if (!mTraversalScheduled) {
          ...
@@ -1815,27 +1815,100 @@ void scheduleTraversals() {
          ...
      }
 }
+
+frameworks/base/core/java/android/view/Choreographer.java
+public void postCallback(int callbackType, Runnable action, Object token) {
+    postCallbackDelayed(callbackType, action, token, 0);
+}
+
+frameworks/base/core/java/android/view/Choreographer.java
+public void postCallbackDelayed(int callbackType,
+        Runnable action, Object token, long delayMillis) {
+    if (action == null) {
+        throw new IllegalArgumentException("action must not be null");
+    }
+    if (callbackType < 0 || callbackType > CALLBACK_LAST) {
+        throw new IllegalArgumentException("callbackType is invalid");
+    }
+
+    postCallbackDelayedInternal(callbackType, action, token, delayMillis);
+}
+
+frameworks/base/core/java/android/view/Choreographer.java
+private void postCallbackDelayedInternal(int callbackType,
+        Object action, Object token, long delayMillis) {
+    if (DEBUG_FRAMES) {
+        Log.d(TAG, "PostCallback: type=" + callbackType
+                + ", action=" + action + ", token=" + token
+                + ", delayMillis=" + delayMillis);
+    }
+
+    synchronized (mLock) {
+        final long now = SystemClock.uptimeMillis();
+        final long dueTime = now + delayMillis;
+        mCallbackQueues[callbackType].addCallbackLocked(dueTime, action, token);
+
+        if (dueTime <= now) {
+            scheduleFrameLocked(now);
+        } else {
+            Message msg = mHandler.obtainMessage(MSG_DO_SCHEDULE_CALLBACK, action);
+            msg.arg1 = callbackType;
+            msg.setAsynchronous(true);
+            mHandler.sendMessageAtTime(msg, dueTime);
+        }
+    }
+}
+
+frameworks/base/core/java/android/view/Choreographer.java
+private void scheduleFrameLocked(long now) {
+    if (!mFrameScheduled) {
+        mFrameScheduled = true;
+        if (USE_VSYNC) {
+            
+            // If running on the Looper thread, then schedule the vsync immediately,
+            // otherwise post a message to schedule the vsync from the UI thread
+            // as soon as possible.
+            if (isRunningOnLooperThreadLocked()) {
+                scheduleVsyncLocked();
+            } else {
+                ...
+            }
+        } else {
+            ...
+        }
+    }
+}
+
+frameworks/base/core/java/android/view/Choreographer.java
+private void scheduleVsyncLocked() {
+    try {
+        Trace.traceBegin(Trace.TRACE_TAG_VIEW, "Choreographer#scheduleVsyncLocked");
+        mDisplayEventReceiver.scheduleVsync();
+    } finally {
+        Trace.traceEnd(Trace.TRACE_TAG_VIEW);
+    }
+}
 ```
 
-Choreographer 的引入，主要是配合系统Vsync垂直同步机制（Android“黄油计划”中引入的机制之一，协调APP生成UI数据和SurfaceFlinger合成图像，避免Tearing画面撕裂的现象），给上层 App 的渲染提供一个稳定的 Message 处理的时机，也就是 Vsync 到来的时候 ，系统通过对 Vsync 信号周期的调整，来控制每一帧绘制操作的时机。Choreographer 扮演 Android 渲染链路中承上启下的角色：
+`Choreographer` 的引入，主要是配合系统 Vsync 垂直同步机制（Android“黄油计划”中引入的机制之一，协调APP生成UI数据和 `SurfaceFlinger` 合成图像，避免Tearing画面撕裂的现象），给上层 App 的渲染提供一个稳定的 Message 处理的时机，也就是 Vsync 到来的时候 ，系统通过对 Vsync 信号周期的调整，来控制每一帧绘制操作的时机。`Choreographer` 扮演 Android 渲染链路中承上启下的角色：
 
 - 承上：负责接收和处理 App 的各种更新消息和回调，等到 Vsync 到来的时候统一处理。比如集中处理 Input(主要是 Input 事件的处理) 、Animation(动画相关)、Traversal(包括 measure、layout、draw 等操作) ，判断卡顿掉帧情况，记录 CallBack 耗时等；
 
-- 启下：负责请求和接收 Vsync 信号。接收 Vsync 事件回调(通过 FrameDisplayEventReceiver.onVsync )，请求 Vsync(FrameDisplayEventReceiver.scheduleVsync) 。
+- 启下：负责请求和接收 Vsync 信号。接收 Vsync 事件回调(通过 `FrameDisplayEventReceiver.onVsync` )，请求 `Vsync(FrameDisplayEventReceiver.scheduleVsync`) 。
 
-Choreographer在收到CALLBACK_TRAVERSAL类型的绘制任务后，其内部的工作流程如下图所示：
+`Choreographer` 在收到 `CALLBACK_TRAVERSAL` 类型的绘制任务后，其内部的工作流程如下图所示：
 
-![](/learn-android/aosp/create-app-20.webp)
+![](/learn-android/aosp/app-launch-33.png)
 
-![](/learn-android/aosp/create-app-22.png)
+从以上流程图可以看出：`ViewRootImpl` 调用 `Choreographer` 的 `postCallback` 接口放入待执行的绘制消息后，`Choreographer`会先向系统申请 APP 类型的 vsync 信号，然后等待系统 vsync 信号到来后，去回调到 `ViewRootImpl` 的 `doTraversal` 函数中执行真正的绘制动作（measure、layout、draw）。这个绘制过程从 Perfetto 上看如下图所示：
 
-![](/learn-android/aosp/create-app-24.png)
+![](/learn-android/aosp/app-launch-34.png)
 
-从以上流程图可以看出：ViewRootImpl调用Choreographer的postCallback接口放入待执行的绘制消息后，Choreographer会先向系统申请APP 类型的vsync信号，然后等待系统vsync信号到来后，去回调到ViewRootImpl的doTraversal函数中执行真正的绘制动作（measure、layout、draw）。这个绘制过程从 Perfetto 上看如下图所示：
+![](/learn-android/aosp/app-launch-35.png)
 
-![](/learn-android/aosp/create-app-21.png)
+![](/learn-android/aosp/app-launch-36.png)
 
-我们接着ViewRootImpl的doTraversal函数的简化代码流程往下看：
+我们接着 `ViewRootImpl` 的 `doTraversal` 函数的简化代码流程往下看：
 
 ```java
 frameworks/base/core/java/android/view/ViewRootImpl.java
@@ -1851,6 +1924,7 @@ void doTraversal() {
     }
 }
 
+frameworks/base/core/java/android/view/ViewRootImpl.java
 private void performTraversals() {
      ...
      // 1.从DecorView根节点出发，遍历整个View控件树，完成整个View控件树的measure测量操作
@@ -1925,18 +1999,19 @@ private boolean draw(boolean fullRedrawNeeded) {
 }
 ```
 
-从上面的代码流程可以看出，ViewRootImpl中负责的整个应用界面绘制的主要流程如下：
+从上面的代码流程可以看出，`ViewRootImpl` 中负责的整个应用界面绘制的主要流程如下：
 
-从界面View控件树的根节点DecorView出发，递归遍历整个View控件树，完成对整个View控件树的measure测量操作，由于篇幅所限，本文就不展开分析这块的详细流程；
-界面第一次执行绘制任务时，会通过Binder IPC访问系统窗口管理服务WMS的relayout接口，实现窗口尺寸的计算并向系统申请用于本地绘制渲染的Surface“画布”的操作（具体由SurfaceFlinger负责创建应用界面对应的BufferQueueLayer对象，并通过内存共享的方式通过Binder将地址引用透过WMS回传给应用进程这边），由于篇幅所限，本文就不展开分析这块的详细流程；
-从界面View控件树的根节点DecorView出发，递归遍历整个View控件树，完成对整个View控件树的layout测量操作；
-从界面View控件树的根节点DecorView出发，递归遍历整个View控件树，完成对整个View控件树的draw测量操作，如果开启并支持硬件绘制加速（从Android 4.X开始谷歌已经默认开启硬件加速），则走GPU硬件绘制的流程，否则走CPU软件绘制的流程；
+- 从界面View控件树的根节点 `DecorView` 出发，递归遍历整个 `View` 控件树，完成对整个 `View` 控件树的 `measure` 测量操作，由于篇幅所限，本文就不展开分析这块的详细流程；
 
-![](/learn-android/aosp/create-app-22.png)
+- 界面第一次执行绘制任务时，会通过Binder IPC访问系统窗口管理服务WMS的relayout接口，实现窗口尺寸的计算并向系统申请用于本地绘制渲染的Surface“画布”的操作（具体由SurfaceFlinger负责创建应用界面对应的BufferQueueLayer对象，并通过内存共享的方式通过Binder将地址引用透过WMS回传给应用进程这边），由于篇幅所限，本文就不展开分析这块的详细流程；
+
+- 从界面 `View` 控件树的根节点 `DecorView` 出发，递归遍历整个 `View` 控件树，完成对整个 `View` 控件树的 `layout` 测量操作；
+
+- 从界面 `View` 控件树的根节点 `DecorView` 出发，递归遍历整个  `View` 控件树，完成对整个 `View` 控件树的 `draw` 测量操作，如果开启并支持硬件绘制加速（从Android 4.X开始谷歌已经默认开启硬件加速），则走GPU硬件绘制的流程，否则走CPU软件绘制的流程；
 
 借用一张图来总结应用UI绘制的流程，如下所示：
 
-![](/learn-android/aosp/create-app-23.webp)
+![](/learn-android/aosp/app-launch-37.png)
 
 ## 应用 RenderThread 渲染
 
