@@ -859,7 +859,7 @@ public static void loop() {
     }
 }
 
-/home/biezhihua/projects/aosp/frameworks/base/core/java/android/os/Looper.java
+frameworks/base/core/java/android/os/Looper.java
 private static boolean loopOnce(final Looper me,
         final long ident, final int thresholdOverride) {
 
@@ -880,7 +880,7 @@ private static boolean loopOnce(final Looper me,
     return true;
 }
 
-/home/biezhihua/projects/aosp/frameworks/base/core/java/android/os/MessageQueue.java
+frameworks/base/core/java/android/os/MessageQueue.java
 Message next() {
     ...
 
@@ -949,18 +949,17 @@ int Looper::pollInner(int timeoutMillis) {
 
 ### Application 的创建与初始化
 
-应用进程启动初始化执行 ActivityThread#main 函数过程中，在开启主线程loop 消息循环之前，会通过 Binder 调用系统核心服务 AMS 的 attachApplication 接口将自己注册到 AMS 中。下面我们接着这个流程往下看，我们先从Perfetto上看看 AMS 服务的 attachApplication 接口是如何处理应用进程的 attach 注册请求的：
+应用进程启动初始化执行 `ActivityThread#main` 函数过程中，在开启主线程 `loop` 消息循环之前，会通过 Binder 调用系统核心服务 AMS 的 `attachApplication` 接口将自己注册到 AMS 中。下面我们接着这个流程往下看，我们先从Perfetto上看看 AMS 服务的 `attachApplication` 接口是如何处理应用进程的 attach 注册请求的：
 
-![](/learn-android/aosp/create-app-12.png)
+![](/learn-android/aosp/app-launch-24.png)
 
-![](/learn-android/aosp/create-app-13.png)
+![](/learn-android/aosp/app-launch-25.png)
 
 我们继续来看相关代码的简化流程：
 
 ```java
 
-
-// frameworks/base/services/core/java/com/android/server/am/ActivityManagerService.java
+frameworks/base/services/core/java/com/android/server/am/ActivityManagerService.java
 public final void attachApplication(IApplicationThread thread, long startSeq) {
     synchronized (this) {
         ...
@@ -979,7 +978,17 @@ private boolean attachApplicationLocked(@NonNull IApplicationThread thread,
      } else if (instr2 != null) {
            ...
      } else {
-           thread.bindApplication(...);
+            thread.bindApplication(processName, appInfo,
+                    app.sdkSandboxClientAppVolumeUuid, app.sdkSandboxClientAppPackage,
+                    providerList, null, profilerInfo, null, null, null, testMode,
+                    mBinderTransactionTrackingEnabled, enableTrackAllocation,
+                    isRestrictedBackupMode || !normalMode, app.isPersistent(),
+                    new Configuration(app.getWindowProcessController().getConfiguration()),
+                    app.getCompat(), getCommonServicesLocked(app.isolated),
+                    mCoreSettingsObserver.getCoreSettingsLocked(),
+                    buildSerial, autofillOptions, contentCaptureOptions,
+                    app.getDisabledCompatChanges(), serializedSystemFontMap,
+                    app.getStartElapsedTime(), app.getStartUptime());
      }
      ...
      // See if the top visible activity is waiting to run in this process...
@@ -994,17 +1003,29 @@ private boolean attachApplicationLocked(@NonNull IApplicationThread thread,
 
 frameworks/base/core/java/android/app/ActivityThread.java
 private class ApplicationThread extends IApplicationThread.Stub {
-      @Override
-      public final void bindApplication(...) {
+       @Override
+        public final void bindApplication(String processName, ApplicationInfo appInfo,
+                String sdkSandboxClientAppVolumeUuid, String sdkSandboxClientAppPackage,
+                ProviderInfoList providerList, ComponentName instrumentationName,
+                ProfilerInfo profilerInfo, Bundle instrumentationArgs,
+                IInstrumentationWatcher instrumentationWatcher,
+                IUiAutomationConnection instrumentationUiConnection, int debugMode,
+                boolean enableBinderTracking, boolean trackAllocation,
+                boolean isRestrictedBackupMode, boolean persistent, Configuration config,
+                CompatibilityInfo compatInfo, Map services, Bundle coreSettings,
+                String buildSerial, AutofillOptions autofillOptions,
+                ContentCaptureOptions contentCaptureOptions, long[] disabledCompatChanges,
+                SharedMemory serializedSystemFontMap,
+                long startRequestedElapsedTime, long startRequestedUptime) {
             ...
+
             AppBindData data = new AppBindData();
             data.processName = processName;
             data.appInfo = appInfo;
             ...
-            // 向应用进程主线程Handler发送BIND_APPLICATION消息，触发在应用主线程执行handleBindApplication初始化动作
+
             sendMessage(H.BIND_APPLICATION, data);
-      }
-      ...
+        }
 }
 
 frameworks/base/core/java/android/app/ActivityThread.java
@@ -1031,43 +1052,60 @@ private void handleBindApplication(AppBindData data) {
 }
 ```
 
-从上面的代码流程可以看出：AMS 服务在执行应用的 attachApplication 注册请求过程中，会用应用进程ActivityThread#IApplicationThread的 bindApplication 接口，而 bindApplication 接口函数实现中又会通过往应用主线程消息队列 post BIND_APPLICATION 消息触发执行handleBindApplication 初始化函数，从 Perfetto 看如下图所示：
+从上面的代码流程可以看出：AMS 服务在执行应用的 `attachApplication` 注册请求过程中，会用应用进程`ActivityThread#IApplicationThread` 的 `bindApplication` 接口，而 `bindApplication` 接口函数实现中又会通过往应用主线程消息队列 post `BIND_APPLICATION` 消息触发执行`handleBindApplication` 初始化函数，从 Perfetto 看如下图所示：
 
-![](/learn-android/aosp/create-app-14.png)
+![](/learn-android/aosp/app-launch-26.png)
 
-我们继续结合代码看看 handleBindApplication 的简化关键流程：
+我们继续结合代码看看 `handleBindApplication` 的简化关键流程：
 
 ```java
 frameworks/base/core/java/android/app/ActivityThread.java
 private void handleBindApplication(AppBindData data) {
     ...
+
     // 1.创建应用的LoadedApk对象
     data.info = getPackageInfoNoCheck(data.appInfo, data.compatInfo);
+
     ...
+
     // 2.创建应用Application的Context、触发Art虚拟机加载应用APK的Dex文件到内存中，并加载应用APK的Resource资源
     final ContextImpl appContext = ContextImpl.createAppContext(this, data.info);
+
     ...
+
     // 3.调用LoadedApk的makeApplication函数，实现创建应用的Application对象
-    app = data.info.makeApplication(data.restrictedBackupMode, null);
+    // If the app is being launched for full backup or restore, bring it up in
+    // a restricted environment with the base application class.
+    app = data.info.makeApplicationInner(data.restrictedBackupMode, null);
+
     ...
     // 4.执行应用Application#onCreate生命周期函数
-    mInstrumentation.onCreate(data.instrumentationArgs);
+    // Do this after providers, since instrumentation tests generally start their
+    // test thread at this point, and we don't want that racing.
+    try {
+        mInstrumentation.onCreate(data.instrumentationArgs);
+    }
+    catch (Exception e) {
+        throw new RuntimeException(
+            "Exception thrown in onCreate() of "
+            + data.instrumentationName + ": " + e.toString(), e);
+    }
     ...
 }
 ```
 
-在 ActivityThread#handleBindApplication 初始化过程中在应用主线程中主要完成如下几件事件**：
+在 `ActivityThread#handleBindApplication` 初始化过程中在应用主线程中主要完成如下几件事件**：
 
-- 根据框架传入的 ApplicationInfo 息创建应用 APK 对应的 LoadedApk 对象;
-- 创建应用 Application 的 Context 对象；
-- 创建类加载器 ClassLoader 对象并触发 Art 虚拟机执行 OpenDexFilesFromOat 动作加载应用 APK 的 Dex 文件；
-- 通过 LoadedApk 加载应用 APK 的 Resource 资源；
-- 调用 LoadedApk 的 makeApplication 函数，创建应用的 Application 对象;
-- 执行应用 Application#onCreate 生命周期函数（APP应用开发者能控制的第一行代码）;
-
-下面我们结合代码重点看看 APK Dex 文件的加载和 Resource 资源的加载流程。
+- 根据框架传入的 `ApplicationInfo` 息创建应用 APK 对应的 `LoadedApk` 对象;
+- 创建应用 `Application` 的 `Context` 对象；
+- 创建类加载器 `ClassLoader` 对象并触发 Art 虚拟机执行 `OpenDexFilesFromOat` 动作加载应用 APK 的 Dex 文件；
+- 通过 `LoadedApk` 加载应用 APK 的 Resource 资源；
+- 调用 `LoadedApk` 的 `makeApplication` 函数，创建应用的 `Application` 对象;
+- 执行应用 `Application#onCreate` 生命周期函数（APP应用开发者能控制的第一行代码）;
 
 ### 应用APK的Dex文件加载
+
+下面我们结合代码重点看看 APK Dex 文件的加载和 Resource 资源的加载流程。
 
 ```java
 frameworks/base/core/java/android/app/ContextImpl.java
@@ -1168,9 +1206,9 @@ public static ClassLoader createClassLoader(...) {
 }
 ```
 
-从以上代码可以看出：在创建Application的Context对象后会立马尝试去加载APK的Resource资源，而在这之前需要通过LoadedApk去创建类加载器ClassLoader对象，而这个过程最终就会触发Art虚拟机加载应用APK的dex文件。
+从以上代码可以看出：在创建 `Application` 的 `Context` 对象后会立马尝试去加载 APK 的 Resource 资源，而在这之前需要通过 LoadedApk 去创建类加载器 ClassLoader 对象，而这个过程最终就会触发 Art 虚拟机加载应用 APK 的 dex 文件。
 
-![](/learn-android/aosp/create-app-14.png)
+![](/learn-android/aosp/app-launch-31.png)
 
 ### 应用APK的Resource资源加载
 
@@ -1270,19 +1308,35 @@ private ApkAssets(@FormatType int format, @NonNull String path, @PropertyFlags i
 }
 ```
 
-从以上代码可以看出：系统对于应用APK文件资源的加载过程其实就是创建应用进程中的 Resources 资源对象的过程，其中真正实现 APK 资源文件的I/O解析作，最终是借助于 AssetManager 中通过 JNI 调用系统 Native 层的相关 C 函数实现。整个过程从上 Perfetto 看如下图所示：
+从以上代码可以看出：系统对于应用 APK 文件资源的加载过程其实就是创建应用进程中的 Resources 资源对象的过程，其中真正实现 APK 资源文件的 I/O 解析作，最终是借助于 `AssetManager` 中通过 JNI 调用系统 Native 层的相关 C 函数实现。整个过程从上 Perfetto 看如下图所示：
 
-![](/learn-android/aosp/create-app-15.png)
+![](/learn-android/aosp/app-launch-27.png)
 
 ## 应用 Activity 的创建与初始化
 
 ### Activity Create
 
-看看AMS在收到应用进程的attachApplication注册请求后，先通过应用及进程的IApplicationThread#bindApplication接口，触发应用进程在主线程执行 handleBindApplication 初始化操作，然后继续执行启动应用 Activity 的操作，下面我们来看看系统是如何启动创建应用 Activity 的，简化代码流程如下：
+看看AMS在收到应用进程的 `attachApplication` 注册请求后，先通过应用及进程的 `IApplicationThread#bindApplication` 接口，触发应用进程在主线程执行 `handleBindApplication` 初始化操作，然后继续执行启动应用 `Activity` 的操作，下面我们来看看系统是如何启动创建应用 `Activity` 的，简化代码流程如下：
 
-![](/learn-android/aosp/create-app-16.png)
+![](/learn-android/aosp/app-launch-28.png)
 
 ```java
+frameworks/base/services/core/java/com/android/server/am/ActivityManagerService.java
+private boolean attachApplicationLocked(@NonNull IApplicationThread thread,
+        int pid, int callingUid, long startSeq) {
+
+    ...
+    // See if the top visible activity is waiting to run in this process...
+    if (normalMode) {
+        try {
+            didSomething = mAtmInternal.attachApplication(app.getWindowProcessController());
+        } catch (Exception e) {
+            Slog.wtf(TAG, "Exception thrown launching activities in " + app, e);
+            badApp = true;
+        }
+    }
+}
+
 frameworks/base/services/core/java/com/android/server/wm/ActivityTaskManagerService.java
 public boolean attachApplication(WindowProcessController wpc) throws RemoteException {
     synchronized (mGlobalLockWithoutBoost) {
@@ -1413,7 +1467,7 @@ public boolean test(ActivityRecord r) {
     return false;
 }
 
-realStartActivityLocked:769, ActivityTaskSupervisor (com.android.server.wm)
+frameworks/base/services/core/java/com/android/server/wm/ActivityTaskSupervisor.java
 boolean realStartActivityLocked(ActivityRecord r, WindowProcessController proc,
             boolean andResume, boolean checkConfig) throws RemoteException {
          ...
@@ -1433,11 +1487,11 @@ boolean realStartActivityLocked(ActivityRecord r, WindowProcessController proc,
 }
 ```
 
-从以上代码分析可以看到，框架 system_server 进程最终是通过 ActivityStackSupervisor#realStartActivityLocked 函数中，通过 LaunchActivityItem 和 ResumeActivityItem 两个类的封装，依次实现 binder 调用通知应用进程这边执行 Activity 的 Launch 和 Resume 动作的，我们继续往下看相关代码流程：
+从以上代码分析可以看到，框架 system_server 进程最终是通过   `ActivityStackSupervisor#realStartActivityLocked` 函数中，通过 `LaunchActivityItem` 和 `ResumeActivityItem` 两个类的封装，依次实现 binder 调用通知应用进程这边执行 `Activity` 的 `Launch` 和 `Resume` 动作的，我们继续往下看相关代码流程：
 
 ```java
 
-core/java/android/app/servertransaction/LaunchActivityItem.java
+frameworks/base/core/java/android/app/servertransaction/LaunchActivityItem.java
 public void execute(ClientTransactionHandler client, IBinder token,
         PendingTransactionActions pendingActions) {
     Trace.traceBegin(TRACE_TAG_ACTIVITY_MANAGER, "activityStart");
@@ -1450,10 +1504,7 @@ public void execute(ClientTransactionHandler client, IBinder token,
     Trace.traceEnd(TRACE_TAG_ACTIVITY_MANAGER);
 }
 
-/**
- * Extended implementation of activity launch. Used when server requests a launch or relaunch.
- */
-core/java/android/app/ActivityThread.java
+frameworks/base/core/java/android/app/ActivityThread.java
 public Activity handleLaunchActivity(ActivityClientRecord r,
         PendingTransactionActions pendingActions, Intent customIntent) {
     ...
@@ -1465,7 +1516,7 @@ public Activity handleLaunchActivity(ActivityClientRecord r,
     return a;
 }
 
-    /**  Core implementation of activity launch. */
+frameworks/base/core/java/android/app/ActivityThread.java
 private Activity performLaunchActivity(ActivityClientRecord r, Intent customIntent) {
         ...
         // 1.创建Activity的Context
@@ -1509,7 +1560,7 @@ final void attach(...) {
     ...
 }
 
-
+frameworks/base/core/java/android/app/Instrumentation.java
 public void callActivityOnCreate(Activity activity, Bundle icicle) {
     ...
 
@@ -1518,12 +1569,7 @@ public void callActivityOnCreate(Activity activity, Bundle icicle) {
     ...
 }
 
-core/java/android/app/Activity.java
-final void performCreate(Bundle icicle) {
-    performCreate(icicle, null);
-}
-
-core/java/android/app/Activity.java
+frameworks/base/core/java/android/app/Activity.java
 final void performCreate(Bundle icicle, PersistableBundle persistentState) {
     if (Trace.isTagEnabled(Trace.TRACE_TAG_WINDOW_MANAGER)) {
         Trace.traceBegin(Trace.TRACE_TAG_WINDOW_MANAGER, "performCreate:"
@@ -1546,18 +1592,17 @@ final void performCreate(Bundle icicle, PersistableBundle persistentState) {
 
 从上面代码可以看出，应用进程这边在收到系统 binder 调用后，在主线程中创建 Activity 的流程主要步骤如下：
 
-- 创建Activity的Context；
-- 通过反射创建Activity对象；
-- 执行Activity的attach动作，其中会创建应用窗口的PhoneWindow对象并设置WindowManage；
-- 执行应用Activity的onCreate生命周期函数，并在setContentView中创建窗口的DecorView对象；
+- 创建 `Activity` 的 `Context`；
+- 通过反射创建 `Activity` 对象；
+- 执行 `Activity`的 `attach` 动作，其中会创建应用窗口的`PhoneWindow` 对象并设置`WindowManager`；
+- 执行应用 `Activity` 的 `onCreate` 生命周期函数，并在 `setContentView` 中创建窗口的 `DecorView` 对象；
 
-![](/learn-android/aosp/create-app-16.png)
+![](/learn-android/aosp/app-launch-29.png)
 
 ### Activity Resume
 
 ```java
 frameworks/base/core/java/android/app/servertransaction/ResumeActivityItem.java
-@Override
 public void execute(ClientTransactionHandler client, IBinder token,
             PendingTransactionActions pendingActions) {
    // 原生标识Activity Resume的systrace tag
@@ -1568,11 +1613,15 @@ public void execute(ClientTransactionHandler client, IBinder token,
 }
 
 frameworks/base/core/java/android/app/ActivityThread.java
- @Override
 public void handleResumeActivity(...){
     ...
     // 1.执行performResumeActivity流程,执行应用Activity的onResume生命周期函数
-    final ActivityClientRecord r = performResumeActivity(token, finalStateRequest, reason);
+    // TODO Push resumeArgs into the activity for consideration
+    // skip below steps for double-resume and r.mFinish = true case.
+    if (!performResumeActivity(r, finalStateRequest, reason)) {
+        return;
+    }
+    
     ...
     if (r.window == null && !a.mFinished && willBeVisible) {
             ...
@@ -1589,7 +1638,7 @@ public void handleResumeActivity(...){
     ...
 }
 
-core/java/android/app/ActivityThread.java
+frameworks/base/core/java/android/app/ActivityThread.java
 public boolean performResumeActivity(ActivityClientRecord r, boolean finalStateRequest,
         String reason) {
     ...
@@ -1604,7 +1653,7 @@ public boolean performResumeActivity(ActivityClientRecord r, boolean finalStateR
     return true;
 }
 
-core/java/android/view/WindowManagerImpl.java
+frameworks/base/core/java/android/view/WindowManagerImpl.java
 public void addView(@NonNull View view, @NonNull ViewGroup.LayoutParams params) {
     mGlobal.addView(view, params, mContext.getDisplayNoVerify(), mParentWindow,
             mContext.getUserId());
@@ -1644,7 +1693,7 @@ public void addView(View view, ViewGroup.LayoutParams params,
     }
 }
 
-core/java/android/view/ViewRootImpl.java
+frameworks/base/core/java/android/view/ViewRootImpl.java
 public void setView(View view, WindowManager.LayoutParams attrs, View panelParentView,
         int userId) {
     synchronized (this) {
@@ -1675,9 +1724,9 @@ public void setView(View view, WindowManager.LayoutParams attrs, View panelParen
 
 从 Perfetto 上看整个过程如下图所示：
 
-![](/learn-android/aosp/create-app-18.png)
+![](/learn-android/aosp/app-launch-30.png)
 
-## 应用 layout 与 draw
+## 应用 布局与绘制
 
 接上一节的分析，应用主线程中在执行Activity的Resume流程的最后，会创建ViewRootImpl对象并调用其setView函数，从此并开启了应用界面UI布局与绘制的流程。在开始讲解这个过程之前，我们先来整理一下前面代码中讲到的这些概念，如Activity、PhoneWindow、DecorView、ViewRootImpl、WindowManager它们之间的关系与职责，因为这些核心类基本构成了Android系统的GUI显示系统在应用进程侧的核心架构，其整体架构如下图所示：
 
