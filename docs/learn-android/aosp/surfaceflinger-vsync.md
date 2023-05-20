@@ -1715,7 +1715,7 @@ void EventThreadConnection::onFirstRef() {
 
 - 然后 EventThreadConnection 初始化好之后，在第一次引用调用的时候，会把自己注册到 EventThread 的集合中 mDisplayEventConnections。
 
-### Vsync-app 的申请和发射
+### VSYNC-app 的申请
 
 接下来我们主要讲解app怎么向SurfaceFlinger申请Vsync-app的，然后Vsync-app的信号怎么发射到应用的。
 
@@ -1901,7 +1901,7 @@ EventThread的线程函数循环调用，一方面检测是否有Vsync信号发�
 
 - 如果有app申请了Vsync，但是没有接受到Vsync事件，可能是把之前的Vsync关了，所以要从新打开，并坐等下次Vsync的到来，但是为了保证安全，不能死等，所以设置一个timeout的时间。
 
-### setVsyncEnabled
+### VSYNC-app 的发射
 
 这个方法是开关Vsync-app信号的函数，从这个函数的实现，是间接调用mCallbackRepeater的start和stop方法。而CallbackRepeater是在创建DispSyncSource对象构造方法中创建的。
 
