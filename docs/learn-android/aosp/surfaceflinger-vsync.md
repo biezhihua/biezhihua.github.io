@@ -16,62 +16,62 @@ tag:
 
 ## 导读
 
-Vsync信号是SurfaceFlinger进程中核心的一块逻辑，我们主要从以下几个方面着手讲解。
+Vsync 信号是 SurfaceFlinger 进程中核心的一块逻辑，我们主要从以下几个方面着手讲解。
 
 - 软件Vsync是怎么实现的，它是如何保持有效性的？
-- systrace中看到的VSYNC信号如何解读，这些脉冲信号是在哪里打印的？
-- 为什么VSYNC-sf / VSYNC-app 时断时续？
-- SF请求VSYNC-SF信号进行合成的流程是怎样的？
+- Perfetto 中看到的 VSYNC 信号如何解读，这些脉冲信号是在哪里打印的？
+- 为什么 VSYNC-sf / VSYNC-app 时断时续？
+- SF 请求 VSYNC-SF 信号进行合成的流程是怎样的？
 - “dumpsys SurfaceFlinger --dispsync"命令输出如何解读？
+
+![](/learn-android/aosp/surfaceflinger-vsync-6.png)
 
 ## VSYNC 信号
 
-当前手机屏幕显示屏大部分都是60Hz（也有一部分是90Hz/120Hz/165Hz）,意味着显示屏每隔16.66毫秒刷新一次，如果在显示屏刷新时刻去更新显示的内容，就会导致屏幕撕裂（其中还有掉帧问题，就是连续的两个刷新周期，显示屏只能显示同一帧图像，具体请查询Android黄油计划），为了避免这种情况，我们在显示屏幕两次刷新之间的空档期去更新显示内容，当可以安全的更新内容时，系统会收到显示屏发来的信号，处于历史原因，我们称之为VSYNC信号。
+当前手机屏幕显示屏大部分都是60Hz（也有一部分是90Hz/120Hz/165Hz），意味着显示屏每隔16.66毫秒刷新一次，如果在显示屏刷新时刻去更新显示的内容，就会导致屏幕撕裂（其中还有掉帧问题，就是连续的两个刷新周期，显示屏只能显示同一帧图像，具体请查询Android黄油计划），为了避免这种情况，我们在显示屏幕两次刷新之间的空档期去更新显示内容，当可以安全的更新内容时，系统会收到显示屏发来的信号，处于历史原因，我们称之为VSYNC信号。
 
-### 硬件VSYNC和软件VSYNC
+### 硬件 VSYNC 和软件 VSYNC
 
 通过 Perfetto 来认识VSYNC
 
 ![](/learn-android/aosp/surfaceflinger-vsync-1.png)
 
-- 因为我们只有一个显示屏，所以只有一个硬件VSYNC，即HW_VSYNC。HW_VSYNC_displayid脉冲的宽度是16ms，因此显示屏的帧率是60Hz。
+- 因为我们只有一个显示屏，所以只有一个硬件 VSYNC，即 HW_VSYNC。HW_VSYNC_{displayid} 脉冲的宽度是16ms，因此显示屏的帧率是60Hz。
 
-- HW_VSYNC_ON_displayid表示硬件VSYNC是否打开。可见硬件VSYNC大部分时间是关闭的，只有在特殊场景下才会打开（比如更新SW VSYNC模型的时候）,displayId在sf中标识这个显示屏的唯一字符串。
+- HW_VSYNC_ON_{displayid} 表示硬件 VSYNC 是否打开。可见硬件VSYNC大部分时间是关闭的，只有在特殊场景下才会打开（比如更新 SW VSYNC 模型的时候），displayId 是在 sf 中标识这个显示屏的唯一字符串。
 
-- App的绘制以及SF的合成分别由对应的软件VSYNC来驱动的：VSYNC-app驱动App进行绘制；VSYNC-sf驱动SF对相关的Layer进行合成。
+- App 的绘制以及 SF 的合成分别由对应的软件 VSYNC 来驱动的：VSYNC-app 驱动 App 进行绘制；VSYNC-sf 驱动 SF 对相关的 Layer 进行合成。
 
-- VSYNC-app与VSYNC-sf是”按需发射“的，如果App要更新界面，它得”申请“VSYNC-app，如果没有App申请VSYNC-app，那么VSYNC-app将不再发射。同样，当App更新了界面，它会把对应的Graphic Buffer放到Buffer Queue中。Buffer Queue通知SF进行合成，此时SF会申请VSYNC-sf。如果SF不再申请VSYNC-sf，VSYNC-sf将不再发射。注意，默认情况下这些申请都是一次性的，意味着，如果App要持续不断的更新，它就得不断去申请VSYNC-app；而对SF来说，只要有合成任务，它就得再去申请VSYNC-sf。
+- VSYNC-app 与 VSYNC-sf 是 **“按需发射”** 的，如果 App 要更新界面，它得“申请” VSYNC-app ，如果没有 App 申请 VSYNC-app ，那么 VSYNC-app 将不再发射。同样，当 App 更新了界面，它会把对应的 Graphic Buffer 放到 Buffer Queue 中。Buffer Queue 通知 SF 进行合成，此时 SF 会申请 VSYNC-sf 。如果 SF 不再申请 VSYNC-sf ，VSYNC-sf 将不再发射。注意，默认情况下这些申请都是一次性的，意味着，如果 App 要持续不断的更新，它就得不断去申请 VSYNC-app ；而对 SF 来说，只要有合成任务，它就得再去申请 VSYNC-sf。
 
-- VSYNC-app与VSYNC-sf是相互独立的。VSYNC-app触发App的绘制，Vsync-sf触发SF合成。App绘制与SF合成都会加大CPU的负载，为了避免绘制与合成打架造成的性能问题，VSYNC-app可以与VSYNC-sf稍微错开一下，像下图一样：
+- VSYNC-app 与 VSYNC-sf 是相互独立的。VSYNC-app 触发 App 的绘制，Vsync-sf 触发 SF 合成。App 绘制与 SF 合成都会加大 CPU 的负载，为了避免绘制与合成打架造成的性能问题，VSYNC-app 可以与 VSYNC-sf 稍微错开一下，像下图一样：
 
 ![](/learn-android/aosp/surfaceflinger-vsync-2.png)
 
-- 从我们抓的systrace中也可看到这种偏移，但是要注意：systrace中VSYNC脉冲，上升沿与下降沿各是一次VSYNC信号。这里的高、低电平只是一种示意，如果要查看VSYNC-app与VSYNC-sf的偏移，不能错误的以为“同是上升沿或者同是下降沿进行比对”。忘记上升沿或者下降沿吧，只需拿两个人相邻的VSYNC信号进行比对。如下图所示，VSYNC-app领先VSYNC-sf有85微秒。不过要注意，这个85微秒只是软件误差，算不得数，在我们的系统中，VSYNC-app与VSYNC-sf并没有错开。有必要再补充下：SF进行合成的是App的上一帧，而App当前正在绘制的那一帧，要等到下一个VSYNC-sf来临时再进行合成。
+- 从我们抓的 Perfetto 中也可看到这种偏移，但是要注意： Perfetto 中 VSYNC 脉冲，上升沿与下降沿各是一次 VSYNC 信号。这里的高、低电平只是一种示意，如果要查看 VSYNC-app 与 VSYNC-sf 的偏移，不能错误的以为“同是上升沿或者同是下降沿进行比对”。忘记上升沿或者下降沿吧，只需拿两个人相邻的 VSYNC 信号进行比对。如下图所示，VSYNC-app 领先 VSYNC-sf 有85微秒。不过要注意，这个85微秒只是软件误差，算不得数，在我们的系统中，VSYNC-app 与 VSYNC-sf 并没有错开。有必要再补充下：SF 进行合成的是 App 的上一帧，而 App 当前正在绘制的那一帧，要等到下一个 VSYNC-sf 来临时再进行合成。
 
 ### 与VSYNC相关的线程
 
-抓了好几份systrace，都没有显示出线程的名字，按照后面讲解代码中的理解，我用679手机查看SurfaceFlinger进程的线程信息，大概列出和VSYNC相关的线程名字。
+- TimerDispatch 线程：TimerDispatch 充当软件 VSYNC 的信号泵，这个线程包装成 VsyncDispatchTimeQueue 这个类，里面有一个 Callback Map 变量，存放的是那些关心 VSYNC 信号的人（appEventThread, appSfEventThread, sf的MessageQueue），TimerDispatch 就是根据模型计算的唤醒时间对着它们发送 SW VSYNC。
 
-- TimerDispatch线程： TimerDispatch充当软件VSYNC的信号泵，这个线程包装成VsyncDispatchTimeQueue这个类，里面有一个CallbackMap变量，存放的是那些关心VSYNC信号的人（appEventThread, appSfEventThread, sf的MessageQueue），TimerDispatch就是根据模型计算的唤醒时间对着它们发送SW VSYNC。
+- appEventThread 线程：它是 EventThread 类型的实例，它是 VSYNC-app 寄宿的线程。很明显，它就是 VSYNC-app 的掌门人。一方面，它接收 App 对 VSYNC-app 的请求，如果没有 App 请求 VSYNC-app，它就进入休眠；另一方面，它接收 TimerDispatch 发射过来 VSYNC-app，控制 App 的绘制。
 
-- appEventThread线程：它是EventThread类型的实例，它是VSYNC-app寄宿的线程。很明显，它就是VSYNC-app的掌门人。一方面，它接收App对VSYNC-app的请求，如果没有App请求VSYNC-app，它就进入休眠；另一方面，它接收TimerDispatch发射过来VSYNC-app，控制App的绘制。
+- appSfEventThread 线程：它是 EventThread 类型的实例，它是 VSYNC-appSf 寄宿的线程，和 appEventThread 线程功能是类似的，用于调试代码，暂时忽略。
 
-- appSfEventThread线程：它是EventThread类型的实例，它是VSYNC-appSf寄宿的线程，和appEventThread线程功能是类似的，用于调试代码，暂时忽略。
-
-- MessageQueue（表示主线程）： 它是VSYNC-sf寄宿的线程，很明显，它就是VSYNC-sf的掌门人，不过它专给SF一个人服务。一方面，如果SF有合成需求，会向它提出申请；另一方面，它接收TimerDispatch发射过来的VSYNC-sf，控制SF的合成。
+- MessageQueue（表示主线程）： 它是 VSYNC-sf 寄宿的线程，很明显，它就是 VSYNC-sf 的掌门人，不过它专给 SF 一个人服务。一方面，如果 SF 有合成需求，会向它提出申请；另一方面，它接收 TimerDispatch 发射过来的 VSYNC-sf，控制 SF 的合成。
 
 HW VSYNC/SW VSYNC/VSYNC/VSYNC-app与VSYNC-SF的关联可以用一个PLL图来表示：
 
 ![](/learn-android/aosp/surfaceflinger-vsync-3.png)
 
-### VSYNC信号从哪里开始初始化的？
+### VSYNC 信号从哪里开始初始化的？
 
-因为Android大版本每次更新，SurfaceFlinger模块都要进行代码重构，，所以我们就从Android 13代码的源头开始讲起。
+因为 Android 大版本每次更新，SurfaceFlinger 模块都要进行代码重构，所以我们就从 Android 13 代码的源头开始讲起。
 
-我们在讲解SurfaceFlinger::init方法的时候，init会去初始化HWComposer并注册回调函数，如下：
+我们在讲解 SurfaceFlinger::init 方法的时候，init 会去初始化 HWComposer 并注册回调函数，如下：
 
 ```c++
-// frameworks/native/services/surfaceflinger/surfaceflinger.rc
+frameworks/native/services/surfaceflinger/surfaceflinger.rc
 
 service surfaceflinger /system/bin/surfaceflinger
     class core animation
@@ -84,25 +84,6 @@ service surfaceflinger /system/bin/surfaceflinger
     socket pdx/system/vr/display/manager    stream 0666 system graphics u:object_r:pdx_display_manager_endpoint_socket:s0
     socket pdx/system/vr/display/vsync      stream 0666 system graphics u:object_r:pdx_display_vsync_endpoint_socket:s0
 
-`surfaceflinger.rc` 是一个 Android init 脚本，用于定义 SurfaceFlinger 服务的配置。SurfaceFlinger 是 Android 系统的核心组件，负责合成和显示图形。该文件定义了 SurfaceFlinger 服务的启动方式和权限。现在让我们分析文件的每一行内容：
-
-1. `service surfaceflinger /system/bin/surfaceflinger`定义一个名为 "surfaceflinger" 的服务，它的可执行文件位于 `/system/bin/surfaceflinger`。
-
-2. `class core animation`将 SurfaceFlinger 服务分配到 "core" 和 "animation" 类别。这些类别用于在特定条件下控制服务的启动和关闭。
-
-3. `user system`设置 SurfaceFlinger 服务运行在 "system" 用户上下文中。
-
-4. `group graphics drmrpc readproc`将 SurfaceFlinger 服务的组设置为 "graphics"、"drmrpc" 和 "readproc"。这些组定义了服务的权限。
-
-5. `capabilities SYS_NICE`赋予 SurfaceFlinger 服务 SYS\_NICE 功能。这允许服务更改其调度优先级，以便在需要时获得更多 CPU 时间。
-
-6. `onrestart restart --only-if-running zygote`如果 SurfaceFlinger 服务重启，该行命令会尝试重启名为 "zygote" 的服务。`--only-if-running` 参数确保仅在 "zygote" 服务已运行时执行重启操作。
-
-7. `task_profiles HighPerformance`为 SurfaceFlinger 服务分配 "HighPerformance" 任务配置文件。这可能会调整服务的性能参数。
-
-8-10. `socket pdx/...`这三行定义了 SurfaceFlinger 服务用于与客户端通信的 UNIX 域套接字。套接字的权限、所有者和安全上下文在这些行中定义。
-
-总之，`surfaceflinger.rc` 文件定义了 SurfaceFlinger 服务的启动配置、权限和通信方式。这个文件在 Android 系统启动时被 init 进程读取，用于正确地启动和运行 SurfaceFlinger 服务。
 ```
 
 ```c++
@@ -148,9 +129,10 @@ sp<SurfaceFlinger> createSurfaceFlinger() {
 }
 ```
 
-我们在讲解SurfaceFlinger::init方法的时候，init会去初始化HWComposer并注册回调函数，如下：
+我们在讲解 SurfaceFlinger::init 方法的时候，init 会去初始化 HWComposer 并注册回调函数，如下：
 
 ```C++
+frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp
 // Do not call property_set on main thread which will be blocked by init
 // Use StartPropertySetThread instead.
 void SurfaceFlinger::init() {
@@ -164,14 +146,13 @@ void SurfaceFlinger::init() {
 }
 ```
 
-- 创建一个HWComposer对象并传入一个name属性，再把该对象设置到mCompositionEngine中。
-- 这里的this就是SurfaceFlinger本身，它实现了HWC2::ComposerCallback回调方法。
+- 创建一个 HWComposer 对象并传入一个 name 属性，再把该对象设置到m CompositionEngine 中。
+- 这里的 this 就是 SurfaceFlinger 本身，它实现了 HWC2::ComposerCallback 回调方法。
 
-定义ComposerCallback回调方法:
+定义 ComposerCallback 回调方法:
 
 ```c++
 /frameworks/native/services/surfaceflinger/DisplayHardware/HWC2.h
-
 struct ComposerCallback {
     virtual void onComposerHalHotplug(hal::HWDisplayId, hal::Connection) = 0;
     virtual void onComposerHalRefresh(hal::HWDisplayId) = 0;
@@ -180,17 +161,13 @@ struct ComposerCallback {
     virtual void onComposerHalVsyncPeriodTimingChanged(hal::HWDisplayId,
                                                        const hal::VsyncPeriodChangeTimeline&) = 0;
     virtual void onComposerHalSeamlessPossible(hal::HWDisplayId) = 0;
-
-protected:
-    ~ComposerCallback() = default;
 };
 ```
 
-根据HWC2::ComposerCallback的设计逻辑，SurfaceFlinger::init方法中设置完HWC的回调之后，会立刻收到一个Hotplug事件，并在SurfaceFlinger::onComposerHalHotplug中去处理，所以流程就走到了：
+根据 HWC2::ComposerCallback 的设计逻辑，SurfaceFlinger::init 方法中设置完 HWC 的回调之后，会立刻收到一个 Hotplug 事件，并在 SurfaceFlinger::onComposerHalHotplug 中去处理，所以流程就走到了：
 
 ```c++
 /frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp
-    
 void SurfaceFlinger::onComposerHalHotplug(hal::HWDisplayId hwcDisplayId, hal::Connection connection) {
   ...
     if (std::this_thread::get_id() == mMainThreadId) {
@@ -201,11 +178,10 @@ void SurfaceFlinger::onComposerHalHotplug(hal::HWDisplayId hwcDisplayId, hal::Co
 }
 ```
 
-继续分析processDisplayHotplugEventsLocked的方法
+继续分析 processDisplayHotplugEventsLocked 的方法
 
 ```c++
 /frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp
-
 void SurfaceFlinger::processDisplayHotplugEventsLocked() {
     for (const auto& event : mPendingHotplugEvents) {
 
@@ -216,7 +192,6 @@ void SurfaceFlinger::processDisplayHotplugEventsLocked() {
 
     mPendingHotplugEvents.clear();
 }
-
 
 
 void SurfaceFlinger::processDisplayChangesLocked() {
@@ -254,7 +229,7 @@ oid SurfaceFlinger::processDisplayAdded(const wp<IBinder>& displayToken,
 }
 ```
 
-就会走到了initScheduler方法，这个方法就是初始化VSYNC信号的函数。
+就会走到了 initScheduler 方法，这个方法就是初始化VSYNC信号的函数。
 
 ```c++
 /frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp
@@ -337,67 +312,103 @@ void SurfaceFlinger::initScheduler(const sp<DisplayDevice>& display) {
 
 ```
 
-- 先判断mScheduler是否为空，避免重复初始化。
+- 先判断 mScheduler 是否为空，避免重复初始化。
 
-- 初始化mRefreshRateConfigs对象，这个对象包含了刷新率的配置信息，包含当前屏幕的刷新率，刷新周期等信息。
+- 初始化 mRefreshRateConfigs 对象，这个对象包含了刷新率的配置信息，包含当前屏幕的刷新率，刷新周期等信息。
 
-- currRefreshRate是一个Fps对象，其中存储了刷新率fps和刷新周期period。
-
-- 初始化mVsyncConfiguration对象，这个类封装了不同刷新率下的Vsync配置信息，app phase就是VSYNC-app的偏移量，sf phase是VSYNC-sf的偏移量。这个类会再创建appEventThread或者sf的回调函数中把偏移量传递进去，主要是为了计算SW VSYNC唤醒VSYNC-app或者VSYNC-sf的时间，这个类可以通过属性进行配置，代码实现中也固定了部分参数。
-
-初- 始化Scheduler对象 mScheduler，这个类的构造函数中，初始化了 VsyncSchedule这个结构体，该结构体里面的三个对象都非常重要，dispatch就是TimerDispatcher的线程，也就是VYSNC信号的节拍器（心跳），其他两个对象是为dispatch服务的。
-
-- 创建appEventThread和appSfEventThread，appEventThread/appSfEventThread就是上面说的这个线程，同步绑定回调函数到VsyncDispatch上面，名字是"app","appSf","sf"。
-
-- mEventQueue的initVsync方法主要是绑定一个回调函数到VsyncDispatch上面，回调名字是"sf"。
+- currRefreshRate 是一个 Fps 对象，其中存储了刷新率fps和刷新周期period。
 
 ```c++
+frameworks/native/services/surfaceflinger/Scheduler/include/scheduler/Fps.h
+// Frames per second, stored as floating-point frequency. Provides conversion from/to period in
+// nanoseconds, and relational operators with precision threshold.
+//
+//     const Fps fps = 60_Hz;
+//
+//     using namespace fps_approx_ops;
+//     assert(fps == Fps::fromPeriodNsecs(16'666'667));
+//
+class Fps {
+    ...
+};
+```
+
+- 初始化 mVsyncConfiguration 对象，这个类封装了不同刷新率下的 Vsync 配置信息，vsyncPhaseOffsetNs 就是 VSYNC-app 的偏移量，sfVSyncPhaseOffsetNs 是 VSYNC-sf 的偏移量。这个类会再创建 appEventThread 或者 sf 的回调函数中把偏移量传递进去，主要是为了计 算SW VSYNC 唤醒 VSYNC-app 或者 VSYNC-sf 的时间，这个类可以通过属性进行配置，代码实现中也固定了部分参数。
+
+```c++
+frameworks/native/services/surfaceflinger/SurfaceFlingerDefaultFactory.cpp
+std::unique_ptr<scheduler::VsyncConfiguration> DefaultFactory::createVsyncConfiguration(
+        Fps currentRefreshRate) {
+    if (property_get_bool("debug.sf.use_phase_offsets_as_durations", false)) {
+        return std::make_unique<scheduler::impl::WorkDuration>(currentRefreshRate);
+    } else {
+        return std::make_unique<scheduler::impl::PhaseOffsets>(currentRefreshRate);
+    }
+}
+
+frameworks/native/services/surfaceflinger/Scheduler/VsyncConfiguration.cpp
+PhaseOffsets::PhaseOffsets(Fps currentRefreshRate)
+      : PhaseOffsets(currentRefreshRate, sysprop::vsync_event_phase_offset_ns(1000000),
+                     sysprop::vsync_sf_event_phase_offset_ns(1000000),
+                     ...) {}
+```
+
+- 初始化 Scheduler 对象 mScheduler，这个类的构造函数中，初始化了 VsyncSchedule 这个结构体，该结构体里面的三个对象都非常重要，dispatch 就是 TimerDispatcher 的线程，也就是 VSYNC 信号的节拍器（心跳），其他两个对象是为 dispatch 服务的。
+
+```c++
+frameworks/native/services/surfaceflinger/Scheduler/Scheduler.cpp
+class Scheduler : impl::MessageQueue {
+    using Impl = impl::MessageQueue;
+
+    std::optional<VsyncSchedule> mVsyncSchedule;
+}
+
+frameworks/native/services/surfaceflinger/Scheduler/Scheduler.cpp
+void Scheduler::createVsyncSchedule(FeatureFlags features) {
+    mVsyncSchedule.emplace(features);
+}
+
+frameworks/native/services/surfaceflinger/Scheduler/VsyncSchedule.h
 // Schedule that synchronizes to hardware VSYNC of a physical display.
 class VsyncSchedule {
-public:
-    explicit VsyncSchedule(FeatureFlags);
-    VsyncSchedule(VsyncSchedule&&);
-    ~VsyncSchedule();
-
-    // TODO(b/185535769): Hide behind API.
-    const VsyncTracker& getTracker() const { return *mTracker; }
-    VsyncTracker& getTracker() { return *mTracker; }
-    VsyncController& getController() { return *mController; }
-
-    // TODO(b/185535769): Remove once VsyncSchedule owns all registrations.
-    VsyncDispatch& getDispatch() { return *mDispatch; }
-
-    void dump(std::string&) const;
-
-private:
-    friend class TestableScheduler;
-
-    using TrackerPtr = std::unique_ptr<VsyncTracker>;
-    using DispatchPtr = std::unique_ptr<VsyncDispatch>;
-    using ControllerPtr = std::unique_ptr<VsyncController>;
-
-    // For tests.
-    VsyncSchedule(TrackerPtr, DispatchPtr, ControllerPtr);
-
-    static TrackerPtr createTracker();
-    static DispatchPtr createDispatch(VsyncTracker&);
-    static ControllerPtr createController(VsyncTracker&, FeatureFlags);
-
-    class PredictedVsyncTracer;
-    using TracerPtr = std::unique_ptr<PredictedVsyncTracer>;
-
-    // Effectively const except in move constructor.
     TrackerPtr mTracker;
     DispatchPtr mDispatch;
     ControllerPtr mController;
     TracerPtr mTracer;
 };
-
 ```
 
-那么从上面的代码逻辑中，我们可以知道节拍器线程（心跳）一共绑定了3个Callback，分别是"app" ,"appSf","sf"。
+- 创建 appEventThread 和 appSfEventThread ， appEventThread/appSfEventThread 就是上面说的这个线程，同步绑定回调函数到 VsyncDispatch 上面，名字是 "app","appSf","sf"。
 
-## VSYNC-sf/VSYNC-app的申请与投递
+```c++
+void SurfaceFlinger::initScheduler(const sp<DisplayDevice>& display) {
+    ...
+
+    mAppConnectionHandle =
+            mScheduler->createConnection("app", mFrameTimeline->getTokenManager(),
+                                         /*workDuration=*/configs.late.appWorkDuration,
+                                         /*readyDuration=*/configs.late.sfWorkDuration,
+                                         impl::EventThread::InterceptVSyncsCallback());
+    mSfConnectionHandle =
+            mScheduler->createConnection("appSf", mFrameTimeline->getTokenManager(),
+                                         /*workDuration=*/std::chrono::nanoseconds(vsyncPeriod),
+                                         /*readyDuration=*/configs.late.sfWorkDuration,
+                                         [this](nsecs_t timestamp) {
+                                             mInterceptor->saveVSyncEvent(timestamp);
+                                         });
+
+    mScheduler->initVsync(mScheduler->getVsyncDispatch(), *mFrameTimeline->getTokenManager(),
+                          configs.late.sfWorkDuration);
+
+    ...
+}
+```
+
+- mEventQueue 的 initVsync 方法主要是绑定一个回调函数到VsyncDispatch 上面，回调名字是 "sf"。
+
+那么从上面的代码逻辑中，我们可以知道节拍器线程（心跳）一共绑定了3个 Callback，分别是 "app" , "appSf" , "sf"。
+
+## VSYNC-sf 与 VSYNC-app 的申请与投递
 
 我们先看看通道的建立过程，也是从源代码开始看起。
 
@@ -491,7 +502,7 @@ VsyncSchedule::ControllerPtr VsyncSchedule::createController(VsyncTracker& track
 
 这边我们把这几个类图的关系画出来，如下：
 
-![](/learn-android/aosp/surfaceflinger-vsync-4.webp)
+![](/learn-android/aosp/surfaceflinger-vsync-4.png)
 
 VsyncDispatchTimerQueue是继承VsyncDispatch，而节拍器（心跳）线程也就是该对象中的mTimeKeeper，这个Timer.cpp中会创建TimerDispatch这个名字的线程。
 
@@ -2291,7 +2302,7 @@ bool VSyncPredictor::addVsyncTimestamp(nsecs_t timestamp) {
 
 由于很多现象需要多个因素做全面分析，只有当众多因素中确实存在一个对因变量影响作用明显高于其他因素的变量，才能将它作为自变量，应用一元相关的回归分析进行预测，而谷歌采用的是回归算法中的最小二乘法。
 
-![](/learn-android/aosp/surfaceflinger-vsync-5.webp)
+![](/learn-android/aosp/surfaceflinger-vsync-5.png)
 
 在这个方程式中，b就是回归系数，a就是截距。
 
