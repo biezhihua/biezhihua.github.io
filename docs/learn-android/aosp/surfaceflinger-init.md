@@ -4,20 +4,37 @@ tag:
   - aosp
 ---
 
-# Android | AOSP | SurfaceFlinger模块
+# Android | AOSP | SurfaceFlinger模块 | 转载&加工
 
 ## 前言1
 
 转载自：<https://www.jianshu.com/p/db6f62f70ed1> ，并结合Perfetto更新了部分内容。
 
-SurfaceFlinger是一个系统服务，作用就是接受不同layer的buffer数据进行合成，然后发送到显示设备进行显示。
+## 前言2
 
-SurfaceFlinger进程是什么时候起来的？
+源码版本：android-13.0.0_r41
 
-在之前的Android低版本手机上，SurfaceFlinger进程是在init.rc中启动的，在最新的高版本上SurfaceFlinger进程并不是直接在init.rc文件中启动的，而是通过Android.bp去启动surfaceflinger.rc文件，然后解析文件内容启动SurfaceFlinger进程。
+## surfaceflinger 进程的启动
+
+`SurfaceFlinger` 是一个系统服务，作用就是接受不同 layer 的 buffer 数据进行合成，然后发送到显示设备进行显示。
+
+`surfaceflinger` 进程是什么时候起来的？
+
+在最新的高版本上是通过 `Android.bp` 去启动 `surfaceflinger.rc` 文件，然后解析文件内容启动 `SurfaceFlinger` 进程。
+
+```c++
+frameworks/native/services/surfaceflinger/Android.bp
+cc_binary {
+    name: "surfaceflinger",
+    defaults: ["libsurfaceflinger_binary"],
+    init_rc: ["surfaceflinger.rc"],
+    ...
+}
+```
 
 ```c++
 frameworks/native/services/surfaceflinger/surfaceflinger.rc
+
 service surfaceflinger /system/bin/surfaceflinger
     class core animation
     user system
@@ -31,11 +48,10 @@ service surfaceflinger /system/bin/surfaceflinger
 
 ```
 
-关于init.rc文件的解析和Android.bp编译脚本的执行本文不做深入研究，启动SurfaceFlinger进程，就会执行到main函数。
+关于 `init.rc` 文件的解析和 `Android.bp` 编译脚本的执行本文不做深入研究，启动 `surfaceflinger` 进程，就会执行到 `main_surfaceflinger.cpp` 中 `main` 函数。
 
 ```c++
 frameworks/native/services/surfaceflinger/main_surfaceflinger.cpp
-
 
 int main(int, char**) {
     signal(SIGPIPE, SIG_IGN);
@@ -131,17 +147,24 @@ int main(int, char**) {
 }
 ```
 
-关于main函数中，有几个关键的点需要关注。
+## `ProcessState::self()`
 
-- ProcessState::self() 函数的调用，个人理解是同binder驱动建立链接，获取驱动的版本，通知驱动，同时启动线程来处理Client的请求，总结如下：
-（1）构建ProcessState全局对象gProcess
-（2）打开binder驱动，建立链接
-（3）在驱动内部创建该进程的binder_proc,binder_thread结构，保存该进程的进程信息和线程信息，并加入驱动的红黑树队列中。
-（4）获取驱动的版本信息
-（5）把该进程最多可同时启动的线程告诉驱动，并保存到改进程的binder_proc结构中
-（6）把设备文件/dev/binder映射到内存中
+`ProcessState::self()`  函数的调用，个人理解是同 binder 驱动建立链接，获取驱动的版本，通知驱动，同时启动线程来处理 Client 的请求，总结如下：
 
-- 设置SurfaceFlinger进程的优先级
+- 构建 ProcessState 全局对象 gProcess
+- 打开 binder 驱动，建立链接
+- 在驱动内部创建该进程的 binder_proc , binder_thread 结构，保存该进程的进程信息和线程信息，并加入驱动的红黑树队列中。
+- 获取驱动的版本信息
+- 把该进程最多可同时启动的线程告诉驱动，并保存到改进程的 binder_proc 结构中
+- 把设备文件 /dev/binder 映射到内存中
+
+```c++
+// When SF is launched in its own process, limit the number of
+// binder threads to 4.
+ProcessState::self()->setThreadPoolMaxThreadCount(4);
+```
+
+## 设置进程优先级
 
 ```c++
 setpriority(PRIO_PROCESS, 0, PRIORITY_URGENT_DISPLAY);
@@ -157,29 +180,44 @@ if (cpusets_enabled()) set_cpuset_policy(0, SP_SYSTEM);
 关于cpuset的使用，有一些简单的命令如下：
 
 查看cpuset的所有分组
+
+```
 adb shell ls -l /dev/cpuset
+```
 
 查看system-background的cpuset的cpu
+
+```
 adb shell cat /dev/cpuset/system-background/cpus
+```
 
 查看system-background的应用
+
+```
 adb shell cat /dev/cpuset/system-background/tasks
+```
 
 查看SurfaceFlinger的cpuset
+
+```
 adb shell 'cat /proc/(pid of surfaceflinger)/cpuset'
+```
 
 可以自定义cpuset，就是可以根据各自的需求，动态配置自定义的cpuset，例如SurfaceFlinger的线程默认跑到4个小核上，假如有个需求要把SurfaceFlinger的线程跑到大核上，就可以配置自定义cpuset，在进入某个场景的时候，把SurfaceFlinger进程pid配置到自定义的cpuset的tasks中。
 
-- 初始化SurfaceFlinger
+## SurfaceFlinger 初始化过程
 
 ```c++
 // 实例化 SurfaceFlinger
 sp<SurfaceFlinger> flinger = surfaceflinger::createSurfaceFlinger();
+
 // 初始化 SurfaceFlinger
 flinger->init();
+
 // 将 SurfaceFlinger添加到 ServiceManager 进程中
 sp<IServiceManager> sm(defaultServiceManager());
 sm->addService(String16(SurfaceFlinger::getServiceName()), flinger, false, IServiceManager::DUMP_FLAG_PRIORITY_CRITICAL | IServiceManager::DUMP_FLAG_PROTO);
+
 //启动 DisplayService
 startDisplayService();
 
@@ -187,9 +225,9 @@ startDisplayService();
 flinger->run();
 ````
 
-- 实例化 SurfaceFlinger
+## SurfaceFlinger 实例化
 
-有个SurfaceFlingerFactory.cpp，设计模式中的工厂类，在该头文件中定义了好多创建不同对象的函数。
+有个 `SurfaceFlingerFactory.cpp` ，设计模式中的工厂类，在该头文件中定义了好多创建不同对象的函数。
 
 ```c++
 /frameworks/native/services/surfaceflinger/SurfaceFlingerFactory.cpp
@@ -199,7 +237,7 @@ sp<SurfaceFlinger> createSurfaceFlinger() {
 }
 ```
 
-通过createSurfaceFlinger()方法创建了一个SurfaceFlinger对象。
+通过 `createSurfaceFlinger()` 方法创建了一个 `SurfaceFlinger` 对象。
 
 ```c++
 /frameworks/native/services/surfaceflinger/SurfaceFlinger.h
@@ -207,26 +245,173 @@ class SurfaceFlinger : public BnSurfaceComposer,
                        public PriorityDumper,
                        private IBinder::DeathRecipient,
                        private HWC2::ComposerCallback,
-                       private ISchedulerCallback 
+                       private ICompositor,
+                       private scheduler::ISchedulerCallback {
 ```
 
-SurfaceFlinger继承BnSurfaceComposer，实现ISurfaceComposer接口，实现ComposerCallback，PriorityDumper是一个辅助类，提供了SurfaceFlinger的dump信息。
+### BnSurfaceComposer
 
-![](/learn-android/aosp/surfaceflinger-1.webp)
+`ISurfaceComposer` 是 Client 端对 `SurfaceFlinger` 进程的 binder 接口调用。
 
-ISurfaceComposer 是Client端对SurfaceFlinger进程的binder接口调用。
+```c++
+class BnSurfaceComposer: public BnInterface<ISurfaceComposer> {
+    ...
+}
+```
 
-ComposerCallback，这个是HWC模块的回调，这个包含了三个很关键的回调函数，onComposerHotplug函数表示
-显示屏热插拔事件， onComposerHalRefresh函数表示Refresh事件，onComposerHalVsync表示Vsync信号事件。
+### ICompositor
 
-接下来分析SurfaceFlinger的构造函数。
+ICompositor是SurfaceFlinger触发合成时的调用。
 
-在SurfaceFlinger中的构造方法中，初始化了很多全局变量，有一些变量会直接影响整个代码的执行流程，而这些变量都可以在开发者模式中去更改它，SurfaceFlinger作为binder的服务端，设置应用中的开发者模式做为Client端进行binder调用去设置更改，主要是为了调试测试，其中还包含芯片厂商高通的一些辅助功能。
+```c++
+struct ICompositor {
+    virtual bool commit(nsecs_t frameTime, int64_t vsyncId, nsecs_t expectedVsyncTime) = 0;
+    virtual void composite(nsecs_t frameTime, int64_t vsyncId) = 0;
+    virtual void sample() = 0;
+}
 
-初始化 SurfaceFlinger
-实例化SurfaceFlinger对象之后，调用init方法，这个方法有几个比较重要的代码。
+```
 
-构造SkiaRenderEngine渲染引擎:
+### ComposerCallback
+
+`ComposerCallback` ，这个是HWC模块的回调，这个包含了三个很关键的回调函数， `onComposerHotplug` 函数表示
+显示屏热插拔事件， `onComposerHalRefresh` 函数表示 Refresh 事件， `onComposerHalVsync` 表示Vsync信号事件。
+
+```c++
+struct ComposerCallback {
+    virtual void onComposerHalHotplug(hal::HWDisplayId, hal::Connection) = 0;
+    virtual void onComposerHalRefresh(hal::HWDisplayId) = 0;
+    virtual void onComposerHalVsync(hal::HWDisplayId, int64_t timestamp,
+                                    std::optional<hal::VsyncPeriodNanos>) = 0;
+    virtual void onComposerHalVsyncPeriodTimingChanged(hal::HWDisplayId,
+                                                       const hal::VsyncPeriodChangeTimeline&) = 0;
+    virtual void onComposerHalSeamlessPossible(hal::HWDisplayId) = 0;
+    virtual void onComposerHalVsyncIdle(hal::HWDisplayId) = 0;
+
+protected:
+    ~ComposerCallback() = default;
+};
+```
+
+## SurfaceFlinger 构造函数
+
+在 `SurfaceFlinger` 中的构造方法中，初始化了很多全局变量，有一些变量会直接影响整个代码的执行流程，而这些变量都可以在开发者模式中去更改它， `SurfaceFlinger` 作为 binder 的服务端，设置应用中的开发者模式做为 Client 端进行 binder 调用去设置更改，主要是为了调试测试，其中还包含芯片厂商高通的一些辅助功能。
+
+```c++
+SurfaceFlinger::SurfaceFlinger(Factory& factory, SkipInitializationTag)
+      : mFactory(factory),
+        mPid(getpid()),
+        mInterceptor(mFactory.createSurfaceInterceptor()),
+        mTimeStats(std::make_shared<impl::TimeStats>()),
+        mFrameTracer(mFactory.createFrameTracer()),
+        mFrameTimeline(mFactory.createFrameTimeline(mTimeStats, mPid)),
+        mCompositionEngine(mFactory.createCompositionEngine()),
+        mHwcServiceName(base::GetProperty("debug.sf.hwc_service_name"s, "default"s)),
+        mTunnelModeEnabledReporter(new TunnelModeEnabledReporter()),
+        mInternalDisplayDensity(getDensityFromProperty("ro.sf.lcd_density", true)),
+        mEmulatedDisplayDensity(getDensityFromProperty("qemu.sf.lcd_density", false)),
+        mPowerAdvisor(std::make_unique<Hwc2::impl::PowerAdvisor>(*this)),
+        mWindowInfosListenerInvoker(sp<WindowInfosListenerInvoker>::make(*this)) {
+    ALOGI("Using HWComposer service: %s", mHwcServiceName.c_str());
+}
+```
+
+## SurfaceFlinger 初始化
+
+实例化 `SurfaceFlinger` 对象之后，调用 `init` 方法，这个方法有几个比较重要的代码。
+
+```c++
+// Do not call property_set on main thread which will be blocked by init
+// Use StartPropertySetThread instead.
+void SurfaceFlinger::init() {
+    ALOGI(  "SurfaceFlinger's main thread ready to run. "
+            "Initializing graphics H/W...");
+    Mutex::Autolock _l(mStateLock);
+
+    // Get a RenderEngine for the given display / config (can't fail)
+    // TODO(b/77156734): We need to stop casting and use HAL types when possible.
+    // Sending maxFrameBufferAcquiredBuffers as the cache size is tightly tuned to single-display.
+    auto builder = renderengine::RenderEngineCreationArgs::Builder()
+                           .setPixelFormat(static_cast<int32_t>(defaultCompositionPixelFormat))
+                           .setImageCacheSize(maxFrameBufferAcquiredBuffers)
+                           .setUseColorManagerment(useColorManagement)
+                           .setEnableProtectedContext(enable_protected_contents(false))
+                           .setPrecacheToneMapperShaderOnly(false)
+                           .setSupportsBackgroundBlur(mSupportsBlur)
+                           .setContextPriority(
+                                   useContextPriority
+                                           ? renderengine::RenderEngine::ContextPriority::REALTIME
+                                           : renderengine::RenderEngine::ContextPriority::MEDIUM);
+    if (auto type = chooseRenderEngineTypeViaSysProp()) {
+        builder.setRenderEngineType(type.value());
+    }
+    mCompositionEngine->setRenderEngine(renderengine::RenderEngine::create(builder.build()));
+    mMaxRenderTargetSize =
+            std::min(getRenderEngine().getMaxTextureSize(), getRenderEngine().getMaxViewportDims());
+
+    // Set SF main policy after initializing RenderEngine which has its own policy.
+    if (!SetTaskProfiles(0, {"SFMainPolicy"})) {
+        ALOGW("Failed to set main task profile");
+    }
+
+    mCompositionEngine->setTimeStats(mTimeStats);
+    mCompositionEngine->setHwComposer(getFactory().createHWComposer(mHwcServiceName));
+    mCompositionEngine->getHwComposer().setCallback(*this);
+    ClientCache::getInstance().setRenderEngine(&getRenderEngine());
+
+    enableLatchUnsignaledConfig = getLatchUnsignaledConfig();
+
+    if (base::GetBoolProperty("debug.sf.enable_hwc_vds"s, false)) {
+        enableHalVirtualDisplays(true);
+    }
+
+    // Process any initial hotplug and resulting display changes.
+    processDisplayHotplugEventsLocked();
+    const auto display = getDefaultDisplayDeviceLocked();
+    LOG_ALWAYS_FATAL_IF(!display, "Missing primary display after registering composer callback.");
+    const auto displayId = display->getPhysicalId();
+    LOG_ALWAYS_FATAL_IF(!getHwComposer().isConnected(displayId),
+                        "Primary display is disconnected.");
+
+    // initialize our drawing state
+    mDrawingState = mCurrentState;
+
+    // set initial conditions (e.g. unblank default device)
+    initializeDisplays();
+
+    mPowerAdvisor->init();
+
+    char primeShaderCache[PROPERTY_VALUE_MAX];
+    property_get("service.sf.prime_shader_cache", primeShaderCache, "1");
+    if (atoi(primeShaderCache)) {
+        if (setSchedFifo(false) != NO_ERROR) {
+            ALOGW("Can't set SCHED_OTHER for primeCache");
+        }
+
+        mRenderEnginePrimeCacheFuture = getRenderEngine().primeCache();
+
+        if (setSchedFifo(true) != NO_ERROR) {
+            ALOGW("Can't set SCHED_OTHER for primeCache");
+        }
+    }
+
+    onActiveDisplaySizeChanged(display);
+
+    // Inform native graphics APIs whether the present timestamp is supported:
+
+    const bool presentFenceReliable =
+            !getHwComposer().hasCapability(Capability::PRESENT_FENCE_IS_NOT_RELIABLE);
+    mStartPropertySetThread = getFactory().createStartPropertySetThread(presentFenceReliable);
+
+    if (mStartPropertySetThread->Start() != NO_ERROR) {
+        ALOGE("Run StartPropertySetThread failed!");
+    }
+
+    ALOGV("Done initializing");
+}
+```
+
+### SkiaRenderEngine 渲染引擎初始化
 
 ```c++
 // Get a RenderEngine for the given display / config (can't fail)
@@ -249,9 +434,11 @@ if (auto type = chooseRenderEngineTypeViaSysProp()) {
 mCompositionEngine->setRenderEngine(renderengine::RenderEngine::create(builder.build()));
 ```
 
-在Android S版本之前，这块的绘制流程都是OpenGL ES实现的，在Android S版本上这块逻辑已经切换到Skia库进行绘制，mCompositionEngine这个类比较重要，主要负责Layer的Client合成，Client合成就是GPU合成。目前Layer的合成方式有两种，一个是GPU合成，一个是HWC合成，针对Skia库的研究有单独的章节进行讲解。
+在Android S版本之前，这块的绘制流程都是 OpenGL ES 实现的，在Android S 版本上这块逻辑已经切换到 Skia 库进行绘制， `mCompositionEngine` 这个类比较重要，主要负责 Layer 的 Client 合成，Client合 成就是 GPU 合成。目前 Layer 的合成方式有两种，一个是 GPU 合成，一个是 HWC 合成，针对 Skia 库的研究有单独的章节进行讲解。
 
-在init方法中，重点看这个函数中调用了initScheduler方法。
+### initScheduler 调度器初始化
+
+在 `init` 方法中，重点看这个函数中调用了 `initScheduler` 方法。
 
 ```c++
 // start the EventThread
@@ -275,67 +462,13 @@ mEventQueue->initVsync(mScheduler->getVsyncDispatch(), *mFrameTimeline->getToken
                        configs.late.sfWorkDuration);
 ```
 
-图中是initScheduler方法中几个关键的代码，该代码和Vsync研究密切相关，当分析研究SurfaceFlinger的合成流程，也就最核心的流程，其触发条件就是由Vsync控制的，Vsync很像一个节拍器，SurfaceFlinger中每一帧的合成都需要跟随节拍器，太快或者太慢都会导致屏幕显示异常，一般表现为画面卡顿，不流畅，关于Vsync的研究有独立章节进行讲解。
+图中是 `initScheduler` 方法中几个关键的代码，该代码和Vsync研究密切相关，当分析研究 `SurfaceFlinger` 的合成流程，也就最核心的流程，其触发条件就是由 Vsync 控制的，Vsync 很像一个节拍器，  `SurfaceFlinger` 中每一帧的合成都需要跟随节拍器，太快或者太慢都会导致屏幕显示异常，一般表现为画面卡顿，不流畅，关于Vsync的研究有独立章节进行讲解。
 
-将SurfaceFlinger添加到 ServiceManager进程中
+将 `SurfaceFlinger` 添加到 `ServiceManager` 进程中
 
-SurfaceFlinger模块提供很多binder接口，在服务端的onTransact函数会根据Client端传递的code做不同的代码处理，下图是onTransact函数中一处code的处理。
+`SurfaceFlinger` 模块提供很多 binder 接口，在服务端的 `onTransact` 函数会根据 Client 端传递的 code 做不同的代码处理
 
-```c++
-case 1034: {
-    switch (n = data.readInt32()) {
-        case 0:
-        case 1:
-            enableRefreshRateOverlay(static_cast<bool>(n));
-            break;
-        default: {
-            Mutex::Autolock lock(mStateLock);
-            reply->writeBool(mRefreshRateOverlay != nullptr);
-        }
-    }
-    return NO_ERROR;
-}
-```
-
-这个code是1034的逻辑，是那个Client端调用过来的呢？
-
-是设置应用中的开发者模式页面中的功能，搜索了Settings应用中关于1034的逻辑，找到了一处代码包含这段逻辑。
-
-```c++
-Settings/src/com/android/settings/development/ShowRefreshRatePreferenceController.java
-
-private static final String SHOW_REFRESH_RATE_KEY = "show_refresh_rate";
-@VisibleForTesting
-static final int SURFACE_FLINGER_CODE = 1034;
-public ShowRefreshRatePreferenceController(Context context) {
-    super(context);
-    mSurfaceFlinger = ServiceManager.getService(SURFACE_FLINGER_SERVICE_KEY);
-}
-
-@VisibleForTesting
-void updateShowRefreshRateSetting() {
-    // magic communication with surface flinger.
-    try {
-        if (mSurfaceFlinger != null) {
-            final Parcel data = Parcel.obtain();
-            final Parcel reply = Parcel.obtain();
-            data.writeInterfaceToken(SURFACE_COMPOSER_INTERFACE_KEY);
-            data.writeInt(SETTING_VALUE_QUERY);
-            mSurfaceFlinger.transact(SURFACE_FLINGER_CODE, data, reply, 0 /* flags */);
-            final boolean enabled = reply.readBoolean();
-            ((SwitchPreference) mPreference).setChecked(enabled);
-            reply.recycle();
-             data.recycle();
-         }
-     } catch (RemoteException ex) {
-         // intentional no-op
-     }
- }
-```
-
-从上面的代码可以看到，App端对SurfaceFlinger进程进行了binder通讯。
-
-启动 SurfaceFlinger
+## SurfaceFlinger 启动
 
 ```c++
 void SurfaceFlinger::run() {
@@ -348,42 +481,42 @@ void SurfaceFlinger::onFirstRef() {
 }
 ```
 
-在前面介绍的main函数，SurfaceFlinger对象是一个智能指针，sp强引用指针。该智能指针在第一次引用的时候，会调用onFirstRef方法，进一步实例化内部需要的对象，这个方法调用了mEventQueue的init方法，而这个对象就是线程安全的MessageQueue对象。
+在前面介绍的 `main` 函数， `SurfaceFlinger` 对象是一个智能指针，sp 强引用指针。该智能指针在第一次引用的时候，会调用 `onFirstRef` 方法，进一步实例化内部需要的对象，这个方法调用了 `mEventQueue` 的 `init` 方法，而这个对象就是线程安全的 `MessageQueue` 对象。
 
-SurfaceFlinger中的MessageQueue和Android应用层开发的MessageQueue设计非常相似，只是个别角色做的事情稍微有一点不同。
+`SurfaceFlinger` 中的 `MessageQueue` 和 Android 应用层开发的 `MessageQueue` 设计非常相似，只是个别角色做的事情稍微有一点不同。
 
-SurfaceFlinger的MessageQueue机制的角色：
+`SurfaceFlinger` 的 `MessageQueue` 机制的角色：
 
-MessageQueue 同样做为消息队列向外暴露接口，不像应用层的MessageQueue一样作为Message链表的队列缓存，而是提供了相应的发送消息的接口以及等待消息方法。
-native的Looper是整个MessageQueue的核心，以epoll_event为核心，event_fd为辅助构建一套快速的消息回调机制。
-native的Handler则是实现handleMessage方法，当Looper回调的时候，将会调用Handler中的handleMessage方法处理回调函数。
+`MessageQueue` 同样做为消息队列向外暴露接口，不像应用层的 `MessageQueue` 一样作为 `Message` 链表的队列缓存，而是提供了相应的发送消息的接口以及等待消息方法。
 
-MessageQueue init
+native 的 `Looper` 是整个 `MessageQueue` 的核心，以 `epoll_event` `为核心，event_fd` 为辅助构建一套快速的消息回调机制。
+
+native 的 `Handler` 则是实现 `handleMessage` 方法，当 `Looper` 回调的时候，将会调用 `Handler` 中的 `handleMessage` 方法处理回调函数。
 
 ```c++
 /frameworks/native/services/surfaceflinger/Scheduler/MessageQueue.cpp
 
-void MessageQueue::init(const sp<SurfaceFlinger>& flinger) {
-    mFlinger = flinger;
-    mLooper = new Looper(true);
-    mHandler = new Handler(*this);
-}
-该init方法中实例化了Looper和Handle。
+MessageQueue::MessageQueue(ICompositor& compositor)
+      : MessageQueue(compositor, sp<Handler>::make(*this)) {}
 
-void MessageQueue::Handler::handleMessage(const Message& message) {
-    switch (message.what) {
-        case INVALIDATE:
-            mEventMask.fetch_and(~eventMaskInvalidate);
-            mQueue.mFlinger->onMessageReceived(message.what, mVsyncId, mExpectedVSyncTime);
-            break;
-        case REFRESH:
-            mEventMask.fetch_and(~eventMaskRefresh);
-            mQueue.mFlinger->onMessageReceived(message.what, mVsyncId, mExpectedVSyncTime);
-            break;
+MessageQueue::MessageQueue(ICompositor& compositor, sp<Handler> handler)
+      : mCompositor(compositor),
+        mLooper(sp<Looper>::make(kAllowNonCallbacks)),
+        mHandler(std::move(handler)) {}
+
+void MessageQueue::Handler::handleMessage(const Message&) {
+    mFramePending.store(false);
+
+    const nsecs_t frameTime = systemTime();
+    auto& compositor = mQueue.mCompositor;
+
+    if (!compositor.commit(frameTime, mVsyncId, mExpectedVsyncTime)) {
+        return;
     }
+
+    compositor.composite(frameTime, mVsyncId);
+    compositor.sample();
 }
 ```
 
-在上面的回调函数，可以看到注册了两种不同的刷新监听，一个是invalidate刷新，一个是refresh刷新。它们最后都会回调到SurfaceFlinger中的onMessageReceived中，换句话说，每当我们需要图元刷新的时候，就会通过mEventQueue的post方法，回调到SurfaceFlinger的主线程进行合成刷新。
-
-以上就是SurfaceFlinger进程初始化的过程，中间提到了一些比较重要的类或者对象，接下来会通过几个章节对SurfaceFlinger进程中比较核心的逻辑进行代码讲解。
+每当我们需要图元刷新的时候，就会通过 `mEventQueue` 的 `post` 方法，回调到 `SurfaceFlinger` 的主线程进行合成刷新。
