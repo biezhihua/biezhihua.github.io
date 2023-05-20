@@ -412,7 +412,7 @@ void SurfaceFlinger::initScheduler(const sp<DisplayDevice>& display) {
 
 先看看通道的建立过程，也是从源代码开始看起。
 
-### 向 VsyncDispatch 注册 Callback
+### VsyncDispatch 初始化
 
 我们知道 VsyncDispatch 是节拍器（心跳），也就是 TimerDispatch 的线程所在，所以我们需要了解下 VsyncDispatch 是在什么时候初始化的？在前面 Vsync 信号初始化的逻辑中，我们了解到 Scheduler 类再构造方法中会创建 VsyncDispatch 对象，而这个对象也就是 SurfaceFlinger 系统中唯一的，相关代码如下：
 
@@ -501,7 +501,7 @@ VsyncSchedule::ControllerPtr VsyncSchedule::createController(VsyncTracker& track
 
 ![](/learn-android/aosp/surfaceflinger-vsync-4.png)
 
-VsyncDispatchTimerQueue 是继承 VsyncDispatch，而节拍器（心跳）线程也就是该对象中的mTimeKeeper，这个Timer.cpp中会创建TimerDispatch这个名字的线程。
+VsyncDispatchTimerQueue 是继承 VsyncDispatch，而节拍器（心跳）线程也就是该对象中的 mTimeKeeper，这个 Timer.cpp 中会创建 TimerDispatch 这个名字的线程。
 
 ```c++
 
@@ -511,15 +511,7 @@ frameworks/native/services/surfaceflinger/Scheduler/VSyncDispatchTimerQueue.h
  * using a single timer queue.
  */
 class VSyncDispatchTimerQueue : public VSyncDispatch {
-    // Constructs a VSyncDispatchTimerQueue.
-    // \param[in] tk                    A timekeeper.
-    // \param[in] tracker               A tracker.
-    // \param[in] timerSlack            The threshold at which different similarly timed callbacks
-    //                                  should be grouped into one wakeup.
-    // \param[in] minVsyncDistance      The minimum distance between two vsync estimates before the
-    //                                  vsyncs are considered the same vsync event.
-    VSyncDispatchTimerQueue(std::unique_ptr<TimeKeeper>, VSyncTracker&, nsecs_t timerSlack,
-                            nsecs_t minVsyncDistance);
+    ...
 };
 
 
@@ -621,9 +613,9 @@ bool Timer::dispatch() {
 
 ```
 
-- Timer类在构造方法会创建的一个线程mDispatchThread。
+- Timer 类在构造方法会创建的一个线程 mDispatchThread。
 
-- 在这里用到了timerfd，timerfd是Linux为用户程序提供一个定时器接口，这个接口基于文件描述符，通过文件描述符的可读事件进行超时通知，因此可以配合epoll等使用，timerfd_create() 函数创建一个定时器对象，同时返回一个与之关联的文件描述符。
+- 在这里用到了 timerfd，timerfd 是 Linux 为用户程序提供一个定时器接口，这个接口基于文件描述符，通过文件描述符的可读事件进行超时通知，因此可以配合epoll等使用，timerfd_create() 函数创建一个定时器对象，同时返回一个与之关联的文件描述符。
 
   - clockid: CLOCK_REALTIME:系统实时时间，随着系统实时时间改变而改变，即从UTC1970-1-1 0:0:0开始计时，CLOCK_MONOTONIC:从系统启动这一刻开始计时，不受系统时间被用户改变的影响。
 
@@ -639,11 +631,13 @@ bool Timer::dispatch() {
 
   - old_value: 参数old_value如果不为NULL, old_vlaue返回之前定时器设置的超时时间，具体参考timerfd_gettimer()函数。
 
-- timerfd配合epoll函数使用，如果定时器时间到了，就会执行上图中alarmAt函数传入的函数指针，这个函数指针是VsyncDispatchTimerQueue.cpp类的timerCallback()函数，而这个函数中，就是对注册的callback执行回调。
+- timerfd 配合 epoll 函数使用，如果定时器时间到了，就会执行上图中 alarmAt 函数传入的函数指针，这个函数指针是 VsyncDispatchTimerQueue.cpp 类的 timerCallback() 函数，而这个函数中，就是对注册的 callback 执行回调。
 
-### SF向VsyncDispatch注册回调的过程
+### SF 向 VsyncDispatch 注册与回调的过程
 
-下面，我们跟踪下SF是如何注册自己的回调函数。
+#### 注册过程
+
+跟踪下SF是如何注册自己的回调函数。
 
 我们知道，App有个主线程（ActivityThread）专门进行UI处理，该主线程是由一个消息队列（Looper/handler）驱动，主线程不断的从消息队列中取出消息，处理消息，如此往复。
 
@@ -666,12 +660,12 @@ public static void main(String[] args) {
 }
 ```
 
-SF也类似，有个主线程负责处理合成相关的事物，同时有一个消息队列来驱动，从第一章中SurfaceFlinger模块的主流程模块中讲解了MessageQueue的初始化过程，当初始化完毕之后，SF主线程就进入了消息循环，等待有申请合入相关的事物，然后去做相应的处理。
+SF 也类似，有个主线程负责处理合成相关的事物，同时有一个消息队列来驱动，从第一章中 SurfaceFlinger 模块的主流程模块中讲解了 MessageQueue 的初始化过程，当初始化完毕之后，SF 主线程就进入了消息循环，等待有申请合入相关的事物，然后去做相应的处理。
 
-MessageQueue中有个方法initVsync(),在前面讲解的VSYNC信号的初始化过程中，其中调用了MessageQueue的initVsync函数。
+MessageQueue 中有个方法 initVsync()，在前面讲解的 VSYNC 信号的初始化过程中，其中调用了 MessageQueue 的 initVsync 函数。
 
 ```c++
-/frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp
+frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp
 
 void SurfaceFlinger::initScheduler(const sp<DisplayDevice>& display) {
     ...
@@ -683,7 +677,7 @@ void SurfaceFlinger::initScheduler(const sp<DisplayDevice>& display) {
 }
 ```
 
-在initVsync函数中初始化mVsync.registation对象，这个对象是VSyncDispatch.h文件中定义的类 VSyncCallbackRegistration，这个类的作用是操作已经注册回调的帮助类，在该类的构造函数中间接调用dispatch.registerCallback()。
+在 initVsync 函数中初始化 mVsync.registation 对象，这个对象是 VSyncDispatch.h 文件中定义的类  VSyncCallbackRegistration ，这个类的作用是操作已经注册回调的帮助类，在该类的构造函数中间接调用 dispatch.registerCallback() 。
 
 ```c++
 frameworks/native/services/surfaceflinger/Scheduler/MessageQueue.cpp
@@ -723,11 +717,13 @@ VSyncDispatchTimerQueue::CallbackToken VSyncDispatchTimerQueue::registerCallback
 
 ```
 
-VsyncDispatch的注册函数就会往mCallbacks注册封装了callbackFn的VsyncDispatchTimerQueueEntry对象。从上面的几个步骤来看就完成了SF向VsyncDispatch注册的全部流程，相对Android S之前的系统版本实现优化了下，并没有采用EventThread的方式。
+VsyncDispatch 的注册函数就会往 mCallbacks 注册封装了callbackFn 的 VsyncDispatchTimerQueueEntry 对象。从上面的几个步骤来看就完成了 SF 向 VsyncDispatch 注册的全部流程。
+
+#### 回调过程
 
 回调过程如下：
 
-- 当VsyncDispatch发送VSYNC-sf的信号时，会走到MessageQueue类注册的回调函数。
+- 当 VsyncDispatch 发送 VSYNC-sf 的信号时，会走到MessageQueue类 注册的回调函数。
 
 ```c++
 
@@ -745,7 +741,7 @@ ScheduleResult VSyncDispatchTimerQueue::schedule(CallbackToken token,
     return result;
 }
 
-
+frameworks/native/services/surfaceflinger/Scheduler/VSyncDispatchTimerQueue.cpp
 void VSyncDispatchTimerQueue::setTimer(nsecs_t targetTime, nsecs_t /*now*/) {
     mIntendedWakeupTime = targetTime;
     mTimeKeeper->alarmAt(std::bind(&VSyncDispatchTimerQueue::timerCallback, this),
@@ -753,6 +749,7 @@ void VSyncDispatchTimerQueue::setTimer(nsecs_t targetTime, nsecs_t /*now*/) {
     mLastTimerSchedule = mTimeKeeper->now();
 }
 
+frameworks/native/services/surfaceflinger/Scheduler/VSyncDispatchTimerQueue.cpp
 void VSyncDispatchTimerQueue::timerCallback() {
     struct Invocation {
         std::shared_ptr<VSyncDispatchTimerQueueEntry> callback;
@@ -770,23 +767,14 @@ void VSyncDispatchTimerQueue::timerCallback() {
     }
 }
 
+frameworks/native/services/surfaceflinger/Scheduler/MessageQueue.cpp
 void MessageQueue::vsyncCallback(nsecs_t vsyncTime, nsecs_t targetWakeupTime, nsecs_t readyTime) {
-    ATRACE_CALL();
-    // Trace VSYNC-sf
-    mVsync.value = (mVsync.value + 1) % 2;
-
-    {
-        std::lock_guard lock(mVsync.mutex);
-        mVsync.lastCallbackTime = std::chrono::nanoseconds(vsyncTime);
-        mVsync.scheduledFrameTime.reset();
-    }
-
-    const auto vsyncId = mVsync.tokenManager->generateTokenForPredictions(
-            {targetWakeupTime, readyTime, vsyncTime});
+    ...
 
     mHandler->dispatchFrame(vsyncId, vsyncTime);
 }
 
+frameworks/native/services/surfaceflinger/Scheduler/MessageQueue.cpp
 void MessageQueue::Handler::dispatchFrame(int64_t vsyncId, nsecs_t expectedVsyncTime) {
     if (!mFramePending.exchange(true)) {
         mVsyncId = vsyncId;
@@ -795,19 +783,7 @@ void MessageQueue::Handler::dispatchFrame(int64_t vsyncId, nsecs_t expectedVsync
     }
 }
 
-
-handleMessage的函数调用栈：
-thread #1, name = 'surfaceflinger', stop reason = step over
-frame #0: 0x0000566eac668d7d surfaceflinger`android::impl::MessageQueue::Handler::handleMessage(this=0x00007a3974b6aac0, (null)=<unavailable>) at MessageQueue.cpp:48:31
-frame #1: 0x00007a3bcbff84b0 libutils.so`android::Looper::pollInner(this=0x00007a39e4b59b10, timeoutMillis=<unavailable>) at Looper.cpp:333:26
-frame #2: 0x00007a3bcbff828f libutils.so`android::Looper::pollOnce(this=0x00007a39e4b59b10, timeoutMillis=-1, outFd=0x0000000000000000, outEvents=0x0000000000000000, outData=0x0000000000000000) at Looper.cpp:213:18
-frame #3: 0x0000566eac669442 surfaceflinger`android::impl::MessageQueue::waitMessage() [inlined] android::Looper::pollOnce(this=<unavailable>, timeoutMillis=-1) at Looper.h:270:16
-frame #4: 0x0000566eac669431 surfaceflinger`android::impl::MessageQueue::waitMessage(this=0x00007a3a44b593c0) at MessageQueue.cpp:145:32
-frame #5: 0x0000566eac672709 surfaceflinger`android::scheduler::Scheduler::run(this=0x00007a3a44b593c0) at Scheduler.cpp:131:9
-frame #6: 0x0000566eac6d6b2b surfaceflinger`main [inlined] android::SurfaceFlinger::run(this=<unavailable>) at SurfaceFlinger.cpp:483:17
-frame #7: 0x0000566eac6d6b1f surfaceflinger`main((null)=1, (null)=<unavailable>) at main_surfaceflinger.cpp:167:14
-frame #8: 0x00007a3bc9670cca libc.so`::__libc_init(raw_args=<unavailable>, onexit=<unavailable>, slingshot=(surfaceflinger`main at main_surfaceflinger.cpp:79), structors=<unavailable>)(), int (*)(int, char **, char **), const structors_array_t *const) at libc_init_dynamic.cpp:157:8
-
+frameworks/native/services/surfaceflinger/Scheduler/MessageQueue.cpp
 void MessageQueue::Handler::handleMessage(const Message&) {
     mFramePending.store(false);
 
@@ -821,26 +797,73 @@ void MessageQueue::Handler::handleMessage(const Message&) {
     compositor.composite(frameTime, mVsyncId);
     compositor.sample();
 }
-
 ```
 
-- 在这个回调函数中，通过Handler将VSYNC事件转换成内部的msg，投递到消息队列中。
+handleMessage的函数调用栈：
 
-- SF主线程从消息队列中取出消息，回调到SF->handleMessage()
+```c++
+thread #1, name = 'surfaceflinger', stop reason = step over
+frame #0: 0x0000566eac668d7d surfaceflinger`android::impl::MessageQueue::Handler::handleMessage(this=0x00007a3974b6aac0, (null)=<unavailable>) at MessageQueue.cpp:48:31
+frame #1: 0x00007a3bcbff84b0 libutils.so`android::Looper::pollInner(this=0x00007a39e4b59b10, timeoutMillis=<unavailable>) at Looper.cpp:333:26
+frame #2: 0x00007a3bcbff828f libutils.so`android::Looper::pollOnce(this=0x00007a39e4b59b10, timeoutMillis=-1, outFd=0x0000000000000000, outEvents=0x0000000000000000, outData=0x0000000000000000) at Looper.cpp:213:18
+frame #3: 0x0000566eac669442 surfaceflinger`android::impl::MessageQueue::waitMessage() [inlined] android::Looper::pollOnce(this=<unavailable>, timeoutMillis=-1) at Looper.h:270:16
+frame #4: 0x0000566eac669431 surfaceflinger`android::impl::MessageQueue::waitMessage(this=0x00007a3a44b593c0) at MessageQueue.cpp:145:32
+frame #5: 0x0000566eac672709 surfaceflinger`android::scheduler::Scheduler::run(this=0x00007a3a44b593c0) at Scheduler.cpp:131:9
+frame #6: 0x0000566eac6d6b2b surfaceflinger`main [inlined] android::SurfaceFlinger::run(this=<unavailable>) at SurfaceFlinger.cpp:483:17
+frame #7: 0x0000566eac6d6b1f surfaceflinger`main((null)=1, (null)=<unavailable>) at main_surfaceflinger.cpp:167:14
+frame #8: 0x00007a3bc9670cca libc.so`::__libc_init(raw_args=<unavailable>, onexit=<unavailable>, slingshot=(surfaceflinger`main at main_surfaceflinger.cpp:79), structors=<unavailable>)(), int (*)(int, char **, char **), const structors_array_t *const) at libc_init_dynamic.cpp:157:8
+```
 
-可见，MessageQueue是接收VSYNC-SF信号的，将VsyncDispatch发送的VSYNC-SF信号通过自身转到SF，驱动SF执行合成操作。
+- 在这个回调函数中，通过 Handler 将 VSYNC 事件转换成内部的 msg，投递到消息队列中。
 
-### DispSyncSource是VsyncDispatch与EventThread之间的桥梁
+- SF 主线程从消息队列中取出消息，回调到 SF->handleMessage()
 
-DispSyncSource是对标准SW VSYNC的细分，产生VSYNC-app，它可以认为是信号源，仍然需要触发下游组件来接受信号，对DisplaySyncSource来说，它的下游组件就是EventThread。所以说DispSyncSource是VsyncDispatch与EventThread之间通讯的纽带。
+可见，MessageQueue 是接收 VSYNC-SF 信号的，将 VsyncDispatch 发送的 VSYNC-SF 信号通过自身转到 SF，驱动 SF 执行合成操作。
 
-在DispSyncSource类中，下游组件用mCallback来表示，mCallback是VSyncSource::Callback类型，而EventThread也继承自VsyncSource::Callback。
+### DispSyncSource 是 VsyncDispatch 与 EventThread 之间的桥梁
+
+DispSyncSource 是对标准 SW VSYNC 的细分，产生 VSYNC-app ，它可以认为是信号源，仍然需要触发下游组件来接受信号，对 DisplaySyncSource 来说，它的下游组件就是 EventThread。所以说 DispSyncSource 是 VsyncDispatch 与  EventThread 之间通讯的纽带。
+
+在 DispSyncSource 类中，下游组件用 mCallback 来表示， mCallback 是 VSyncSource::Callback 类型，而 EventThread 也继承自 VsyncSource::Callback。
 
 相关代码如下：
 
-DispSyncSource是怎么和VsyncDispatch建立联系？
+```c++
+/home/biezhihua/projects/aosp/frameworks/native/services/surfaceflinger/Scheduler/DispSyncSource.h
+class DispSyncSource final : public VSyncSource {
+    ...
 
-这个和SF向VsyncDispatch注册很类似，DispSyncSource有个mCallbackRepeater对象，该对象在初始化的时候，会传入DispSyncSource的回调接口DispSyncsource::onVsyncCallback。
+    std::unique_ptr<CallbackRepeater> mCallbackRepeater;
+
+    VSyncSource::Callback* mCallback GUARDED_BY(mCallbackMutex) = nullptr;
+
+    ...
+};
+
+/home/biezhihua/projects/aosp/frameworks/native/services/surfaceflinger/Scheduler/EventThread.h
+class VSyncSource {
+public:
+    class VSyncData {
+        ...
+    };
+
+    class Callback {
+        ...
+
+        virtual void onVSyncEvent(nsecs_t when, VSyncData vsyncData) = 0;
+    };
+
+    ...
+};
+
+/home/biezhihua/projects/aosp/frameworks/native/services/surfaceflinger/Scheduler/EventThread.h
+class EventThread : public android::EventThread, private VSyncSource::Callback {
+}
+```
+
+#### DispSyncSource 是怎么和 VsyncDispatch 建立联系？
+
+这个和 SF 向 VsyncDispatch 注册很类似，DispSyncSource 有个 mCallbackRepeater 对象，该对象在初始化的时候，会传入DispSyncSource 的回调接口 DispSyncsource::onVsyncCallback。
 
 ```c++
 frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp
@@ -957,13 +980,13 @@ EventThread::EventThread(std::unique_ptr<VSyncSource> vsyncSource,
 
 ```
 
-在初始化DispSyncSource的时候，会创建mCallbackRepeater对象，这个对象需要传入VsyncDispatch和DispSyncSource回调函数。
+在初始化 DispSyncSource 的时候，会创建 mCallbackRepeater 对象，这个对象 mCallbackRepeater 需要传入 VsyncDispatch 和 DispSyncSource 回调函数。
 
-在CallbackRepeater的构造方法中，会创建VsyncCallbackRegistration这个对象，这个对象在创建的时候，会给VsyncDispatch注册回调函数。
+在CallbackRepeater 的构造方法中，会创建 VsyncCallbackRegistration 这个对象，这个对象在创建的时候，会给 VsyncDispatch 注册回调函数。
 
-当VsyncDispatch发送信号的时候，先传递给CallbackRepeater，再传递到DispSyncsource中。
+当 VsyncDispatch 发送信号的时候，先传递给 CallbackRepeater ，再传递到 DispSyncsource 中。
 
-当DispSyncSource收到信息会把信号发送到EventThread中。
+当 DispSyncSource 收到信息会把信号发送到 EventThread 中。
 
 回调函数调用栈：
 
@@ -1054,18 +1077,15 @@ void EventThread::onVSyncEvent(nsecs_t timestamp, VSyncSource::VSyncData vsyncDa
 
 ```
 
-### App向EventThread注册Connection
+### App 向 EventThread 注册 Connection
 
-如果有App关心VSYN-APP，则需要向appEventThread注册Connection，可能有多个App同时关注VSYNC-app信号，所以在EventThread的内部有一个mDisplayEventConnections来保存着Connection，Connection是一个Bn对象，因为要与APP进行binder通讯。
+如果有 App 关心 VSYN-APP，则需要向 appEventThread 注册 Connection，可能有多个 App 同时关注 VSYNC-app 信号，所以在 EventThread 的内部有一个 mDisplayEventConnections 来保存着 Connection，Connection 是一个 Bn 对象，因为要与 APP 进行 binder 通讯。
 
 ```c++
  /frameworks/native/services/surfaceflinger/Scheduler/EventThread.h
- 
-
 class EventThread : public android::EventThread, private VSyncSource::Callback {
     ...
 
-    std::vector<wp<EventThreadConnection>> mDisplayEventConnections GUARDED_BY(mMutex);
 
     ....
 };
@@ -1100,6 +1120,27 @@ void EventThread::removeDisplayEventConnectionLocked(const wp<EventThreadConnect
 以上贴的三段代码，分别是定义Connection的集合对象，往appEventThread注册Connection和删除Connection。
 
 ```c++
+void SurfaceFlinger::initScheduler(const sp<DisplayDevice>& display) {
+    ...
+
+    mAppConnectionHandle =
+            mScheduler->createConnection("app", mFrameTimeline->getTokenManager(),
+                                         /*workDuration=*/configs.late.appWorkDuration,
+                                         /*readyDuration=*/configs.late.sfWorkDuration,
+                                         impl::EventThread::InterceptVSyncsCallback());
+    ...
+}
+
+/home/biezhihua/projects/aosp/frameworks/native/services/surfaceflinger/Scheduler/Scheduler.cpp
+ConnectionHandle Scheduler::createConnection(
+        const char* connectionName, frametimeline::TokenManager* tokenManager,
+        std::chrono::nanoseconds workDuration, std::chrono::nanoseconds readyDuration,
+        impl::EventThread::InterceptVSyncsCallback interceptCallback) {
+    ...
+    return createConnection(std::move(eventThread));
+}
+
+/home/biezhihua/projects/aosp/frameworks/native/services/surfaceflinger/Scheduler/Scheduler.cpp
 ConnectionHandle Scheduler::createConnection(std::unique_ptr<EventThread> eventThread) {
     const ConnectionHandle handle = ConnectionHandle{mNextConnectionHandleId++};
     ALOGV("Creating a connection handle with ID %" PRIuPTR, handle.id);
@@ -1111,11 +1152,13 @@ ConnectionHandle Scheduler::createConnection(std::unique_ptr<EventThread> eventT
     return handle;
 }
 
+/home/biezhihua/projects/aosp/frameworks/native/services/surfaceflinger/Scheduler/Scheduler.cpp
 sp<EventThreadConnection> Scheduler::createConnectionInternal(
         EventThread* eventThread, ISurfaceComposer::EventRegistrationFlags eventRegistration) {
     return eventThread->createEventConnection([&] { resync(); }, eventRegistration);
 }
 
+/home/biezhihua/projects/aosp/frameworks/native/services/surfaceflinger/Scheduler/EventThread.cpp
 sp<EventThreadConnection> EventThread::createEventConnection(
         ResyncCallback resyncCallback,
         ISurfaceComposer::EventRegistrationFlags eventRegistration) const {
@@ -1126,19 +1169,19 @@ sp<EventThreadConnection> EventThread::createEventConnection(
 
 ```
 
-## SF请求VSYNC-sf
+## SF 请求 VSYNC-sf
 
 ### scheduleFrame
 
-当应用上帧的时候，也就是当BufferQueue有新的Graphic Buffer到达时，应用会通过binder通讯，调用到SurfaceFlinger的setTransactionState方法，再去调用setTransactionFlags方法，通知SF有新的Graphic Buffer到达：
+当应用上帧的时候，也就是当 BufferQueue 有新的 Graphic Buffer 到达时，应用会通过 binder 通讯，调用到 SurfaceFlinger 的 setTransactionState 方法，再去调用 setTransactionFlags 方法，通知 SF 有新的 Graphic Buffer 到达：
 
-SF的scheduleCommit方法中调用MessageQueue的scheduleFrame方法。
+SF的 scheduleCommit 方法中调用 MessageQueue 的 scheduleFrame 方法。
 
-scheduleFrame方法就是SF去申请一次性的VSYNC。
+scheduleFrame 方法就是SF去申请一次性的 VSYNC。
+
+应用上帧的调用栈：
 
 ```c++
-应用上帧的调用栈
-
 thread #17, name = 'binder:458_5', stop reason = breakpoint 1.3
 frame #0: 0x000058e7b49e4022 surfaceflinger`android::SurfaceFlinger::setTransactionFlags(unsigned int, android::scheduler::TransactionSchedule, android::sp<android::IBinder> const&, android::SurfaceFlinger::FrameHint) [inlined] android::SurfaceFlinger::scheduleCommit(this=0x00006ffc7adad8c0, hint=kActive) at SurfaceFlinger.cpp:1827:14
 frame #1: 0x000058e7b49e4022 surfaceflinger`android::SurfaceFlinger::setTransactionFlags(this=0x00006ffc7adad8c0, mask=16, schedule=<unavailable>, applyToken=<unavailable>, frameHint=kActive) at SurfaceFlinger.cpp:3705:9
@@ -1219,7 +1262,7 @@ void MessageQueue::scheduleFrame() {
 
 ### schedule
 
-上面的代码是通过Vsync结构体的registration对象调用schedule方法。
+上面的代码是通过 Vsync 结构体的 registration 对象调用 schedule 方法。
 
 ```c++
 frameworks/native/services/surfaceflinger/Scheduler/MessageQueue.h
@@ -1236,7 +1279,7 @@ struct Vsync {
 };
 ```
 
-间接的调用到VsynDispatch的schedule方法。
+间接的调用到 VsynDispatch 的 schedule 方法。
 
 ```c++
 frameworks/native/services/surfaceflinger/Scheduler/VSyncDispatchTimerQueue.cpp
@@ -1288,13 +1331,13 @@ void VSyncDispatchTimerQueue::setTimer(nsecs_t targetTime, nsecs_t /*now*/) {
 }
 ```
 
-其中的mToken是当初SF注册的到VsyncDispatch的索引，通过mToken可以找到注册到VsyncDispatch中的VsyncDispatchTimerQueueEntry对象，这个对象记录了很多信息，包括回调到SF的函数地址，下一次发送VSYNC信号的时间等等。
+其中的 mToken 是当初 SF 注册的到 VsyncDispatch 的索引，通过 mToken 可以找到注册到 VsyncDispatch 中的 VsyncDispatchTimerQueueEntry 对象，这个对象记录了很多信息，包括回调到 SF 的函数地址，下一次发送VSYNC信号的时间等等。
 
-## VSYNC-sf产生和发射
+## VSYNC-sf 产生和发射
 
-从前面的代码可以看到，当应用上帧的时候，SurfaceFlinger就会去申请VSYNC-sf的信号，那申请的VSYNC-sf的信号，什么时候会发给SurfaceFlinger，去做合成的动作。从前面的代码，已经可以看到申请信息的时候，已经调用到VsyncDispatch的schedule的方法。
+从前面的代码可以看到，当应用上帧的时候，SurfaceFlinger 就会去申请 VSYNC-sf 的信号，那申请的 VSYNC-sf 的信号，什么时候会发给 SurfaceFlinger，去做合成的动作。从前面的代码，已经可以看到申请信息的时候，已经调用到 VsyncDispatch 的 schedule 的方法。
 
-要了解VSYNC-sf的发射路径，需要仔细阅读VsyncDispatch的子类的实现逻辑，查看VSyncDispatchTimerQueue.cpp的代码如下：
+要了解 VSYNC-sf 的发射路径，需要仔细阅读 VsyncDispatch 的子类的实现逻辑，查看 VSyncDispatchTimerQueue.cpp 的代码如下：
 
 ```c++
 frameworks/native/services/surfaceflinger/Scheduler/VSyncDispatchTimerQueue.cpp
@@ -1333,11 +1376,10 @@ ScheduleResult VSyncDispatchTimerQueue::schedule(CallbackToken token,
 }
 ```
 
-从上面的代码，token是编号，就是代表sf，app或者appSF注册到VsyncDispatch的索引值，VsyncDispatch中有一个集合记录这三个的回调信息，也就是mCallbacks，这个里面存储了一个对象VsyncDispatchtimerQueueEntry，这个类很关键，它保存了回调的函数指针，回调的名字和两个信号直接的误差值等等。
+从上面的代码，token 是编号，就是代表 sf，app 或者 appSF 注册到 VsyncDispatch 的索引值，VsyncDispatch 中有一个集合记录这三个的回调信息，也就是 mCallbacks ，这个里面存储了一个对象 VsyncDispatchtimerQueueEntry ，这个类很关键，它保存了回调的函数指针，回调的名字和两个信号直接的误差值等等。
 
 ```c++
 /frameworks/native/services/surfaceflinger/Scheduler/VSyncDispatch.h
-
 struct ScheduleTiming {
     nsecs_t workDuration = 0;
     nsecs_t readyDuration = 0;
@@ -1352,28 +1394,11 @@ struct ScheduleTiming {
  };
 ```
 
-这个类保存了几个关键信息，有一个ArmingInfo是参与计算Vsync唤醒的时间信息。当SurfaceFlinger申请Vsync-sf的信号，从上面的schedule方法传入一个ScheduleTiming结构体。
+这个类保存了几个关键信息，有一个ArmingInfo是参与计算Vsync唤醒的时间信息。当 SurfaceFlinger 申请Vsync-sf的信号，从上面的 schedule方法传入一个 ScheduleTiming 结构体。
 
-```c++
-/frameworks/native/services/surfaceflinger/Scheduler/VSyncDispatch.h
+这个结构体会记录三个值，workDuration，readyDuration。这两个值是固定的，而且这两个值在不同的刷新率下都是不一样的，都是参与计算Vsync信号发射的时间，我们这边只重点关注 earliestVsync，这个是上一个 Vsync 发射的时间。 这个值是很关键的，根据这个值，再通过一个软件模型校准的值，获得下一次 Vsync 发射的时间值。
 
-struct ScheduleTiming {
-    nsecs_t workDuration = 0;
-    nsecs_t readyDuration = 0;
-    nsecs_t earliestVsync = 0;
-
-     bool operator==(const ScheduleTiming& other) const {
-         return workDuration == other.workDuration && readyDuration == other.readyDuration &&
-                 earliestVsync == other.earliestVsync;
-     }
-
-     bool operator!=(const ScheduleTiming& other) const { return !(*this == other); }
- };
-```
-
-这个结构体会记录三个值，workDuration，readyDuration。这两个值是固定的，而且这两个值在不同的刷新率下都是不一样的，都是参与计算Vsync信号发射的时间，我们这边只重点关注earliestVsync，这个是上一个Vsync发射的时间。 这个值是很关键的，根据这个值，再通过一个软件模型校准的值，获得下一次Vsync发射的时间值。
-
-前面的schedule方法中，假如是sf的token来申请Vsync信息，会调用callback->schedule这个方法，这个方法很重要，主要是根据上一次的vysnc发射时间计算下一次的Vsync发射时间。
+前面的 schedule 方法中，假如是 sf 的 token 来申请 Vsync 信息，会调用 callback->schedule 这个方法，这个方法很重要，主要是根据上一次的 vysnc 发射时间计算下一次的 Vsync 发射时间。
 
 ```c++
 frameworks/native/services/surfaceflinger/Scheduler/VSyncDispatchTimerQueue.cpp
@@ -1405,7 +1430,48 @@ ScheduleResult VSyncDispatchTimerQueueEntry::schedule(VSyncDispatch::ScheduleTim
     mArmedInfo = {nextWakeupTime, nextVsyncTime, nextReadyTime};
     return getExpectedCallbackTime(nextVsyncTime, timing);
 }
+```
 
+这段代码是一个名为 `VSyncDispatchTimerQueueEntry::schedule` 的成员函数，它在 Android 开源项目（AOSP）中可能用于计算和设置垂直同步（VSync）的调度时间。具体来说，这个函数接收一个 `ScheduleTiming` 结构体、一个 VSync 跟踪器，以及当前时间作为参数，并返回一个 `ScheduleResult` 结构体。这个函数的主要功能是计算下一个 VSync 时间、下一个唤醒时间，并设置调度时间。
+
+```cpp
+// 成员函数 schedule，接收一个 ScheduleTiming 结构体、一个 VSync 跟踪器，以及当前时间作为参数
+ScheduleResult VSyncDispatchTimerQueueEntry::schedule(VSyncDispatch::ScheduleTiming timing,
+                                                      VSyncTracker& tracker, nsecs_t now) {
+    // 计算下一个 VSync 时间，这个时间是从 timing.earliestVsync 和 now + timing.workDuration + timing.readyDuration 中的较大值开始的
+    auto nextVsyncTime = tracker.nextAnticipatedVSyncTimeFrom(
+            std::max(timing.earliestVsync, now + timing.workDuration + timing.readyDuration));
+    // 计算下一个唤醒时间，这个时间是下一个 VSync 时间减去工作时长和准备时长
+    auto nextWakeupTime = nextVsyncTime - timing.workDuration - timing.readyDuration;
+
+    // 检查是否会跳过一个 VSync 目标，如果会的话，返回预期的回调时间
+    bool const wouldSkipAVsyncTarget =
+            mArmedInfo && (nextVsyncTime > (mArmedInfo->mActualVsyncTime + mMinVsyncDistance));
+    // 检查是否会跳过一个唤醒，如果会的话，返回预期的回调时间
+    bool const wouldSkipAWakeup =
+            mArmedInfo && ((nextWakeupTime > (mArmedInfo->mActualWakeupTime + mMinVsyncDistance)));
+    if (wouldSkipAVsyncTarget && wouldSkipAWakeup) {
+        return getExpectedCallbackTime(nextVsyncTime, timing);
+    }
+
+    // 检查是否已经为 VSync 调度了回调，如果是的话，重新计算下一个 VSync 时间和下一个唤醒时间
+    bool const alreadyDispatchedForVsync = mLastDispatchTime &&
+            ((*mLastDispatchTime + mMinVsyncDistance) >= nextVsyncTime &&
+             (*mLastDispatchTime - mMinVsyncDistance) <= nextVsyncTime);
+    if (alreadyDispatchedForVsync) {
+        nextVsyncTime =
+                tracker.nextAnticipatedVSyncTimeFrom(*mLastDispatchTime + mMinVsyncDistance);
+        nextWakeupTime = nextVsyncTime - timing.workDuration - timing.readyDuration;
+    }
+
+    // 计算下一个准备时间，这个时间是下一个 VSync 时间减去准备时长
+    auto const nextReadyTime = nextVsyncTime - timing.readyDuration;
+    // 更新 mScheduleTiming 和 mArmedInfo 的值
+    mScheduleTiming = timing;
+    mArmedInfo = {nextWakeupTime, nextVsyncTime, nextReadyTime};
+    // 返回预期的回调时间
+    return getExpectedCallback
+}
 ```
 
 这个是最核心的逻辑，从上面代码可以看到下面几个点的逻辑顺序。
@@ -1419,13 +1485,12 @@ ScheduleResult VSyncDispatchTimerQueueEntry::schedule(VSyncDispatch::ScheduleTim
 
 ```c++
 /frameworks/native/services/surfaceflinger/Scheduler/VSyncDispatchTimerQueue.cpp
-
 if (callback->wakeupTime() < mIntendedWakeupTime - mTimerSlack) {
     rearmTimerSkippingUpdateFor(now, it);//发射Vsync信号
 }
 ```
 
-这个方法执行完毕之后，会判断下一次发射的时间，和上一次设置的发射的时间做比较，如果小于这个值，需要把最近的发射时间重新设置到定时器中，这个mIntendedWakeupTiem变量在每次正常发射之后，这个值通常会设置为默认值，是int 8个字节的最大值 9223372036854775807，所以通常就会走到rearmTimerSkippingUpdateFor的函数中。
+这个方法执行完毕之后，会判断下一次发射的时间，和上一次设置的发射的时间做比较，如果小于这个值，需要把最近的发射时间重新设置到定时器中，这个 mIntendedWakeupTiem 变量在每次正常发射之后，这个值通常会设置为默认值，是int 8个字节的最大值 9223372036854775807，所以通常就会走到 rearmTimerSkippingUpdateFor 的函数中。
 
 ```c++
 void VSyncDispatchTimerQueue::rearmTimerSkippingUpdateFor(
@@ -1464,7 +1529,7 @@ void VSyncDispatchTimerQueue::rearmTimerSkippingUpdateFor(
 }
 ```
 
-从上面的函数中，可以很明显的看出来，SurfaceFlinger申请的Vsync-sf发射时间，把下一次唤醒的时间传入这个函数中，首先在mCallbacks中查找有没有发现发射更早的时间，假如app申请的发射时间在处理中，如果传过来的是Vsync-sf的发射时间，会把app或者appSf的发射时间更新下，然后从中找一个最近的，最快的发射时间设置到定时器中。
+从上面的函数中，可以很明显的看出来，SurfaceFlinger 申请的 Vsync-sf 发射时间，把下一次唤醒的时间传入这个函数中，首先在mCallbacks 中查找有没有发现发射更早的时间，假如app申请的发射时间在处理中，如果传过来的是Vsync-sf的发射时间，会把app或者appSf的发射时间更新下，然后从中找一个最近的，最快的发射时间设置到定时器中。
 
 ```c++
 void VSyncDispatchTimerQueue::setTimer(nsecs_t targetTime, nsecs_t /*now*/) {
@@ -1476,9 +1541,9 @@ void VSyncDispatchTimerQueue::setTimer(nsecs_t targetTime, nsecs_t /*now*/) {
 
 ```
 
-定时器就是前面介绍的mTimer，我们把下次发射的时间设置到定时器中，会在对应的时间内回调到VsynDispatchTimerQueue的timerCallback方法中。然后把最近的一次发射时间设置给mIntendedWakerupTime这个变量。
+定时器就是前面介绍的 mTimer，我们把下次发射的时间设置到定时器中，会在对应的时间内回调到 VsynDispatchTimerQueue 的 timerCallback 方法中。然后把最近的一次发射时间设置给 mIntendedWakerupTime 这个变量。
 
-假如Vsync-sf的定时器设置给Timer之后，接下来就是Vsync-sf的发射过程，假如Timer的定时器到时间之后，会调用到VsynDispatchTimerQueue的timerCallback中，这个timerCallback方法很重要。是分发SW-VSYNC的地方。
+假如 Vsync-sf 的定时器设置给 Timer 之后，接下来就是 Vsync-sf 的发射过程，假如Timer的定时器到时间之后，会调用到 VsynDispatchTimerQueue 的 timerCallback 中，这个 timerCallback 方法很重要。是分发 SW-VSYNC 的地方。
 
 ```c++
 void VSyncDispatchTimerQueue::timerCallback() {
@@ -1523,13 +1588,13 @@ void VSyncDispatchTimerQueue::timerCallback() {
 
 从上面的代码流程中，可以看到当发射的时间回调这个方法中，会在mCallbacks的集合中查找符合这次发射的时间的匹配者， 先判断该对象中的发射时间是否有效，如果有效的话，获取当前的时间信息和发射时间的差值。因为设置给定时器的唤醒时间，和当前时间按理是一致的，但是因为软件实现肯定是有偏差值的，所以拿发射的时间值，和真正的发射的时间值有个校验。如果符合发射的时间，则把需要发射的对象放到invocation的集合中。然后遍历这个集合挨个把Vsync信号发射给对应的代码。
 
-## Vsync-app的申请和发射
+## Vsync-app 的申请和发射
 
-### 应用向surfaceflinger注册connection
+### 应用向 Surfaceflinger 注册 connection
 
-前面讲了Vsync-sf的发射，为什么这两块要分开说，因为再Android S版本之前的版本，Vsync-app和Vsync-sf都是EventThread的形式，在12版本上Vsync-sf的逻辑去掉EventThread的形式，谷歌做了重构，所以就剩下Vsync-app还是采用EventThead的形式。
+前面讲了 Vsync-sf 的发射，为什么这两块要分开说，因为再 Android S 版本之前的版本，Vsync-app 和 Vsync-sf 都是EventThread 的形式，在12版本上 Vsync-sf 的逻辑去掉  EventThread 的形式，谷歌做了重构，所以就剩下 Vsync-app 还是采用 EventThread 的形式。
 
-接下来我们讲下应用怎么去申请Vsync-app的信号，本章节主要讲解SurfaceFlinger里面的逻辑，针对应用怎么申请Vsync-app信息，简单的说下，就是通过Choreographer这个对象去申请Vsync-app的信号，然后通过其内部类FrameDisplayEventReceiver来接受vsync信号，也就是Vsync-app的发射最后到这个对象里面，来触发app刷新，核心就是FrameDisplayEventReceiver类，这个类的初始化在是Choreographer的构造函数中。
+接下来我们讲下应用怎么去申请 Vsync-app 的信号，本章节主要讲解 SurfaceFlinger 里面的逻辑，针对应用怎么申请 Vsync-app 信息，简单的说下，就是通过 Choreographer 这个对象去申请 Vsync-app 的信号，然后通过其内部类 FrameDisplayEventReceiver 来接受 vsync 信号，也就是 Vsync-app 的发射最后到这个对象里面，来触发 app 刷新，核心就是 FrameDisplayEventReceiver 类，这个类的初始化在是 Choreographer的构造函数中。
 
 ```java
 frameworks/base/core/java/android/view/Choreographer.java
@@ -1562,28 +1627,33 @@ private final class FrameDisplayEventReceiver extends DisplayEventReceiver
 
 /**
  * Creates a display event receiver.
- *
- * @param looper The looper to use when invoking callbacks.
- * @param vsyncSource The source of the vsync tick. Must be on of the VSYNC_SOURCE_* values.
- * @param eventRegistration Which events to dispatch. Must be a bitfield consist of the
- * EVENT_REGISTRATION_*_FLAG values.
  */
 public DisplayEventReceiver(Looper looper, int vsyncSource, int eventRegistration) {
-    if (looper == null) {
-        throw new IllegalArgumentException("looper must not be null");
-    }
-
     mMessageQueue = looper.getQueue();
     mReceiverPtr = nativeInit(new WeakReference<DisplayEventReceiver>(this), mMessageQueue,
             vsyncSource, eventRegistration);
 }
 ```
 
-这个方法会在初始化NativeDisplayEventReceiver对象，NativeDisplayEventReceiver对象继承DisplayEventDispatcher对象，这个对象在初始化的时候，会初始化mReceiver对象，初始化这个mReceiver对象的时候会创建DisplayEventReceiver对象。
+这个方法会在初始化 NativeDisplayEventReceiver 对象， NativeDisplayEventReceiver 对象继承 DisplayEventDispatcher 对象，这个对象在初始化的时候，会初始化 mReceiver 对象，初始化这个 mReceiver 对象的时候会创建 DisplayEventReceiver 对象。
 
 ```c++
-frameworks/native/libs/gui/DisplayEventReceiver.cpp
+/home/biezhihua/projects/aosp/frameworks/native/include/gui/DisplayEventReceiver.h
+class DisplayEventReceiver {
+public:
 
+    ...
+
+    /*
+     * requestNextVsync() schedules the next Event::VSync. It has no effect
+     * if the vsync rate is > 0.
+     */
+    status_t requestNextVsync();
+
+
+};
+
+frameworks/native/libs/gui/DisplayEventReceiver.cpp
 DisplayEventReceiver::DisplayEventReceiver(
         ISurfaceComposer::VsyncSource vsyncSource,
         ISurfaceComposer::EventRegistrationFlags eventRegistration) {
@@ -1635,17 +1705,17 @@ void EventThreadConnection::onFirstRef() {
 
 这个构造方法中有很重要的步骤，具体如下：
 
-- 获取SurfaceFlinger的binder代理对象BpSurfaceComposer，就可以调用SurfaceFlinger binder服务端的接口
+- 获取 SurfaceFlinger 的 binder 代理对象 BpSurfaceComposer ，就可以调用 SurfaceFlinger binder 服务端的接口
 
-- 调用SurfaceFlinger的binder接口创建一个connection，这个connection就是注册到EventThread中，用来判断是不是要接受Vsync-app信号。
+- 调用 SurfaceFlinger 的binder接口创建一个connection，这个 connection 就是注册到 EventThread 中，用来判断是不是要接受Vsync-app信号。
 
-  - 在SurfaceFlinger创建这个这个connection是会走到EventThread的createEventConnection，在EventThreadConnection的构造方法中会创建一个sockert对象。这个mEventConnection也是一个binder对象，IDisplayEventConnection，SurfaceFlinger进程返回BpDisplayEventConnection赋值给mEventConection。而服务端就是EventThreadConnection。
+  - 在 SurfaceFlinger 创建这个这个 connection 是会走到 EventThread 的 createEventConnection ，在 EventThreadConnection 的构造方法中会创建一个 socket 对象。这个 mEventConnection 也是一个 binder 对象， IDisplayEventConnection ， SurfaceFlinger 进程返回 BpDisplayEventConnection 赋值给 mEventConection。而服务端就是 EventThreadConnection。
 
-- 在DisplayEventReceiver构造方法中也会创建一个空的gui::BitTubet对象，并且调用connection的binder接口，把socket对象设置到EventThreadConnection对象中，这个操作就是把两边关联起来，从代码实现可以看出是讲SurfaceFlinger进程中服务端创建的gui::BitTube对象赋值给应用端空的gui::BitTube对象。
+- 在DisplayEventReceiver 构造方法中也会创建一个空的 gui::BitTubet 对象，并且调用 connection 的 binder 接口，把 socket 对象设置到 EventThreadConnection 对象中，这个操作就是把两边关联起来，从代码实现可以看出是讲 SurfaceFlinge r进程中服务端创建的 gui::BitTube 对象赋值给应用端空的 gui::BitTube 对象。
 
-- 然后EventThreadConnection初始化好之后，在第一次引用调用的时候，会把自己注册到EventThread的集合中mDisplayEventConnections。
+- 然后 EventThreadConnection 初始化好之后，在第一次引用调用的时候，会把自己注册到 EventThread 的集合中 mDisplayEventConnections。
 
-### Vsync-app的申请和发射
+### Vsync-app 的申请和发射
 
 接下来我们主要讲解app怎么向SurfaceFlinger申请Vsync-app的，然后Vsync-app的信号怎么发射到应用的。
 
