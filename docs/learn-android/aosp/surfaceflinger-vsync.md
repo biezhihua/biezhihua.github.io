@@ -1169,7 +1169,7 @@ sp<EventThreadConnection> EventThread::createEventConnection(
 
 ```
 
-## SF 请求 VSYNC-sf
+## VSYNC-sf 的申请
 
 ### scheduleFrame
 
@@ -1588,7 +1588,7 @@ void VSyncDispatchTimerQueue::timerCallback() {
 
 从上面的代码流程中，可以看到当发射的时间回调这个方法中，会在mCallbacks的集合中查找符合这次发射的时间的匹配者， 先判断该对象中的发射时间是否有效，如果有效的话，获取当前的时间信息和发射时间的差值。因为设置给定时器的唤醒时间，和当前时间按理是一致的，但是因为软件实现肯定是有偏差值的，所以拿发射的时间值，和真正的发射的时间值有个校验。如果符合发射的时间，则把需要发射的对象放到invocation的集合中。然后遍历这个集合挨个把Vsync信号发射给对应的代码。
 
-## Vsync-app 的申请和发射
+## VSYNC-app 的申请和发射
 
 ### 应用向 Surfaceflinger 注册 connection
 
@@ -2045,7 +2045,7 @@ void EventThread::dispatchEvent(const DisplayEventReceiver::Event& event,
 
 这个DisplayEventConsumers就是connection的vector集合对象，然后通过connection对象把Vsync事件发送出去。后面应用怎么接受到这个Vsync-app的信号，本章节就不分析，大家有兴趣的话可以自己下来了解下。
 
-## SW VSYNC模型和校准
+## SW VSYNC 模型和校准
 
 在Android S之前的版本，开关硬件VSync开关是有一个线程都做的，在12版本上面都已经做了重构。
 
