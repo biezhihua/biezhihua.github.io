@@ -2423,51 +2423,56 @@ IRenderPipeline::DrawResult SkiaOpenGLPipeline::draw(
 
 ## SurfaceFlinger 合成显示
 
-SurfaceFlinger合成显示部分完全属于Android系统GUI中图形显示的内容，逻辑结构也比较复杂，但不属于本文介绍内容的重点。所以本小节中只是总体上介绍一下其工作原理与思想，不再详细分析源码，感兴趣的读者可以关注笔者后续的文章再来详细分析讲解。简单的说SurfaceFlinger作为系统中独立运行的一个Native进程，借用Android官网的描述，其职责就是负责接受来自多个来源的数据缓冲区，对它们进行合成，然后发送到显示设备。如下图所示：
+`SurfaceFlinger` 合成显示部分完全属于 Android 系统 GUI 中图形显示的内容，逻辑结构也比较复杂，但不属于本文介绍内容的重点。所以本小节中只是总体上介绍一下其工作原理与思想，不再详细分析源码，感兴趣的读者可以关注笔者后续的文章再来详细分析讲解。简单的说 `SurfaceFlinger` 作为系统中独立运行的一个 Native 进程，借用Android官网的描述，其职责就是负责接受来自多个来源的数据缓冲区，对它们进行合成，然后发送到显示设备。如下图所示：
 
-![](/learn-android/aosp/create-app-30.webp)
+![](/learn-android/aosp/app-launch-43.png)
 
-从上图可以看出，其实SurfaceFlinger在Android系统的整个图形显示系统中是起到一个承上启下的作用：
+从上图可以看出，其实 `SurfaceFlinger` 在Android系统的整个图形显示系统中是起到一个承上启下的作用：
 
-- 对上：通过Surface与不同的应用进程建立联系，接收它们写入Surface中的绘制缓冲数据，对它们进行统一合成。
+- 对上：通过 `Surface` 与不同的应用进程建立联系，接收它们写入 `Surface` 中的绘制缓冲数据，对它们进行统一合成。
 
 - 对下：通过屏幕的后缓存区与屏幕建立联系，发送合成好的数据到屏幕显示设备。
 
-图形的传递是通过Buffer作为载体，Surface是对Buffer的进一步封装，也就是说Surface内部具有多个Buffer供上层使用，如何管理这些Buffer呢？答案就是BufferQueue ，下面我们来看看BufferQueue的工作原理：
+图形的传递是通过 Buffer 作为载体，Surface 是对 Buffer 的进一步封装，也就是说 Surface 内部具有多个 Buffer 供上层使用，如何管理这些Buffer呢？答案就是BufferQueue ，下面我们来看看BufferQueue的工作原理：
 
-### BufferQueue机制
+### BufferQueue 机制
 
-借用一张经典的图来描述BufferQueue的工作原理：
+借用一张经典的图来描述 `BufferQueue` 的工作原理：
 
-![](/learn-android/aosp/create-app-31.webp)
+![](/learn-android/aosp/app-launch-44.png)
 
-BufferQueue是一个典型的生产者-消费者模型中的数据结构。在Android应用的渲染流程中，应用扮演的就是“生产者”的角色，而SurfaceFlinger扮演的则是“消费者”的角色，其配合工作的流程如下：
+`BufferQueue` 是一个典型的生产者-消费者模型中的数据结构。在 Android 应用的渲染流程中，应用扮演的就是“生产者”的角色，而 `SurfaceFlinger` 扮演的则是“消费者”的角色，其配合工作的流程如下：
 
-- 应用进程中在开始界面的绘制渲染之前，需要通过Binder调用dequeueBuffer接口从SurfaceFlinger进程中管理的BufferQueue 中申请一张处于free状态的可用Buffer，如果此时没有可用Buffer则阻塞等待；
+- 应用进程中在开始界面的绘制渲染之前，需要通过 Binder 调用 `dequeueBuffer` 接口从 `SurfaceFlinger` `进程中管理的BufferQueue` 中申请一张处于 free 状态的可用 Buffer，如果此时没有可用 Buffer 则阻塞等待；
 
-- 应用进程中拿到这张可用的Buffer之后，选择使用CPU软件绘制渲染或GPU硬件加速绘制渲染，渲染完成后再通过Binder调用queueBuffer接口将缓存数据返回给应用进程对应的BufferQueue（如果是 GPU 渲染的话，这里还有个 GPU处理的过程，所以这个 Buffer 不会马上可用，需要等 GPU 渲染完成的Fence信号），并申请sf类型的Vsync以便唤醒“消费者”SurfaceFlinger进行消费；
+- 应用进程中拿到这张可用的 Buffer 之后，选择使用 CPU 软件绘制渲染或 GPU 硬件加速绘制渲染，渲染完成后再通过 Binder 调用  `queueBuffer` 接口将缓存数据返回给应用进程对应的 `BufferQueue` （如果是 GPU 渲染的话，这里还有个 GPU处理的过程，所以这个 Buffer 不会马上可用，需要等 GPU 渲染完成的 Fence 信号），并申请sf类型的 Vsync 以便唤醒“消费者” `SurfaceFlinger` 进行消费；
 
-- SurfaceFlinger 在收到 Vsync 信号之后，开始准备合成，使用 acquireBuffer获取应用对应的 BufferQueue 中的 Buffer 并进行合成操作；
+- `SurfaceFlinger` 在收到 Vsync 信号之后，开始准备合成，使用  `acquireBuffer` 获取应用对应的 `BufferQueue` 中的 Buffer 并进行合成操作；
 
-- 合成结束后，SurfaceFlinger 将通过调用 releaseBuffer将 Buffer 置为可用的free状态，返回到应用对应的 BufferQueue中。
+- 合成结束后， `SurfaceFlinger` 将通过调用 `releaseBuffer` 将 Buffer 置为可用的 free 状态，返回到应用对应的 `BufferQueue` 中。
 
-### Vsync同步机制
+### Vsync 同步机制
 
-Vysnc垂直同步是Android在“黄油计划”中引入的一个重要机制，本质上是为了协调BufferQueue的应用生产者生成UI数据动作和SurfaceFlinger消费者的合成消费动作，避免出现画面撕裂的Tearing现象。Vysnc信号分为两种类型：
+VSYNC 垂直同步是 Android 在“黄油计划”中引入的一个重要机制，本质上是为了协调 `BufferQueue` 的应用生产者生成UI数据动作和 `SurfaceFlinger` 消费者的合成消费动作，避免出现画面撕裂的Tearing现象。 VSYNC 信号分为两种类型：
 
-- app类型的Vsync：app类型的Vysnc信号由上层应用中的Choreographer根据绘制需求进行注册和接收，用于控制应用UI绘制上帧的生产节奏。根据第7小结中的分析：应用在UI线程中调用invalidate刷新界面绘制时，需要先透过Choreographer向系统申请注册app类型的Vsync信号，待Vsync信号到来后，才能往主线程的消息队列放入待绘制任务进行真正UI的绘制动作；
+- app 类型的 Vsync ：app 类型的 Vsync 信号由上层应用中的 `Choreographer` 根据绘制需求进行注册和接收，用于控制应用UI绘制上帧的生产节奏。根据第7小结中的分析：应用在UI线程中调用 `invalidate` 刷新界面绘制时，需要先透过 `Choreographer` 向系统申请注册 app 类型的 Vsync 信号，待 Vsync 信号到来后，才能往主线程的消息队列放入待绘制任务进行真正UI的绘制动作；
 
-- sf类型的Vsync:sf类型的Vsync是用于控制SurfaceFlinger的合成消费节奏。应用完成界面的绘制渲染后，通过Binder调用queueBuffer接口将缓存数据返还给应用对应的BufferQueue时，会申请sf类型的Vsync，待SurfaceFlinger 在其UI线程中收到 Vsync 信号之后，便开始进行界面的合成操作。
+- sf 类型的 Vsync : sf 类型的 Vsync 是用于控制 `SurfaceFlinger` 的合成消费节奏。应用完成界面的绘制渲染后，通过 Binder 调用 `queueBuffer` 接口将缓存数据返还给应用对应的 BufferQueue 时，会申请sf类型的Vsync，待 `SurfaceFlinger` 在其UI线程中收到 Vsync 信号之后，便开始进行界面的合成操作。
 
-Vsync信号的生成是参考屏幕硬件的刷新周期的，其架构如下图所示：
+Vsync 信号的生成是参考屏幕硬件的刷新周期的，其架构如下图所示：
 
-![](/learn-android/aosp/create-app-32.webp)
+![](/learn-android/aosp/app-launch-45.png)
 
-本小节所描述的流程，从 Perfetto 上看SurfaceFlinger处理应用上帧工作的流程如下图所示：
+
+本小节所描述的流程，从 Perfetto 上看 `SurfaceFlinger` 处理应用上帧工作的流程如下图所示：
+
+![](/learn-android/aosp/app-launch-46.png)
+
+![](/learn-android/aosp/app-launch-47.png)
 
 ## 其他
 
-### Android中的epoll机制
+### Android中的 epoll 
 
 在 Android 中，epoll 是一种事件通知机制，用于处理 I/O 事件的多路复用。它是基于 Linux 的 epoll 概念进行实现的，提供了高效的事件管理和触发机制，常用于网络编程和异步 I/O 操作。
 
