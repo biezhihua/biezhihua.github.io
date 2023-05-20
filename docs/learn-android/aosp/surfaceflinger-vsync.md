@@ -4,13 +4,17 @@ tag:
   - aosp
 ---
 
-# Android | AOSP | SurfaceFlinger模块-VSYNC研究
+# Android | AOSP | SurfaceFlinger模块-VSYNC研究 | 转载&加工
 
 ## 前言1
 
 转载自：<https://www.jianshu.com/p/5e9c558d1543> ，并结合Perfetto更新了部分内容。
 
 ## 前言2
+
+源码版本：android-13.0.0_r41
+
+## 导读
 
 Vsync信号是SurfaceFlinger进程中核心的一块逻辑，我们主要从以下几个方面着手讲解。
 
