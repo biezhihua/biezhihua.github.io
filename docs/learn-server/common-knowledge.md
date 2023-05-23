@@ -3,7 +3,7 @@ tag:
   - server
 ---
 
-# 服务端常用知识点
+# Server | 服务端常用知识点
 
 ## RPC框架是什么？
 
@@ -23,7 +23,7 @@ RPC 框架提供了一种抽象层，让程序员可以专注于编写应用程�
 
 常见的RPC框架有Google的gRPC、Facebook的Thrift、以及Apache的Dubbo等。
 
-## org.springframework:spring-context:4.3.25.RELEASE 中 @Component 的含义和作用以及使用场景。
+## spring 中 @Component 的含义和作用以及使用场景。
 
 在Spring框架中，`@Component`是一个非常重要的注解。它用于标注一个类作为Spring框架的组件。这些类会被Spring自动扫描并添加到应用程序上下文中，用于依赖注入。`@Component`注解告诉Spring框架，该类是一个Spring组件，它将被Spring应用程序上下文自动检测并注册。
 

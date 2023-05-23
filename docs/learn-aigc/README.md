@@ -2,4 +2,4 @@
 article: false
 ---
 
-# Rust
+# AIGC

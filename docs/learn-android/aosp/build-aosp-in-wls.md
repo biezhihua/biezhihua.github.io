@@ -697,6 +697,7 @@ breakpoint set -M SurfaceFlinger::onComposerHalVsync
 ```
 
 打印调用栈
+
 ```bash
 bt
 ```
@@ -704,7 +705,7 @@ bt
 - <https://source.android.com/docs/core/tests/debug/gdb?hl=zh-cn>
 - <https://lldb.llvm.org/>
 
-##  **init**() got an unexpected keyword argument 'text'
+## **init**() got an unexpected keyword argument 'text'
 
 ```
 ➜  aosp lldbclient.py -p 3696  --setup-forwarding vscode-lldb

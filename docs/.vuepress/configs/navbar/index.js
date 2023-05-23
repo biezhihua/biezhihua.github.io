@@ -1,11 +1,5 @@
 export const navbar = [
     {
-        text: 'Blogs',
-        children:[
-            '/learn-blogs/README.md',
-        ]
-    },
-    {
         text: 'LeetCode',
         children: [
             "/learn-leetcode/README.md",
