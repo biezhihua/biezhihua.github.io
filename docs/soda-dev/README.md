@@ -70,6 +70,9 @@
 
 ### soda-media-tools
 
+- 文件名解析工具
+- 文件转移模式工具
+
 ### soda-media-tools-web
 
 ## 路线图
