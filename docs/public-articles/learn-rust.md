@@ -1,8 +1,8 @@
 ---
-article: false
+article: true
 ---
 
-# Rust
+# learn-rust
 
 ## give me a example for dyn in Rust language.
 

@@ -1,6 +1,8 @@
-# learn-web
+---
+article: true
+---
 
-# DEV
+# learn-web
 
 ## 开发知识点
 
@@ -46,10 +48,10 @@ The HTTP body is the part of an HTTP message that contains the actual data being
 
 The body of an HTTP message is typically used to carry the following types of data:
 
-* **Form data:** This is the data that is submitted in a form. Form data is typically encoded in the application/x-www-form-urlencoded format.
-* **File uploads:** This is the data that is uploaded to a server. File uploads are typically encoded in the multipart/form-data format.
-* **JSON data:** This is a lightweight data format that is often used to transmit structured data between clients and servers.
-* **XML data:** This is a more complex data format that is often used to transmit structured data between clients and servers.
+- **Form data:** This is the data that is submitted in a form. Form data is typically encoded in the application/x-www-form-urlencoded format.
+- **File uploads:** This is the data that is uploaded to a server. File uploads are typically encoded in the multipart/form-data format.
+- **JSON data:** This is a lightweight data format that is often used to transmit structured data between clients and servers.
+- **XML data:** This is a more complex data format that is often used to transmit structured data between clients and servers.
 
 The body of an HTTP message is typically encoded in a binary format, such as UTF-8 or ASCII. The encoding of the body is specified by the Content-Type header.
 
@@ -61,7 +63,7 @@ The body of an HTTP message is an important part of the HTTP protocol. It allows
 
 For more information on HTTP bodies, you can refer to the following resources:
 
-* HTTP Body: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Length
-* List of HTTP Header Fields: https://en.wikipedia.org/wiki/List_of_HTTP_header_fields
-* RFC 7230: https://tools.ietf.org/html/rfc7230
-* RFC 7231: https://tools.ietf.org/html/rfc7231
+- HTTP Body: <https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Length>
+- List of HTTP Header Fields: <https://en.wikipedia.org/wiki/List_of_HTTP_header_fields>
+- RFC 7230: <https://tools.ietf.org/html/rfc7230>
+- RFC 7231: <https://tools.ietf.org/html/rfc7231>

@@ -29,6 +29,7 @@ export default defineUserConfig({
             page?.filePathRelative?.startsWith("learn-rust") ||
             page?.filePathRelative?.startsWith("learn-blogs") ||
             page?.filePathRelative?.startsWith("learn-server") ||
+            page?.filePathRelative?.startsWith("public-articles") ||
             false;
         },
         excerptLength: 0,

@@ -1,9 +1,10 @@
 ---
+article: true
 tag:
   - server
 ---
 
-# Server | 服务端常用知识点
+# learn-server
 
 ## RPC框架是什么？
 
