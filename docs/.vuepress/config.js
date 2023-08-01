@@ -24,13 +24,12 @@ export default defineUserConfig({
     plugins: {
       blog: {
         filter: page => {
-          // return page?.filePathRelative?.startsWith("learn-android") ||
-          //   page?.filePathRelative?.startsWith("learn-aigc") ||
-          //   page?.filePathRelative?.startsWith("learn-rust") ||
-          //   page?.filePathRelative?.startsWith("learn-blogs") ||
-          //   page?.filePathRelative?.startsWith("learn-server") ||
-          //   false;
-          return true;
+          return page?.filePathRelative?.startsWith("learn-android") ||
+            page?.filePathRelative?.startsWith("learn-aigc") ||
+            page?.filePathRelative?.startsWith("learn-rust") ||
+            page?.filePathRelative?.startsWith("learn-blogs") ||
+            page?.filePathRelative?.startsWith("learn-server") ||
+            false;
         },
         excerptLength: 0,
       }
