@@ -2,7 +2,7 @@
 article: true
 ---
 
-# learn-rust
+# Learn-Rust
 
 ## give me a example for dyn in Rust language.
 
