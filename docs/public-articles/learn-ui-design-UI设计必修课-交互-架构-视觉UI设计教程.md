@@ -2,7 +2,7 @@
 article: true
 ---
 
-# learn-ui-design-UI设计必修课:交互-机构-视觉
+# Learn-UI-Design UI设计必修课:交互-机构-视觉
 
 <https://e.dangdang.com/pc/reader/index.html?id=1901211576>
 
