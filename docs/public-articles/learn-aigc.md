@@ -1,8 +1,8 @@
 ---
-article: false
+article: true
 ---
 
-# AIGC
+# learn-aigc
 
 ## stable diffusion、
 
