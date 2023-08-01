@@ -40,4 +40,28 @@ JWT 是一种安全高效的格式，可用于在 Web 应用程序中传输安�
 - 易于使用：JWT 易于使用，可以与各种编程语言和框架一起使用。
 - 可扩展：JWT 可用于各种目的，并且可以根据需要进行定制。
 
-## 
+## http body
+
+The HTTP body is the part of an HTTP message that contains the actual data being transferred. The body is optional, and is not present in all HTTP messages.
+
+The body of an HTTP message is typically used to carry the following types of data:
+
+* **Form data:** This is the data that is submitted in a form. Form data is typically encoded in the application/x-www-form-urlencoded format.
+* **File uploads:** This is the data that is uploaded to a server. File uploads are typically encoded in the multipart/form-data format.
+* **JSON data:** This is a lightweight data format that is often used to transmit structured data between clients and servers.
+* **XML data:** This is a more complex data format that is often used to transmit structured data between clients and servers.
+
+The body of an HTTP message is typically encoded in a binary format, such as UTF-8 or ASCII. The encoding of the body is specified by the Content-Type header.
+
+The size of the body of an HTTP message is limited by the maximum header size and the maximum message size. The maximum header size is typically 8KB, and the maximum message size is typically 1MB.
+
+The body of an HTTP message is typically transmitted after the headers. However, in some cases, the body may be transmitted before the headers. This is known as chunked transfer encoding.
+
+The body of an HTTP message is an important part of the HTTP protocol. It allows clients and servers to transmit data between them.
+
+For more information on HTTP bodies, you can refer to the following resources:
+
+* HTTP Body: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Length
+* List of HTTP Header Fields: https://en.wikipedia.org/wiki/List_of_HTTP_header_fields
+* RFC 7230: https://tools.ietf.org/html/rfc7230
+* RFC 7231: https://tools.ietf.org/html/rfc7231
