@@ -2,7 +2,7 @@
 article: true
 ---
 
-# Learn-AIGC
+# Learn | AIGC
 
 ## stable diffusion、
 

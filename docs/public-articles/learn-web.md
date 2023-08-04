@@ -2,9 +2,7 @@
 article: true
 ---
 
-# learn-web
-
-## 开发知识点
+# Learn | Web
 
 ## 用户登录信息需要存储到cookie中，否则页面重进时无法获取到用户的登录态
 

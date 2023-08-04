@@ -2,7 +2,7 @@
 article: true
 ---
 
-# Learn-Linux
+# Learn | Linux
 
 ## kill target port
 
