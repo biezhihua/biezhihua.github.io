@@ -87,7 +87,7 @@ Process finished with exit code 0
 - https://stackoverflow.com/questions/76349657/what-is-the-missing-sqlite3-lib-file-when-trying-to-run-rustqlite-with-precomp
 - https://blog.itdevwu.com/post/915/
 
-## How to fix: exit code: 0xc0000135, STATUS_DLL_NOT_FOUND
+## How to fix - exit code: 0xc0000135, STATUS_DLL_NOT_FOUND
 
 ```bash
  $biezhihua: D:/Projects/github/examples/sqlite/getting_started_step_1 ❯ echo $LASTEXITCODE
@@ -121,7 +121,7 @@ I asked if we could expect a non-broken libintl DLL in upcoming versions (after 
 
 ### Solution 2
 
-- Add `D:\App\sqlite3` and `D:\App\gettext0.21-iconv1.16-shared-64\bin` to you PATH.
+- Add `D:\App\sqlite3` and `D:\App\gettext0.21-iconv1.16-shared-64\bin` to your PATH.
 - Restart your PowerShell
 - Build your project
 
@@ -137,6 +137,30 @@ Creating database: db.sqlite3
 
 - https://github.com/diesel-rs/diesel/issues/2015#issuecomment-474172079
 - https://github.com/diesel-rs/diesel/discussions/2947
+
+## How to fix - Unsupported type: serial
+
+```SQL
+# sqlite
+CREATE TABLE posts (
+id INTEGER PRIMARY KEY,
+title VARCHAR NOT NULL,
+body TEXT NOT NULL,
+published BOOLEAN NOT NULL DEFAULT FALSE
+)
+```
+
+```SQL
+# postgreSQL
+CREATE TABLE posts (
+id SERIAL PRIMARY KEY,
+title VARCHAR NOT NULL,
+body TEXT NOT NULL,
+published BOOLEAN NOT NULL DEFAULT FALSE
+)
+```
+
+- https://github.com/diesel-rs/diesel/issues/427
 
 ## Other
 
