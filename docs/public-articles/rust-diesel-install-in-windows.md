@@ -162,6 +162,37 @@ published BOOLEAN NOT NULL DEFAULT FALSE
 
 - https://github.com/diesel-rs/diesel/issues/427
 
+## Demo
+
+```bash
+# create database sqlite
+ $biezhihua: D:/Projects/github/diesel_demo on master ≢  ?3 ❯ diesel setup
+Creating migrations directory at: D:\Projects\github\diesel_demo\migrations
+Creating database: db.sqlite3
+```
+
+```bash
+ $biezhihua: D:/Projects/github/diesel_demo on master ≢  ?7 ❯ diesel migration generate create_posts    23% 15/68GB
+Creating migrations\2023-08-10-081601_create_posts\up.sql
+Creating migrations\2023-08-10-081601_create_posts\down.sql
+```
+
+```bash
+# create tables in sqlite3
+# create schema
+ $biezhihua: D:/Projects/github/diesel_demo on master ≢  ?7 ❯ diesel migration run                      28% 19/68GB
+Running migration 2023-08-10-081601_create_posts
+ $biezhihua: D:/Projects/github/diesel_demo on master ≢  ?8 ❯ diesel migration run                      28% 19/68GB
+ $biezhihua: D:/Projects/github/diesel_demo on master ≢  ?8 ❯      
+
+```
+
+```bash
+ $biezhihua: D:/Projects/github/diesel_demo on master ≢  ?8 ❯ diesel migration redo                     28% 19/68GB
+Rolling back migration 2023-08-10-081601_create_posts
+Running migration 2023-08-10-081601_create_posts
+```
+
 ## Other
 
 ### what is setx in poweshell
