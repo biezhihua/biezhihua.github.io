@@ -87,7 +87,58 @@ Process finished with exit code 0
 - https://stackoverflow.com/questions/76349657/what-is-the-missing-sqlite3-lib-file-when-trying-to-run-rustqlite-with-precomp
 - https://blog.itdevwu.com/post/915/
 
-## other
+## How to fix: exit code: 0xc0000135, STATUS_DLL_NOT_FOUND
+
+```bash
+ $biezhihua: D:/Projects/github/examples/sqlite/getting_started_step_1 ❯ echo $LASTEXITCODE
+-1073741515
+```
+
+```bash
+ $biezhihua: D:/Projects/github/examples/postgres/getting_started_step_1 ❯ cargo run
+    Finished dev [unoptimized + debuginfo] target(s) in 0.01s
+     Running `target\debug\show_posts.exe`
+error: process didn't exit successfully: `target\debug\show_posts.exe` (exit code: 0xc0000135, STATUS_DLL_NOT_FOUND)
+```
+
+### Solution 1
+
+copy libiconv-2.dll libintl-9.dll sqlite3.dll sqlite3.lib to your project root directory.
+
+```bash
+ $biezhihua: D:/Projects/github/examples/sqlite/getting_started_step_1 ❯ diesel setup                     26% 18/68GB
+Creating database: db.sqlite3
+Running migration 20170124012402_create_posts
+```
+
+```text
+Download gettext0.21-iconv1.16-shared-64 from http://mlocati.github.io/articles/gettext-iconv-windows.html
+Extract the ZIP. It will contain, inter alia, libintl-8.dll which is newer than libintl-9.dll
+Rename libintl-8.dll to libintl-9.dll
+Place your new libintl-9.dll in the same directory as your executable (e.g., target\debug) to get the fixed libintl to link correctly. If you just copy it and don't rename it, it will link to the broken libintl-9.dll in the Postgres install directory.
+I asked if we could expect a non-broken libintl DLL in upcoming versions (after they figure out the performance regression). I don't know yet, but at least we have a fix.
+```
+
+### Solution 2
+
+- Add `D:\App\sqlite3` and `D:\App\gettext0.21-iconv1.16-shared-64\bin` to you PATH.
+- Restart your PowerShell
+- Build your project
+
+```bash
+PowerShell 7.3.6
+ $biezhihua: D:/Projects/github/examples/sqlite/getting_started_step_1 ❯ diesel setup
+ $biezhihua: D:/Projects/github/examples/sqlite/getting_started_step_1 ❯ diesel setup                     26% 18/68GB
+Creating migrations directory at: D:\Projects\github\examples\sqlite\getting_started_step_1\migrations
+Creating database: db.sqlite3
+```
+
+### References
+
+- https://github.com/diesel-rs/diesel/issues/2015#issuecomment-474172079
+- https://github.com/diesel-rs/diesel/discussions/2947
+
+## Other
 
 ### what is setx in poweshell
 
