@@ -2,9 +2,21 @@
 article: true
 ---
 
-# Learn | Linux
+# Learn | Windows && Linux
 
-## kill target port
+## Windows
+
+## Linus
+
+```bash
+netstat -ano | findstr :<port>
+```
+
+```bash
+taskkill /F /PID <PID>
+```
+
+### kill target port
 
 ```bash
 lsof -i:8702
