@@ -38,7 +38,9 @@ Replaced package `diesel_cli v2.1.0` with `diesel_cli v2.1.0` (executable `diese
 
 ### build sqlite3.lib 
 
+```text
 How to build SQLite3 .lib file on Windows 10
+
 Download source from source (https://www.sqlite.org/download.html)
 
 For example: source https://www.sqlite.org/2020/sqlite-amalgamation-3310100.zip
@@ -53,6 +55,7 @@ Open Developer Command Prompt for VS 2017 by typing Developer Command in Windows
 
 Go to directory where you've extracted source code and binary files (via opened cmd)
 
+```
 Run
 ```bash
 lib /DEF:sqlite3.def /OUT:sqlite3.lib /MACHINE:x64
