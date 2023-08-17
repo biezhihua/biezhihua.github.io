@@ -1,4 +1,4 @@
-# Install Diesel-Cli For Rust In Windwos 11 
+# Solution | Install Diesel-Cli For Rust In Windwos 11 
 
 ## Install MySQL for Windows 11
 
