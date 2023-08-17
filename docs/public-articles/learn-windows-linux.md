@@ -6,8 +6,6 @@ article: true
 
 ## Windows
 
-## Linus
-
 ```bash
 netstat -ano | findstr :<port>
 ```
@@ -21,7 +19,9 @@ net stop winnat
 net start winnat
 ```
 
-### kill target port
+## Linux
+
+- kill target port
 
 ```bash
 lsof -i:8702

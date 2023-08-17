@@ -65,3 +65,11 @@ For more information on HTTP bodies, you can refer to the following resources:
 - List of HTTP Header Fields: <https://en.wikipedia.org/wiki/List_of_HTTP_header_fields>
 - RFC 7230: <https://tools.ietf.org/html/rfc7230>
 - RFC 7231: <https://tools.ietf.org/html/rfc7231>
+
+## labelInValue 有什么作用
+
+"labelInValue" 是一个在前端开发中经常使用的概念，主要用于属性或选项的显示与存储的映射关系。
+
+在一些组件库或框架中，比如 Ant Design 的 Select 组件，可以使用"labelInValue"属性来指定选中项的值和展示文本的格式。一般情况下，该属性接收一个布尔值，当设置为 true 时，选中项的值和展示文本被封装为一个对象，其中包含"label"和"value"两个属性。
+
+这个特性在处理表单提交时很有用，因为它可以让开发人员更方便地获取用户选择的值，并且同时获得对应的展示文本。这样在后续的数据处理或后端传输过程中，可以更容易地使用这些数据。
