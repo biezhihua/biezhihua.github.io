@@ -16,6 +16,11 @@ netstat -ano | findstr :<port>
 taskkill /F /PID <PID>
 ```
 
+```bash
+net stop winnat
+net start winnat
+```
+
 ### kill target port
 
 ```bash
