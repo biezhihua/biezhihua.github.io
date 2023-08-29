@@ -104,3 +104,101 @@ Here's an explanation of traits in Rust:
    In this example, the `speak()` method is called on the `dog` trait object. At runtime, Rust identifies the actual type of the object (`Dog`) and invokes the corresponding implementation of the `speak()` method.
 
 Traits are a powerful feature in Rust that enable code reuse and polymorphism. They provide a way to define shared behavior without knowing the specific types involved, promoting generic and flexible programming patterns.
+
+## 闭包体中的代码定义了稍后在闭包计算时对引用或值如何操作（也就影响了什么会被移 出 闭包，如有）。 帮我解释这段话
+
+这段话的意思是，闭包体中的代码定义了在闭包计算时对引用或值的操作方式，这将决定哪些变量会被移出闭包。
+
+闭包可以通过引用或值来捕获其周围作用域中的变量。当闭包在计算时需要访问这些变量时，它们可以以引用的方式或值的方式被捕获。
+
+如果闭包以引用方式捕获变量，则闭包内部对变量的操作将影响原始变量本身。这意味着变量不会被移出闭包，仍然可以在闭包之后继续使用。
+
+如果闭包以值的方式捕获变量，则闭包内部的操作将在闭包计算时复制变量的值。这意味着变量的所有权被移出闭包，只能在闭包内部使用，之后的代码无法再访问这些变量。
+
+具体选择是以引用方式还是值的方式捕获变量，取决于闭包体中对变量的操作需求。如果需要在闭包之后继续使用变量，可以选择以引用方式捕获；如果变量只在闭包内部使用，可以选择以值的方式捕获。
+
+总结来说，闭包体中的代码定义了对变量的操作方式，从而决定了哪些变量会被移出闭包。这样的设计可以在闭包计算时灵活地控制变量的所有权和可用性。
+
+## 在Rust中 trait bound 是什么意思
+
+在Rust中，Trait Bound（特质限定）指的是在泛型类型参数上使用特定trait的约束条件。Trait Bound用于指定泛型类型参数必须满足的条件，以便在泛型代码中使用特定的trait中定义的方法或功能。
+
+Trait Bound使用where关键字后跟随一个或多个trait约束条件。这些约束条件限定了泛型类型参数必须实现指定的trait。这样可以在泛型代码中使用trait中的方法或者在泛型函数中使用具体的实现类型。
+
+以下是一个示例，展示了Trait Bound的使用：
+
+```rust
+trait Printable {
+    fn print(&self);
+}
+
+struct Person {
+    name: String,
+}
+
+impl Printable for Person {
+    fn print(&self) {
+        println!("Name: {}", self.name);
+    }
+}
+
+fn print_object<T: Printable>(obj: T) {
+    obj.print();
+}
+
+fn main() {
+    let person = Person {
+        name: String::from("Alice"),
+    };
+    print_object(person);
+}
+
+```
+
+在上述示例中，定义了一个trait Printable，其中包含一个print方法。然后，我们创建了一个Person结构体，并为其实现了Printable trait。在print_object函数中，我们使用了Trait Bound T: Printable，表示泛型类型参数T必须实现Printable trait。然后，我们传递一个Person对象给print_object函数，因为Person实现了Printable trait。
+
+通过在泛型类型参数上使用Trait Bound，我们可以在编译时对泛型类型进行约束，以保证它们满足特定的trait约束条件。这样可以在泛型代码中使用trait中定义的方法，提供更加通用和灵活的代码。
+
+## 在Rust 中 dyn 关键字的作用
+
+在Rust中，dyn关键字用于指定trait对象的类型。
+
+在Rust中，trait对象是指对实现了某个trait的类型进行抽象，通过trait对象可以以统一的方式访问不同类型的具体实现。使用trait对象时，通常需要将具体类型转换为trait对象类型，这时就可以使用dyn关键字来标记trait对象的类型。
+
+具体来说，使用dyn关键字时，需要将trait指定为动态分发（dynamic dispatch），而不是静态分发（static dispatch）。动态分发允许在运行时根据具体对象的类型来调用相应的方法，而静态分发在编译时就会确定调用哪个方法。
+
+下面是一个使用dyn关键字的示例：
+
+```rust
+trait Animal {
+    fn make_sound(&self);
+}
+
+struct Dog;
+struct Cat;
+
+impl Animal for Dog {
+    fn make_sound(&self) {
+        println!("Woof!");
+    }
+}
+
+impl Animal for Cat {
+    fn make_sound(&self) {
+        println!("Meow!");
+    }
+}
+
+fn main() {
+    let dog: Box<dyn Animal> = Box::new(Dog);
+    let cat: Box<dyn Animal> = Box::new(Cat);
+
+    dog.make_sound(); // 使用trait对象调用动态分发的方法
+    cat.make_sound(); // 使用trait对象调用动态分发的方法
+}
+
+```
+
+在上述示例中，定义了一个Animal trait，具有make_sound方法。然后，分别为Dog和Cat类型实现了Animal trait。在main函数中，我们创建了dog和cat作为Box<dyn Animal>类型的trait对象。使用dyn关键字标记了Animal作为动态分发，因此在调用make_sound方法时会进行动态分发，根据具体对象的类型来调用相应的方法。
+
+总结来说，dyn关键字在Rust中用于标记trait对象的类型，指定为动态分发，使得可以在运行时根据具体对象的类型来调用相应的方法。这提供了更大的灵活性，可以在运行时决定调用哪个方法，但也会带来一些性能上的开销。
