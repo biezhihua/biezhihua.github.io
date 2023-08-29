@@ -264,3 +264,30 @@ fn main() {
 In the example above, Person struct implements the std::fmt::Debug trait using the derive attribute. When printing the person struct using println! and the {:?} placeholder, it displays a detailed representation of the struct fields.
 
 In summary, the {} placeholder is used for normal display of values, while {:?} is used for a more detailed and debug representation of values. The choice between them depends on the desired output format and the traits implemented by the value being printed.
+
+## 在Rust中str是什么？
+
+在Rust中，str是一种类型，表示字符串的切片（slice）。它是不可变的，由一个字节数组和一个指向该数组的长度组成。str类型可以用于表示任意长度的UTF-8编码字符串。
+
+与String类型不同，str类型是静态分配的，即在编译时就确定了字符串的内容和长度。它通常作为引用（&str）出现，因为字符串切片通常是对字符串的引用，而不是拥有字符串的所有权。
+
+由于str类型是不可变的，无法直接修改其内容。要对str进行操作或修改，通常需要将其转换为可变的String类型，进行修改后再转换回&str类型。
+
+以下是一个使用str类型的示例：
+
+```rust
+fn main() {
+    let greeting: &str = "Hello, world!";
+    let name: &str = "Alice";
+
+    println!("Greeting: {}", greeting);
+    println!("Name: {}", name);
+}
+```
+
+在上述示例中，我们定义了两个&str类型的变量：greeting和name，它们分别表示问候语和名字。然后，我们使用println!宏打印了这两个字符串切片。
+
+需要注意的是，&str类型是一种不可变的引用，可以在Rust中方便地处理和传递文本数据。它被广泛用于函数参数、结构体字段、以及与其他字符串相关的操作和函数中。
+
+总结来说，str是在Rust中表示字符串切片的类型，它是不可变的、静态分配的，并以&str的形式作为引用使用。它适用于表示任意长度的UTF-8编码字符串，并在Rust中广泛用于处理文本数据。
+
