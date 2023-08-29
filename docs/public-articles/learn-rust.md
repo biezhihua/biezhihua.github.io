@@ -225,3 +225,42 @@ fn main() {
 需要注意的是，Rust还提供了String类型，用于动态分配和可变的字符串数据。与字符串字面值不同，String类型的字符串是可变的，可以修改其内容。而字符串字面值是静态分配的，其内容在编译时就被确定下来了。
 
 总结来说，字符串字面值是一种在Rust程序中直接使用的不可变字符串表示形式，类型为&str。字符串字面值是静态分配的，其内容在编译时就被确定下来了，并且可以被多个变量共享引用。
+
+## what the different between {} and {:?} in Rust
+
+In Rust, {} and {:?} are used as placeholders within format strings to print values. The main difference between them lies in how they format and display the values.
+
+{}: This is the default placeholder used for formatting values in Rust. It is often referred to as the "Display" placeholder. It is used to format values that implement the std::fmt::Display trait. This placeholder is suitable for most types and provides a human-readable representation of the value. Example:
+
+```rust
+fn main() {
+    let num = 42;
+    let text = "Hello";
+
+    println!("Number: {}", num); // Output: Number: 42
+    println!("Text: {}", text); // Output: Text: Hello
+}
+```
+
+{:?}: This is a special placeholder used for formatting values in Rust, known as the "Debug" placeholder. It is used to format values that implement the std::fmt::Debug trait. It provides a more verbose and detailed representation of the value, primarily used for debugging purposes. Example:
+
+```rust
+#[derive(Debug)]
+struct Person {
+    name: String,
+    age: u32,
+}
+
+fn main() {
+    let person = Person {
+        name: String::from("Alice"),
+        age: 25,
+    };
+
+    println!("Person: {:?}", person); // Output: Person: Person { name: "Alice", age: 25 }
+}
+```
+
+In the example above, Person struct implements the std::fmt::Debug trait using the derive attribute. When printing the person struct using println! and the {:?} placeholder, it displays a detailed representation of the struct fields.
+
+In summary, the {} placeholder is used for normal display of values, while {:?} is used for a more detailed and debug representation of values. The choice between them depends on the desired output format and the traits implemented by the value being printed.
