@@ -394,3 +394,36 @@ T: Display,
   
 而所有的这一切发生在编译时所以不会影响运行时效率！
 ```
+
+
+## 闭包
+
+- https://kaisery.github.io/trpl-zh-cn/ch13-01-closures.html
+
+一旦闭包捕获了定义它的环境中一个值的引用或者所有权（也就影响了什么会被移 进 闭包，如有)，闭包体中的代码定义了稍后在闭包计算时对引用或值如何操作（也就影响了什么会被移 出 闭包，如有）。闭包体可以做以下任何事：将一个捕获的值移出闭包，修改捕获的值，既不移动也不修改值，或者一开始就不从环境中捕获值。
+
+闭包捕获和处理环境中的值的方式影响闭包实现的 trait。Trait 是函数和结构体指定它们能用的闭包的类型的方式。取决于闭包体如何处理值，闭包自动、渐进地实现一个、两个或三个 Fn trait。
+
+- FnOnce 适用于能被调用一次的闭包，所有闭包都至少实现了这个 trait，因为所有闭包都能被调用。一个会将捕获的值移出闭包体的闭包只实现 FnOnce trait，这是因为它只能被调用一次。
+- FnMut 适用于不会将捕获的值移出闭包体的闭包，但它可能会修改被捕获的值。这类闭包可以被调用多次。
+- Fn 适用于既不将被捕获的值移出闭包体也不修改被捕获的值的闭包，当然也包括不从环境中捕获值的闭包。这类闭包可以被调用多次而不改变它们的环境，这在会多次并发调用闭包的场景中十分重要。
+
+```rust
+pub generator_parent_path: Option<Box<dyn FnOnce(&String, &SodaMetaDataBasic) -> String + Send + 'static>>,
+
+error[E0507]: cannot move out of `*fun` which is behind a shared reference
+   --> soda_media_tools_lib\src\soda_media\media_context.rs:194:17
+    |
+194 |                 (fun)(target_directory, dir_metadata);
+    |                 ^^^^^--------------------------------
+    |                 |
+    |                 `*fun` moved due to this call
+    |                 move occurs because `*fun` has type `Box<dyn for<'a, 'b> FnOnce(&'a String, &'b SodaMetaDataBasic) -> String + Send>`, which does not implement the `Copy` trait
+    |
+note: this value implements `FnOnce`, which causes it to be moved when called
+   --> soda_media_tools_lib\src\soda_media\media_context.rs:194:17
+    |
+194 |                 (fun)(target_directory, dir_metadata);
+    |                 ^^^^^
+
+```
