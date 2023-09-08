@@ -35,3 +35,31 @@ article: true
 - 可重定位的机器代码  Relocatable
 - 链接器  Linker、加载器 Loader
 - 目标机器代码
+
+## 编译系统的结构
+
+### 人工英汉翻译的例子
+
+> https://zhuanlan.zhihu.com/p/362072187
+
+源语言句子 -> 第一步：分析源语言 -> 句子的语义 -> 第二步：生成目标语言 -> 目标语言句子
+
+- 分析源语言
+  - 语义分析  Semantic Analysis
+  - 语法分析  Syntax Analysis
+  - 词法分析  Lexical Analysis
+
+![](https://pic1.zhimg.com/80/v2-030d08a420bca7456162086ecb04c704_720w.webp)
+
+
+### 编译器结构
+
+- 词法分析器 -> 词法单元流
+- 语法分析器 -> 语法树
+- 语义分析器 -> 语法树
+- 中间代码生成器 -> 中间表示形式
+- 机器无关代码优化器
+- 目标代码生成器 -> 目标机器语言
+- 机器相关代码优化器 
+
+![](https://pic2.zhimg.com/80/v2-6c3637f5e5bbbc839e178f810c113895_720w.webp)
