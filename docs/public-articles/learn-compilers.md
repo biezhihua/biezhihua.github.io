@@ -154,11 +154,12 @@ BNF:A::=B∣C
 - 三地址码 (Three-address Code)：三地址码由类似于汇编语言的指令序列组成，每个指令最多有三个操作数(operand)
 - 语法结构树/语法树 (Syntax Trees)
 - 逆波兰式
-- 三地址指令的表示：
-  - 四元式 (Quadruples)，(op, y, z, x)
-  - 三元式 (Triples)
-  - 间接三元式(Indirect triples)
-  - ![](https://pic3.zhimg.com/80/v2-b2aa99ac42a1abef2b5a921bb8cbc99e_720w.webp)
+
+#### 三地址指令的表示：
+- 四元式 (Quadruples)，(op, y, z, x)
+- 三元式 (Triples)
+- 间接三元式(Indirect triples)
+- ![](https://pic3.zhimg.com/80/v2-b2aa99ac42a1abef2b5a921bb8cbc99e_720w.webp)
 
 ### 中间代码生成案例
 
