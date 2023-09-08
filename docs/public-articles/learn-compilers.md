@@ -4,6 +4,8 @@ article: true
 
 # Learn | Compilers
 
+![](/public-articles/learn-compilers.png)
+
 ## 什么是编译
 
 > Bilibili: https://www.bilibili.com/video/BV1dL4y1H7T8?p=1&vd_source=7067fca17f42bb32fbfaf035206bde26

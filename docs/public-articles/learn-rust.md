@@ -427,3 +427,34 @@ note: this value implements `FnOnce`, which causes it to be moved when called
     |                 ^^^^^
 
 ```
+
+
+## get tests directory path in Rust
+
+In Rust, you can use the `std::env::current_dir` function to get the current working directory, and then append the path to your tests directory. Assuming you have a project structure like this:
+
+```
+my_project/
+  ├── src/
+  ├── tests/
+  │   └── test_module.rs
+  └── Cargo.toml
+```
+
+You can get the path to the tests directory from within your test code like this:
+
+```rust
+fn main() {
+    // Get the current working directory.
+    let current_dir = std::env::current_dir().expect("Failed to get current directory");
+
+    // Append the 'tests' directory to the current working directory.
+    let tests_dir = current_dir.join("tests");
+
+    println!("Tests directory path: {:?}", tests_dir);
+}
+```
+
+This code first retrieves the current working directory using `std::env::current_dir()`, and then it appends the "tests" directory to the current working directory using the `join` method. Finally, it prints the path to the tests directory.
+
+Make sure to handle any potential errors when getting the current directory, as shown in the example with `expect`.
