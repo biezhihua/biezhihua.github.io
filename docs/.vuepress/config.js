@@ -16,7 +16,7 @@ export default defineUserConfig({
 
   // https://v2.vuepress.vuejs.org/reference/config.html#lang
   lang: 'zh-CN',
-  title: 'biezhihua',
+  title: 'biezhihua的日常',
   description: ' ',
 
   // https://v2.vuepress.vuejs.org/guide/theme.html
