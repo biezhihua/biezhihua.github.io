@@ -458,3 +458,12 @@ fn main() {
 This code first retrieves the current working directory using `std::env::current_dir()`, and then it appends the "tests" directory to the current working directory using the `join` method. Finally, it prints the path to the tests directory.
 
 Make sure to handle any potential errors when getting the current directory, as shown in the example with `expect`.
+
+
+## How to overwrite a file in Rust
+
+- https://ddanilov.me/how-to-overwrite-a-file-in-rust
+
+## How to read and write YAML in Rust with Serde
+
+- https://tms-dev-blog.com/how-to-read-and-write-yaml-in-rust-with-serde/
