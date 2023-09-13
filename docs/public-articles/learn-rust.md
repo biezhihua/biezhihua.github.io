@@ -467,3 +467,7 @@ Make sure to handle any potential errors when getting the current directory, as 
 ## How to read and write YAML in Rust with Serde
 
 - https://tms-dev-blog.com/how-to-read-and-write-yaml-in-rust-with-serde/
+
+## what is the best way to run scheduled concurrent tasks in rust
+
+- https://users.rust-lang.org/t/what-is-the-best-way-to-run-scheduled-concurrent-tasks-in-rust/43931
