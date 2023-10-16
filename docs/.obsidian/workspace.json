@@ -1,0 +1,187 @@
+{
+  "main": {
+    "id": "65fe84b35004dd22",
+    "type": "split",
+    "children": [
+      {
+        "id": "de32cc0d614eb377",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "c3502ff6f9dec178",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "public-articles/plantTest.md",
+                "mode": "source",
+                "source": false
+              }
+            }
+          }
+        ]
+      },
+      {
+        "id": "c0f7deec56bbe439",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "562d443857164a7c",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "public-articles/plantTest.md",
+                "mode": "source",
+                "source": false
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "df188a659e9ea6c4",
+    "type": "split",
+    "children": [
+      {
+        "id": "956d483fe7acd0c7",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "1ba52a2e987f8be1",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical"
+              }
+            }
+          },
+          {
+            "id": "24122867d56394c8",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              }
+            }
+          },
+          {
+            "id": "c20842f8ba42cae6",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {}
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "6e463e35e17523fd",
+    "type": "split",
+    "children": [
+      {
+        "id": "d6e592b88a692266",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "ee2b20b2fc2fed4a",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "public-articles/plantTest.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              }
+            }
+          },
+          {
+            "id": "252f3591471c130d",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "public-articles/plantTest.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              }
+            }
+          },
+          {
+            "id": "4538993a5b04697a",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true
+              }
+            }
+          },
+          {
+            "id": "d0bc5c63feb1ae84",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "public-articles/plantTest.md"
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Open quick switcher": false,
+      "graph:Open graph view": false,
+      "canvas:Create new canvas": false,
+      "daily-notes:Open today's daily note": false,
+      "templates:Insert template": false,
+      "command-palette:Open command palette": false,
+      "workspaces:Manage workspace layouts": false
+    }
+  },
+  "active": "562d443857164a7c",
+  "lastOpenFiles": [
+    "public-articles/plantTest.md",
+    "public-articles/plantTest.plantuml",
+    "public-articles/plantTest.plant",
+    "public-articles/learn-windows-linux.md",
+    "public-articles/Untitled",
+    "public-articles/solution-rust-diesel-install-in-windows.md",
+    "README.md",
+    "about-me.md",
+    "Untitled.md",
+    "soda-dev/README.md",
+    "soda-dev/dev.md",
+    "soda-dev/product-research.md",
+    "inspiration-record.md",
+    "Untitled.canvas",
+    "2023-10-16.md",
+    "Untitled 1.canvas"
+  ]
+}
