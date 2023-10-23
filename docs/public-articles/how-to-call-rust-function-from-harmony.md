@@ -1,4 +1,4 @@
-# 如何在HarmonyNext项目中调用Rust库代码
+# 如何在Harmony Native C++项目中调用Rust库代码
 
 ## 主机配置
 
