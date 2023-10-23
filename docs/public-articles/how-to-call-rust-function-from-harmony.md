@@ -107,7 +107,7 @@ exec /Users/biezhihua/Software/OpenHarmony/Sdk/10/native/llvm/bin/clang++ \
   "$@"
 ```
 
-再讲下面的配置增加到`~/.cargo/config`文件中，如果没有就创建一个：
+再将下面的配置增加到`~/.cargo/config`文件中，如果文件不存在就创建一个：
 ```bash
 [target.aarch64-unknown-linux-ohos]
 linker  = "/Users/biezhihua/WorkSpace/YKGAIAX/GaiaX/harmony/aarch64-unknown-linux-ohos-clang.sh"
@@ -317,101 +317,6 @@ $ tree
 │               └── app_icon.png
 ├── build-profile.json5
 ├── entry
-│   ├── build
-│   │   └── default
-│   │       ├── cache
-│   │       │   └── default
-│   │       │       └── default@CompileArkTS
-│   │       │           └── esmodule
-│   │       │               └── debug
-│   │       │                   ├── compiler.cache.msgpack
-│   │       │                   ├── entry
-│   │       │                   │   └── src
-│   │       │                   │       └── main
-│   │       │                   │           └── ets
-│   │       │                   │               ├── entryability
-│   │       │                   │               │   ├── EntryAbility.js
-│   │       │                   │               │   └── EntryAbility.protoBin
-│   │       │                   │               └── pages
-│   │       │                   │                   ├── Index.js
-│   │       │                   │                   └── Index.protoBin
-│   │       │                   ├── filesInfo.txt
-│   │       │                   ├── modules.cache
-│   │       │                   ├── npmEntries.protoBin
-│   │       │                   ├── npmEntries.txt
-│   │       │                   ├── sourceMaps.json
-│   │       │                   └── temporary
-│   │       │                       └── ets
-│   │       ├── generated
-│   │       │   └── r
-│   │       │       └── default
-│   │       │           └── ResourceTable.h
-│   │       ├── intermediates
-│   │       │   ├── cmake
-│   │       │   │   └── default
-│   │       │   │       └── obj
-│   │       │   │           ├── arm64-v8a
-│   │       │   │           │   ├── libc++_shared.so
-│   │       │   │           │   └── libentry.so
-│   │       │   │           ├── armeabi-v7a
-│   │       │   │           │   ├── libc++_shared.so
-│   │       │   │           │   └── libentry.so
-│   │       │   │           └── x86_64
-│   │       │   │               ├── libc++_shared.so
-│   │       │   │               └── libentry.so
-│   │       │   ├── default
-│   │       │   │   └── temp
-│   │       │   ├── hap_metadata
-│   │       │   │   └── default
-│   │       │   │       └── output_metadata.json
-│   │       │   ├── libs
-│   │       │   │   └── default
-│   │       │   │       ├── arm64-v8a
-│   │       │   │       │   ├── libc++_shared.so
-│   │       │   │       │   ├── libentry.so
-│   │       │   │       │   └── libtest.so
-│   │       │   │       ├── armeabi-v7a
-│   │       │   │       │   ├── libc++_shared.so
-│   │       │   │       │   ├── libentry.so
-│   │       │   │       │   └── libtest.so
-│   │       │   │       └── x86_64
-│   │       │   │           ├── libc++_shared.so
-│   │       │   │           ├── libentry.so
-│   │       │   │           └── libtest.so
-│   │       │   ├── loader
-│   │       │   │   └── default
-│   │       │   │       └── loader.json
-│   │       │   ├── loader_out
-│   │       │   │   └── default
-│   │       │   │       └── ets
-│   │       │   │           ├── modules.abc
-│   │       │   │           └── sourceMaps.map
-│   │       │   ├── merge_profile
-│   │       │   │   └── default
-│   │       │   │       └── module.json
-│   │       │   ├── process_profile
-│   │       │   │   └── default
-│   │       │   │       └── module.json
-│   │       │   └── res
-│   │       │       └── default
-│   │       │           ├── ResourceTable.txt
-│   │       │           ├── ids_map
-│   │       │           ├── module.json
-│   │       │           ├── resConfig.json
-│   │       │           ├── resources
-│   │       │           │   ├── base
-│   │       │           │   │   ├── media
-│   │       │           │   │   │   ├── app_icon.png
-│   │       │           │   │   │   └── icon.png
-│   │       │           │   │   └── profile
-│   │       │           │   │       └── main_pages.json
-│   │       │           │   └── rawfile
-│   │       │           └── resources.index
-│   │       └── outputs
-│   │           └── default
-│   │               ├── entry-default-signed.hap
-│   │               ├── entry-default-unsigned.hap
-│   │               └── pack.info
 │   ├── build-profile.json5
 │   ├── hvigorfile.ts
 │   ├── libs
@@ -514,7 +419,7 @@ $ tree
 
 ### 链接和编译三方库
 
-在`cpp/CMakeLists.txt`中将第三方动态so库路径引入到编译环境中，这样就可以在`hello.cpp`中编译使用了，注意这里和常规的配置也略有不同，需要在`target_link_libraries`中直接追加动态库地址，不可以仅写lib库名：
+在`cpp/CMakeLists.txt`中将第三方动态so库链接到编译环境中，这样就可以在`hello.cpp`中编译使用了，注意这里和常规的配置也略有不同，需要在`target_link_libraries`中直接追加动态库地址，不可以仅写lib库名：
 
 这个case可以成功运行：
 ```
