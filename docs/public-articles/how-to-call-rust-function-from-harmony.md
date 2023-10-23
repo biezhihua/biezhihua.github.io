@@ -1,4 +1,4 @@
-# 如何在HarmonyNext项目中调用三方Rust Native（so）库
+# 如何在HarmonyNext项目中调用Rust库代码
 
 ## 主机配置
 
