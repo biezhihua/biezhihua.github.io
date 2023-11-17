@@ -15,7 +15,7 @@
               "state": {
                 "file": "public-articles/plantTest.md",
                 "mode": "source",
-                "source": false
+                "source": true
               }
             }
           }
@@ -87,7 +87,8 @@
       }
     ],
     "direction": "horizontal",
-    "width": 300
+    "width": 300,
+    "collapsed": true
   },
   "right": {
     "id": "6e463e35e17523fd",
@@ -165,8 +166,9 @@
       "workspaces:Manage workspace layouts": false
     }
   },
-  "active": "562d443857164a7c",
+  "active": "c3502ff6f9dec178",
   "lastOpenFiles": [
+    "public-articles/how-to-call-rust-function-from-harmony.md",
     "public-articles/plantTest.md",
     "public-articles/plantTest.plantuml",
     "public-articles/plantTest.plant",
