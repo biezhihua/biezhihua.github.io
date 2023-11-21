@@ -13,25 +13,7 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "public-articles/plantTest.md",
-                "mode": "source",
-                "source": true
-              }
-            }
-          }
-        ]
-      },
-      {
-        "id": "c0f7deec56bbe439",
-        "type": "tabs",
-        "children": [
-          {
-            "id": "562d443857164a7c",
-            "type": "leaf",
-            "state": {
-              "type": "markdown",
-              "state": {
-                "file": "public-articles/plantTest.md",
+                "file": "public-articles/how-to-ignore-warning-info-in-rust.md",
                 "mode": "source",
                 "source": false
               }
@@ -87,8 +69,7 @@
       }
     ],
     "direction": "horizontal",
-    "width": 300,
-    "collapsed": true
+    "width": 300
   },
   "right": {
     "id": "6e463e35e17523fd",
@@ -104,7 +85,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "public-articles/plantTest.md",
+                "file": "public-articles/how-to-ignore-warning-info-in-rust.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -121,7 +102,7 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "public-articles/plantTest.md",
+                "file": "public-articles/how-to-ignore-warning-info-in-rust.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               }
@@ -144,7 +125,7 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "public-articles/plantTest.md"
+                "file": "public-articles/how-to-ignore-warning-info-in-rust.md"
               }
             }
           }
