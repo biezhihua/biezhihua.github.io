@@ -1,4 +1,4 @@
-# What is the mean `#[repr(C)]`
+# What is the meaning of `#[repr(C)]`
 
 在 Rust 中，`#[repr(C)]` 属性用于指定结构体的内存布局。这个属性特别在与 C 语言接口交互时非常有用，因为它确保了结构体的布局与 C 语言中的布局兼容。
 

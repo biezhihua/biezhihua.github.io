@@ -1,4 +1,4 @@
-# what is the meaning of `#[no_mangle]`
+# What is the meaning of `#[no_mangle]`
 
 这段 Rust 代码定义了一个可以从 C 语言或其他使用 C ABI (Application Binary Interface) 的语言调用的函数。让我们逐部分解释它：
 
