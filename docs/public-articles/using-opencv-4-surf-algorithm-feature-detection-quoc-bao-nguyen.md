@@ -10,7 +10,9 @@ git clone --recursive https://github.com/skvark/opencv-python.git
 
 cd opencv-python
 
-Edit manually setup.py: line 21-22: build_contrib = Trueline 194: add "-DOPENCV_ENABLE_NONFREE=ON" to cmake_args
+Edit manually setup.py: line 
+21-22: build_contrib = Trueline 
+194: add "-DOPENCV_ENABLE_NONFREE=ON" to cmake_args
 
 pip install --upgrade pip cmake setuptools
 
