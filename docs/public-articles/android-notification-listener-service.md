@@ -1,6 +1,5 @@
 # NotificationListenerService
 
-
 `NotificationListenerService` 是 Android 中一个非常重要的服务，允许应用程序读取系统通知，也可以取消通知或触发与通知相关的动作。这个服务是在 Android 4.3（API 级别 18）引入的，主要用于创建可以访问和处理来自其他应用的通知的应用程序，如通知管理器或特定的辅助应用。
 
 ### 主要功能
