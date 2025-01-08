@@ -1,6 +1,6 @@
 {
     "editor.fontSize": 15,
-    "window.zoomLevel": 0.5,
+    "window.zoomLevel": 0.4,
     "editor.fontFamily": "JetBrains Mono, Consolas, 'Courier New', monospace",
     "markdown-preview-enhanced.previewTheme": "one-light.css",
     "explorer.confirmDelete": false,
