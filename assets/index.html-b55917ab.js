@@ -1,0 +1,1 @@
+const e=JSON.parse('{"key":"v-3779af33","path":"/learn-android-reserve/","title":"Learn Android Reserve","lang":"zh-CN","frontmatter":{"title":"Learn Android Reserve","article":false,"feed":false,"sitemap":false},"headers":[],"git":{},"readingTime":{"minutes":0.03,"words":9},"filePathRelative":null,"excerpt":""}');export{e as data};

@@ -1,0 +1,1 @@
+const e=JSON.parse('{"key":"v-5b432310","path":"/learn-android/simplepref/","title":"Simplepref","lang":"zh-CN","frontmatter":{"title":"Simplepref","article":false,"feed":false,"sitemap":false},"headers":[],"git":{},"readingTime":{"minutes":0.03,"words":9},"filePathRelative":null,"excerpt":""}');export{e as data};
