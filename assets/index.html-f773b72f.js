@@ -1,0 +1,1 @@
+const e=JSON.parse('{"key":"v-2a55f17e","path":"/learn-android/performance/","title":"Performance","lang":"zh-CN","frontmatter":{"title":"Performance","article":false,"feed":false,"sitemap":false},"headers":[],"git":{},"readingTime":{"minutes":0.03,"words":9},"filePathRelative":null,"excerpt":""}');export{e as data};
