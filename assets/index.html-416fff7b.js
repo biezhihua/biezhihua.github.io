@@ -1,0 +1,1 @@
+import{_ as a,Y as t,Z as d,$ as e,a0 as n}from"./framework-301d0703.js";const r={},o=e("h1",{id:"android",tabindex:"-1"},[e("a",{class:"header-anchor",href:"#android","aria-hidden":"true"},"#"),n(" Android")],-1),c=[o];function s(i,_){return t(),d("div",null,c)}const l=a(r,[["render",s],["__file","index.html.vue"]]);export{l as default};

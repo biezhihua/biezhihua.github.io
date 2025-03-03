@@ -1,0 +1,1 @@
+const e=JSON.parse('{"key":"v-282958f6","path":"/tag/aosp/","title":"aosp 标签","lang":"zh-CN","frontmatter":{"title":"aosp 标签","index":false,"feed":false,"sitemap":false,"blog":{"type":"category","name":"aosp","key":"tag"},"layout":"BlogCategory"},"headers":[],"git":{},"readingTime":{"minutes":0,"words":0},"filePathRelative":null,"excerpt":""}');export{e as data};
