@@ -1,17 +1,9 @@
 import { defineUserConfig, defaultTheme } from 'vuepress'
-import {
-  navbar,
-  sidebar
-} from './configs/index.js'
-import mathjax3 from 'markdown-it-mathjax3'
-// .vuepress/config.js
+import { navbar, sidebar } from './configs/index.js'
 import { hopeTheme } from "vuepress-theme-hope";
 
 
 export default defineUserConfig({
-  extendsMarkdown: md => {
-    md.use(mathjax3);
-  },
   base: '/',
 
   // https://v2.vuepress.vuejs.org/reference/config.html#lang
