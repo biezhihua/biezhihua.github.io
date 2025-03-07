@@ -118,45 +118,248 @@ Intel® 64 和 IA-32 架构软件开发人员手册合并卷：1、2A、2B、2C�
 4.3 小结
 
 ## 第5章 栈
+
 5.1 栈
+
 5.1.1 栈的特征
+
 5.1.2 栈操作示例
+
+向栈压入数据时，栈顶指针减小，向低地址移动；从栈中弹出数据时，栈顶指针增加，向高地址移动。
+
 ## 第6章 分析abex' crackme#1
+
 6.1 abex' crackme #1
 6.1.1 开始调试
 6.1.2 分析代码
-6.2 破解              47
-6.3 将参数压入栈           47
-6.4 小结             48
 
-## 第7章	栈帧	     49
-7.1 栈帧	   49
-7.2 调试示例：stackframe. exe-	   49
-7.2.1 StackFrame. cpp	  50
-7.2.2 开始执行main()函数&生成栈帧··51
-7.2.3 设置局部变量     52
-7.2.4 add()函数参数传递与调用   53
-第7章	栈帧	     49
-7.1 栈帧	   49
-7.2 调试示例：stackframe. exe-	   49
-7.2.1 StackFrame. cpp	  50
-7.2.2 开始执行main()函数&生成栈帧··51
-7.2.3 设置局部变量     52
-7.2.4 add()函数参数传递与调用   53
-7.2.5 开始执行add()函数&生成栈帧  54
-7.2.6 设置add()函数的局部变量(x,y)    55
-7.2.7 ADD运算          55
-7.2.8 删除函数add()的栈帧&函数
-执行完毕（返回）      56
-7.2.9 从栈中删除函数add()的参数（整理栈）    57
-7.2.10 调用printf()函数       58
-7.2.11 设置返回值         58
-7.2.12 删除栈帧& main()函数终止 58
-7.3 设置OllyDbg选项         59
-7.3.1 Disasm选项    59
-7.3.2 Analysis1选项        60
-7.4 小结               61
+```shell
+PUSH	入栈指令
+CALL	调用指定位置的函数
+INC	值加1
+DEC	值减1
+JMP	跳转到指定地址
+CMP
+比较给定的两个操作数 *与SUB命令类似，但操作数的值不会改变，仅改变EFLAGS寄存器（若2个操作数的值一致,SUB结果为0,ZF被置为1）
+JE	条件跳转指令 (Jump if equal) *若ZF为1, 则跳转
+```
 
+6.2 破解
+
+6.3 将参数压入栈
+
+6.4 小结
+
+## 第7章	栈帧
+
+7.1 栈帧
+
+栈帧(StackFrame)相关知识，栈帧在程序中用于声明局部变量、调用函数。
+
+简言之，栈帧就是利用EBP（栈帧指针，请注意不是ESP）寄存器访问栈内局部变量、参数、函数返回地址等的手段。
+
+为什么使用EBP而不是ESP？
+程序运行中，ESP寄存器的值随时变化，访问栈中函数的局部变量、参数时，若以ESP值为基准编写程序会十分困难，并且也很难使CPU引用到准确的地址。
+所以，调用某函数时，先要把用作基准点（函数起始地址）的ESP值保存到EBP,并维持在函数内部。
+这样，无论ESP的值如何变化，以EBP的值为基准(base)能够安全访问到相关函数的局部变量、参数、返回地址，这就是EBP寄存器作为栈帧指针的作用。
+
+
+栈帧结构
+```bash
+PUSH EBP	      ；函数开始（使用EBP前先把已有值保存到栈中）
+MOV EBP, ESP	  ；保存当前ESP到EBP中
+                ；函数体
+                ；无论ESP值如何变化，EBP都保持不变，可以安全访问函数的局部变量、参数
+MOV ESP, EBP	  ；将函数的起始地址返回到ESP中
+POP EBP	        ；函数返回前弹出保存在栈中的EBP值
+RETN	          ；函数终止
+```
+
+借助栈帧技术管理函数调用时，无论函数调用的深度有多深、多复杂，调用栈都能得到很好的管理与维护。
+
+提示
+- 最新的编译器中都带有一个“优化”(Optimization)选项，使用该选项编译简单的函数将不会生成栈帧。
+- 在栈中保存函数返回地址是系统安全隐患之一，攻击者使用缓冲区溢出技术能够把保存在栈内存的返回地址更改为其他地址。
+
+7.2 调试示例：stackframe. exe
+
+7.2.1 StackFrame.cpp
+
+```c
+#include "stdio.h"
+
+long add(long a, long b) 
+{
+	long x = a, y = b;
+	return (x+y);
+}
+
+int main(int argc, char* argv[])
+{
+	long a = 1, b = 2;
+	long c = add(a, b);
+	printf("Sum of %ld and %ld is %ld\n", a, b, c);
+	return 0;
+}
+```
+
+7.2.2 开始执行main()函数&生成栈帧
+
+```shell
+004D18D0 <stackfram | 55                 | push ebp                                   | StackFrame.c:12
+004D18D1            | 8BEC               | mov ebp,esp                                |
+004D18D3            | 81EC E4000000      | sub esp,E4                                 | 生成栈空间
+004D18D9            | 53                 | push ebx                                   |
+004D18DA            | 56                 | push esi                                   | 
+004D18DB            | 57                 | push edi                                   |
+004D18DC <stackfram | 8D7D DC            | lea edi,dword ptr ss:[ebp-24]              | 初始化局部变量空间
+004D18DF            | B9 09000000        | mov ecx,9                                  | 
+004D18E4            | B8 CCCCCCCC        | mov eax,CCCCCCCC                           | 
+004D18E9            | F3:AB              | rep stosd                                  |
+```
+
+7.2.3 设置局部变量
+
+```shell
+004D18F6            | C745 F8 01000000   | mov dword ptr ss:[ebp-8],1                 | 把数据1保存到[EBP-8]中，[EBP-8]代表局部变量a
+004D18FD            | C745 EC 02000000   | mov dword ptr ss:[ebp-14],2                | 把数据1保存到[EBP-14]中，[EBP-14]代表局部变量b
+```
+
+提示
+DWORD PTR SS:[EBP-4]语句中, SS是Stack Segment的缩写，表示栈段。由于Windows中使用的是段内存模型(Segment Memory Model), 使用时需要指出相关内存属于哪一个区段。其实，32位的Windows OS中, SS、DS、ES的值皆为0, 所以采用这种方式附上区段并没有什么意义。因EBP与ESP是指向栈的寄存器，所以添加上了SS寄存器。请注意,“DWORD PTR”与“SS:”等字符串可以通过设置OllyDbg的相应选项来隐藏。
+
+7.2.4 add()函数参数传递与调用
+
+```shell
+004D1904            | 8B45 EC            | mov eax,dword ptr ss:[ebp-14]              | 
+004D1907            | 50                 | push eax                                   | arg2
+004D1908            | 8B4D F8            | mov ecx,dword ptr ss:[ebp-8]               | 
+004D190B            | 51                 | push ecx                                   | arg1
+004D190C            | E8 12F7FFFF        | call stackframe.4D1023                     | call的同时会push下一个指令的地址004D1911，也叫做返回地址
+```
+
+返回地址
+执行CALL命令进入被调用的函数之前，CPU会先把函数的返回地址压入栈，用作函数执行完毕后的返回地址。
+
+```shell
+0041FA90      004D1911          return to stackframe.__$EncStackInitEnd+26 from stackframe.__enc$textbss$end+23
+0041FA94      00000001          
+0041FA98      00000002          
+```
+
+7.2.5 开始执行add()函数&生成栈帧
+
+```shell
+004D18 | 55                 | push ebp                                                   | StackFrame.c:6
+004D18 | 8BEC               | mov ebp,esp                                                |
+004D18 | 81EC D8000000      | sub esp,D8                                                 |
+```
+
+可以看到，main（）函数使用的EBP值被备份到栈中，然后EBP的值被设置为一个新值。
+
+7.2.6 设置add()函数的局部变量(x,y)
+
+```shell
+004D18 | 8B45 08            | mov eax,dword ptr ss:[ebp+8]                               | 取出参数a
+004D18 | 8945 F8            | mov dword ptr ss:[ebp-8],eax                               | 设置局部变量值
+004D18 | 8B45 0C            | mov eax,dword ptr ss:[ebp+C]                               | 取出参数b
+004D18 | 8945 EC            | mov dword ptr ss:[ebp-14],eax                              | 设置局部变量值
+```
+
+```shell
+0040FCC8          CCCCCCCC     
+0040FCCC          00000002     
+0040FCD0          CCCCCCCC     
+0040FCD4          CCCCCCCC     
+0040FCD8          00000001     
+0040FCDC          CCCCCCCC     
+0040FCE0          0040FDE0     EBP  
+0040FCE4          004D1911     return to stackframe.__$EncStackInitEnd+26 from stackframe.__enc$textbss$end+23
+0040FCE8          00000001     
+0040FCEC          00000002     
+```
+
+7.2.7 ADD运算
+
+```shell
+004D18A2            | 8B45 F8            | mov eax,dword ptr ss:[ebp-8]               | 使用局部变量计算
+004D18A5            | 0345 EC            | add eax,dword ptr ss:[ebp-14]              |
+```
+
+7.2.8 删除函数add()的栈帧&函数执行完毕（返回）
+
+```shell
+004D18B8  | 8BE5               | mov esp,ebp                                                |
+004D18BA  | 5D                 | pop ebp                                                    |
+004D18BB  | C3                 | ret                                                        |
+```
+
+上面这条命令用于恢复函数add（）开始执行时备份到栈中的EBP值，它与401000地址处的PUSH EBP命令对应。EBP值恢复为12FF40, 它是main（）函数的EBP值。到此, add（）函数的栈帧就被删除了。
+
+```shell
+0040FCE4          004D1911     return to stackframe.__$EncStackInitEnd+26 from stackframe.__enc$textbss$end+23
+0040FCE8          00000001     
+0040FCEC          00000002     
+```
+
+7.2.9 从栈中删除函数add()的参数（整理栈）
+
+```shell
+004D1904  | 8B45 EC            | mov eax,dword ptr ss:[ebp-14]                              | StackFrame.c:14
+004D1907  | 50                 | push eax                                                   |
+004D1908  | 8B4D F8            | mov ecx,dword ptr ss:[ebp-8]                               | ecx:_2339CD9D_StackFrame@c
+004D190B  | 51                 | push ecx                                                   | ecx:_2339CD9D_StackFrame@c
+004D190C  | E8 12F7FFFF        | call stackframe.4D1023                                     |
+004D1911  | 83C4 08            | add esp,8                                                  |
+```
+
+```shell
+0040FCE8          00000001     
+0040FCEC          00000002     
+0040FCF0 <&EntryP 004D1028     ESP
+0040FCF4 <&EntryP 004D1028     stackframe.__enc$textbss$end+28
+```
+
+提示
+- 被调函数执行完毕后，函数的调用者(Caller)负责清理存储在栈中的参数，这种方式称为cdecl方式；
+- 反之，被调用者(Callee)负责清理保存在栈中的参数，这种方式称为stdcall方式。这些函数调用规则统称为调用约定(Calling Convention), 这在程序开发与分析中是一个非常重要的概念，第10章将进一步讲解相关内容。
+
+7.2.10 调用printf()函数
+
+```shell
+004D1914            | 8945 E0            | mov dword ptr ss:[ebp-20],eax              |
+004D1917            | 8B45 E0            | mov eax,dword ptr ss:[ebp-20]              | StackFrame.c:15
+004D191A            | 50                 | push eax                                   |
+004D191B            | 8B4D EC            | mov ecx,dword ptr ss:[ebp-14]              |
+004D191E            | 51                 | push ecx                                   |
+004D191F            | 8B55 F8            | mov edx,dword ptr ss:[ebp-8]               |
+004D1922            | 52                 | push edx                                   |
+004D1923            | 68 307B4D00        | push stackframe.4D7B30                     | 4D7B30:"Sum of %ld and %ld is %ld\n"
+004D1928            | E8 AAF7FFFF        | call stackframe.4D10D7                     |
+004D192D            | 83C4 10            | add esp,10                                 |
+```
+
+7.2.11 设置返回值
+
+```shell
+004D1930            | 33C0               | xor eax,eax                                | StackFrame.c:16
+```
+
+XOR命令用来进行Exclusive OR bit（异或）运算，其特点为“2个相同的值进行XOR运算，结果为0”.XOR命令比MOV EAX，0命令执行速度快，常用于寄存器的初始化操作。
+
+7.2.12 删除栈帧& main()函数终止
+
+```shell
+004D1942            | 8BE5               | mov esp,ebp                                |
+004D1944            | 5D                 | pop ebp                                    |
+004D1945            | C3                 | ret                                        |
+```
+
+7.3 设置OllyDbg选项
+7.3.1 Disasm选项
+7.3.2 Analysis1选项
+
+7.4 小结
 
 ## 第8章 abex' crackme#2       62
 8.1 运行abex' crackme#2        62
@@ -178,6 +381,7 @@ Intel® 64 和 IA-32 架构软件开发人员手册合并卷：1、2A、2B、2C�
 8.4.6 加密循环          70
 8.4.7 加密方法          70
 8.5 小结               72
+
 ## 第9章 Process Explorer———最优秀的进程管理工具       74
 9.1 Process Explorer     74
 9.2 具体有哪些优点呢         75
@@ -186,9 +390,9 @@ Intel® 64 和 IA-32 架构软件开发人员手册合并卷：1、2A、2B、2C�
 ## 第10章	函数调用约定       76
 10.1 函数调用约定-	    76
 10.1.1 cdecl	·76
-
 10.1.2 stdcall          77
 10.1.3 fastcall          78
+
 ## 第11章	视频讲座    79
 11.1 运行             79
 11.2 分析              79
@@ -196,6 +400,7 @@ Intel® 64 和 IA-32 架构软件开发人员手册合并卷：1、2A、2B、2C�
 11.2.2 打补丁 (1): 去除消息框    81
 11.2.3 目标 (2): 查找注册码  83
 11.3 小结       85
+
 ## 第12章	究竟应当如何学习代码逆向分析            86
 12.1 逆向工程            86
 12.1.1 任何学习都应当有目标   86
@@ -204,11 +409,11 @@ Intel® 64 和 IA-32 架构软件开发人员手册合并卷：1、2A、2B、2C�
 12.1.4  让检索成为日常生活的一部分    87
 12.1.5 最重要的是实践    87
 12.1.6 请保持平和的心态     87
+
 ## 第二部分 PE文件格式
 
 
-## windows visual studio 的常用命令，例如：编译、连接、生成可执行文件等等
-
+## Windows Visual Studio 的常用命令，例如：编译、连接、生成可执行文件等等
 
 在 **Windows Visual Studio** 环境中，常用的命令涉及编译、链接、构建项目等操作。这些命令可以通过 **Visual Studio 命令行工具**（如 `Developer Command Prompt` 或 `Developer PowerShell`）执行，也可以集成到脚本中实现自动化构建。以下是核心命令及其用途和示例：
 
