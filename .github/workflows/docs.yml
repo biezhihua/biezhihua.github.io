@@ -1,45 +1,52 @@
-name: docs
+name: Deploy Docs
 
 on:
-  # trigger deployment on every push to main branch
   push:
-    branches: [main]
-  # trigger deployment manually
-  workflow_dispatch:
+    branches:
+      - main
+
+permissions:
+  contents: write
 
 jobs:
-  docs:
+  deploy-gh-pages:
     runs-on: ubuntu-latest
-
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
-          # fetch all commits to get last updated time or other git log info
           fetch-depth: 0
+          # if your docs needs submodules, uncomment the following line
+          # submodules: true
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          # choose node.js version to use
-          node-version: '16'
+          node-version: 22
+          cache: pnpm
 
-      # install dependencies if the cache did not hit
-      - name: Install dependencies
-        run: yarn --frozen-lockfile
+      - name: Install Deps
+        run: |
+          corepack enable
+          pnpm install --frozen-lockfile
 
-      # run build script
-      - name: Build VuePress site
-        run: yarn docs:build
+      - name: Build Docs
+        env:
+          NODE_OPTIONS: --max_old_space_size=8192
+        run: |-
+          pnpm run docs:build
+          > src/.vuepress/dist/.nojekyll
 
-      # please check out the docs of the workflow for more details
-      # @see https://github.com/crazy-max/ghaction-github-pages
       - name: Deploy Docs
         uses: JamesIves/github-pages-deploy-action@v4
         with:
-          # deploy to gh-pages branch
+          # Deploy Docs
           branch: gh-pages
-          # deploy the default output dir of VuePress
-          folder: docs/.vuepress/dist
+          folder: src/.vuepress/dist
         env:
           # @see https://docs.github.com/en/actions/reference/authentication-in-a-workflow#about-the-github_token-secret
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

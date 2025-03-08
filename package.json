@@ -1,18 +1,20 @@
 {
   "name": "biezhihua.github.io",
   "version": "1.0.0",
-  "main": "index.js",
   "author": "biezhihua",
   "license": "MIT",
-  "devDependencies": {
-    "vuepress": "2.0.0-beta.61",
-    "vuepress-theme-hope": "2.0.0-beta.193",
-    "vuepress-vite": "2.0.0-beta.61"
-  },
+  "type": "module",
   "scripts": {
-    "docs:clean": "rm -rf ./docs/.vuepress/.cache && rm -rf ./docs/.vuepress/.temp",
-    "docs:dev": "vuepress dev docs",
-    "docs:build": "vuepress build docs",
-    "docs:publish": "vuepress build docs && git add -A && git commit -m docs && git push origin main"
+    "docs:build": "vuepress-vite build src",
+    "docs:clean-dev": "vuepress-vite dev src --clean-cache",
+    "docs:dev": "vuepress-vite dev src",
+    "docs:update-package": "pnpm dlx vp-update"
+  },
+  "devDependencies": {
+    "@vuepress/bundler-vite": "2.0.0-rc.20",
+    "sass-embedded": "^1.85.1",
+    "vue": "^3.5.13",
+    "vuepress": "2.0.0-rc.20",
+    "vuepress-theme-hope": "2.0.0-rc.74"
   }
 }
