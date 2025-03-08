@@ -374,13 +374,38 @@ XOR命令用来进行Exclusive OR bit（异或）运算，其特点为“2个相
 8.2.4 未文档化的结构体
 
 8.3 开始调试 
+
+```shell
+00401238  | 68 141E4000        | push abex' crackme #2.401E14                               |
+0040123D  | E8 F0FFFFFF        | call <JMP.&ThunRTMain>                                     |
+```
 8.3.1 间接调用 
+
 8.3.2 RT MainStruct结构体
+
 8.3.3 ThunRTMain()函数
 
 8.4 分析crackme
+
 8.4.1 检索字符串
+
+TEST: 逻辑比较(Logical Compare)
+与bit-wise logical`AND'一样（仅改变EFLAGS寄存器而不改变操作数的值）若2个操作数中一个为0，则AND运算结果被置为0 -> ZF = 1 。
+JE: 条件转移指令(Jump if equal)
+若ZF=1,  则跳转。
+
 8.4.2 查找字符串地址
+
+```shell
+00403321  | 8D55 BC            | lea edx,dword ptr ss:[ebp-44]                              |
+00403324  | 8D45 CC            | lea eax,dword ptr ss:[ebp-34]                              |
+00403327  | 52                 | push edx                                                   |
+00403328  | 50                 | push eax                                                   |
+00403329  | FF15 58104000      | call dword ptr ds:[<&__vbaVarTstEq>]                       |
+0040332F  | 66:85C0            | test ax,ax                                                 |
+00403332  | 0F84 D0000000      | je abex' crackme #2.403408                                 |
+```
+
 8.4.3 生成Serial的算法
 8.4.4 预测代码
 8.4.5 读取Name字符串的代码
