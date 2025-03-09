@@ -1,1 +1,0 @@
-import{_ as e,Y as t,Z as c,$ as o}from"./framework-301d0703.js";const r={},_=o("p",null,"https://ocw.mit.edu/courses/6-042j-mathematics-for-computer-science-fall-2010/",-1),a=[_];function s(n,i){return t(),c("div",null,a)}const l=e(r,[["render",s],["__file","6.042J Undergraduate Mathematics For Computer Science.html.vue"]]);export{l as default};

@@ -1,1 +1,0 @@
-const e=JSON.parse('{"key":"v-43dcfeba","path":"/learn-android/perfetto/","title":"Perfetto","lang":"zh-CN","frontmatter":{"title":"Perfetto","article":false,"feed":false,"sitemap":false},"headers":[],"git":{},"readingTime":{"minutes":0.03,"words":9},"filePathRelative":null,"excerpt":""}');export{e as data};

@@ -1,1 +1,0 @@
-const e=JSON.parse('{"key":"v-dab40ce2","path":"/learn-leetcode/MIT/","title":"M I T","lang":"zh-CN","frontmatter":{"title":"M I T","article":false,"feed":false,"sitemap":false},"headers":[],"git":{},"readingTime":{"minutes":0.03,"words":9},"filePathRelative":null,"excerpt":""}');export{e as data};

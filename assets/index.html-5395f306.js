@@ -1,1 +1,0 @@
-const e=JSON.parse('{"key":"v-45650f82","path":"/learn-android/aosp/","title":"Aosp","lang":"zh-CN","frontmatter":{"title":"Aosp","article":false,"feed":false,"sitemap":false},"headers":[],"git":{},"readingTime":{"minutes":0.03,"words":9},"filePathRelative":null,"excerpt":""}');export{e as data};

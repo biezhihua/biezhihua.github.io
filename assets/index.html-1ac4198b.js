@@ -1,1 +1,0 @@
-const e=JSON.parse('{"key":"v-2e06b774","path":"/learn-android/android-docs/","title":"Android Docs","lang":"zh-CN","frontmatter":{"title":"Android Docs","article":false,"feed":false,"sitemap":false},"headers":[],"git":{},"readingTime":{"minutes":0.03,"words":9},"filePathRelative":null,"excerpt":""}');export{e as data};

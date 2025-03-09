@@ -1,1 +1,0 @@
-const e=JSON.parse('{"key":"v-29a8528d","path":"/learn-english/NCE/NCE2/","title":"N C E2","lang":"zh-CN","frontmatter":{"title":"N C E2","article":false,"feed":false,"sitemap":false},"headers":[],"git":{},"readingTime":{"minutes":0.03,"words":9},"filePathRelative":null,"excerpt":""}');export{e as data};
