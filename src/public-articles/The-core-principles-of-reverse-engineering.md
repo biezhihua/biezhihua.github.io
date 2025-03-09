@@ -407,9 +407,41 @@ JE: 条件转移指令(Jump if equal)
 ```
 
 8.4.3 生成Serial的算法
+
+```shell
+00402ED0  | 55                 | push ebp                                                   |
+00402ED1  | 8BEC               | mov ebp,esp                                                |
+```
+
+NOP: No Operation, 不执行任何动作的指令（只消耗CPU时钟）。
+
 8.4.4 预测代码
+
+```shell
+00402F8E  | 8D95 78FFFFFF      | lea edx,dword ptr ss:[ebp-88]                              | [ebp-88]:L"BIEZHIHUA"
+00402F94  | 52                 | push edx                                                   |
+00402F95  | 56                 | push esi                                                   |
+00402F96  | 8B0E               | mov ecx,dword ptr ds:[esi]                                 |
+00402F98  | FF91 A0000000      | call dword ptr ds:[ecx+A0]                                 |
+```
+
 8.4.5 读取Name字符串的代码
+
 8.4.6 加密循环
+
+```shell
+00403102  | BB 04000000        | mov ebx,4                                                  |
+
+0040318B  | FF15 30104000      | call dword ptr ds:[<&__vbaVarForInit>]                     |
+00403191  | 8B1D 4C104000      | mov ebx,dword ptr ds:[<&rtcMidCharVar>]                    |
+00403197  | 85C0               | test eax,eax                                               |
+00403199  | 0F84 06010000      | je abex' crackme #2.4032A5                                 |
+
+0040329A  | FF15 C0104000      | call dword ptr ds:[<&__vbaVarForNext>]                     |
+004032A0  | E9 F2FEFFFF        | jmp abex' crackme #2.403197                                |
+004032A5  | 8B45 08            | mov eax,dword ptr ss:[ebp+8]                               |
+```
+
 8.4.7 加密方法
 
 8.5 小结
@@ -420,9 +452,99 @@ JE: 条件转移指令(Jump if equal)
 9.3 sysinternals
 
 ### 第10章	函数调用约定
+
 10.1 函数调用约定
+
+函数调用约定(Calling Convention) |
+
+主要的函数调用约定如下。
+- cdecl
+- stdcall
+- fastcall
+  
+术语说明
+- 调用者————调用函数的一方。
+- 被调用者————被调用的函数。
+- 比如在main()函数中调用printf()函数时，调用者为main(),被调用者为printf().
+
 10.1.1 cdecl
+
+cdecl是主要在C语言中使用的方式，调用者负责处理栈。
+
+```C
+int add(int a, int b)
+{
+	return a + b;
+}
+
+int main(int argc, char* argv[])
+{
+	return add(1, 2);
+}
+```
+
+```shell
+00EF17F2  | 6A 02              | push 2                                                     | cdecl.c:12
+00EF17F4  | 6A 01              | push 1                                                     |
+00EF17F6  | E8 28F8FFFF        | call cdecl.EF1023                                          |
+00EF17FB  | 83C4 08            | add esp,8                                                  |
+```
+
+```shell
+00EF1F10  | 55                 | push ebp                                                   | exe_common.inl:77
+00EF1F11  | 8BEC               | mov ebp,esp                                                |
+00EF1F13  | 83EC 0C            | sub esp,C                                                  |
+00EF1F16  | E8 83F3FFFF        | call cdecl.EF129E                                          | exe_common.inl:78
+00EF1F1B  | 8945 FC            | mov dword ptr ss:[ebp-4],eax                               | [ebp-4]:&"ALLUSERSPROFILE=C:\\ProgramData"
+00EF1F1E  | E8 85F3FFFF        | call cdecl.EF12A8                                          |
+00EF1F23  | 8B00               | mov eax,dword ptr ds:[eax]                                 |
+00EF1F25  | 8945 F8            | mov dword ptr ss:[ebp-8],eax                               | [ebp-8]:&"E:\\Projects\\VisualStudioProjects\\cdecl\\Debug\\cdecl.exe"
+00EF1F28  | E8 3CF1FFFF        | call cdecl.EF1069                                          |
+00EF1F2D  | 8B08               | mov ecx,dword ptr ds:[eax]                                 | ecx:_E28DA64E_cdecl@c
+00EF1F2F  | 894D F4            | mov dword ptr ss:[ebp-C],ecx                               | ecx:_E28DA64E_cdecl@c
+00EF1F32  | 8B55 FC            | mov edx,dword ptr ss:[ebp-4]                               | [ebp-4]:&"ALLUSERSPROFILE=C:\\ProgramData"
+00EF1F35  | 52                 | push edx                                                   |
+00EF1F36  | 8B45 F8            | mov eax,dword ptr ss:[ebp-8]                               | [ebp-8]:&"E:\\Projects\\VisualStudioProjects\\cdecl\\Debug\\cdecl.exe"
+00EF1F39  | 50                 | push eax                                                   |
+00EF1F3A  | 8B4D F4            | mov ecx,dword ptr ss:[ebp-C]                               | ecx:_E28DA64E_cdecl@c
+00EF1F3D  | 51                 | push ecx                                                   | ecx:_E28DA64E_cdecl@c
+00EF1F3E  | E8 92F3FFFF        | call cdecl.EF12D5                                          |
+00EF1F43  | 83C4 0C            | add esp,C                                                  |
+00EF1F46  | 8BE5               | mov esp,ebp                                                | exe_common.inl:79
+00EF1F48  | 5D                 | pop ebp                                                    |
+00EF1F49  | C3                 | ret                                                        |
+```
+
 10.1.2 stdcall
+
+
+```shell
+00F41780  | 55                 | push ebp                                                   | cdecl.c:6
+00F41781  | 8BEC               | mov ebp,esp                                                |
+00F41783  | 81EC C0000000      | sub esp,C0                                                 |
+00F41789  | 53                 | push ebx                                                   |
+00F4178A  | 56                 | push esi                                                   | esi:__enc$textbss$end+23
+00F4178B  | 57                 | push edi                                                   |
+00F4178C  | 8BFD               | mov edi,ebp                                                |
+00F4178E  | 33C9               | xor ecx,ecx                                                | ecx:_E28DA64E_cdecl@c
+00F41790  | B8 CCCCCCCC        | mov eax,CCCCCCCC                                           | eax:_E28DA64E_cdecl@c
+00F41795  | F3:AB              | rep stosd                                                  |
+00F41797  | B9 00C0F400        | mov ecx,<cdecl._E28DA64E_cdecl@c>                          | cdecl.c:15732480, ecx:_E28DA64E_cdecl@c
+00F4179C  | E8 7FFBFFFF        | call cdecl.F41320                                          |
+00F417A1  | 90                 | nop                                                        |
+00F417A2  | 8B45 08            | mov eax,dword ptr ss:[ebp+8]                               | cdecl.c:7, eax:_E28DA64E_cdecl@c
+00F417A5  | 0345 0C            | add eax,dword ptr ss:[ebp+C]                               | eax:_E28DA64E_cdecl@c, [ebp+C]:&"E:\\Projects\\VisualStudioProjects\\cdecl\\Debug\\cdecl.exe"
+00F417A8  | 5F                 | pop edi                                                    | cdecl.c:8
+00F417A9  | 5E                 | pop esi                                                    | esi:__enc$textbss$end+23
+00F417AA  | 5B                 | pop ebx                                                    |
+00F417AB  | 81C4 C0000000      | add esp,C0                                                 |
+00F417B1  | 3BEC               | cmp ebp,esp                                                |
+00F417B3  | E8 8CFAFFFF        | call cdecl.F41244                                          |
+00F417B8  | 8BE5               | mov esp,ebp                                                |
+00F417BA  | 5D                 | pop ebp                                                    |
+00F417BB  | C2 0800            | ret 8                                                      |
+```
+
 10.1.3 fastcall
 
 ### 第11章	视频讲座
