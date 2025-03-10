@@ -556,6 +556,7 @@ int main(int argc, char* argv[])
 11.3 小结
 
 ### 第12章	究竟应当如何学习代码逆向分析
+
 12.1 逆向工程 
 12.1.1 任何学习都应当有目标
 12.1.2 拥有积极心态
@@ -571,24 +572,568 @@ int main(int argc, char* argv[])
 
 ## 第二部分 PE文件格式
 
-### 第13章 PE文件格式⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯90
+### 第13章 PE文件格式 90
+
 13.1 介绍⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯90
+
+PE文件是Windows操作系统下使用的可执行文件格式。
+它是微软在UNIX平台的COFF(Common Object File Format, 通用对象文件格式)基础上制作而成的。
+
 13.2 PE文件格式⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯90
+
+如何加载到内存、从何处开始运行、运行中需要的DLL有哪些、需要多大的栈/堆内存等，大量信息以结构体形式存储在PE头中。换言之，学习PE文件格式就是学习PE头中的结构体。
+
+
 13.2.1 基本结构⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯91
+
+https://www.openrce.org/reference_library/files/reference/PE%20Format.pdf
+
+从DOS头(DOS header)到节区头(Section header)是PE头部分，其下的节区合称PE体。
+文件中使用偏移(offset), 内存中使用VA(Virtual Address, 虚拟地址)来表示位置。
+文件加载到内存时，情况就会发生变化（节区的大小、位置等）。
+文件的内容一般可分为代码(.text)、数据(. data)、资源 (. rsrc) 节，分别保存。
+
+各节区头定义了各节区在文件或内存中的大小、位置、属性等。
+
+PE头与各节区的尾部存在一个区域，称为NULL填充(NULL padding)。
+
+计算机中，为了提高处理文件、内存、网络包的效率，使用“最小基本单位”这一概念，PE文件中也类似。
+
+文件/内存中节区的起始位置应该在各文件/内存最小单位的倍数位置上，空白区域将用NULL填充（看图13-2，可以看到各节区起始地址的截断都遵循一定规则）。
+
 13.2.2 VA&RVA⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯92
+
+基准位置(ImageBase)。
+
+VA指的是进程虚拟内存的绝对地址, RVA(Relative Virtual Address, 相对虚拟地址)指从某个基准位置(ImageBase)开始的相对地址。
+
+VA与RVA满足下面的换算关系：
+- RVA+ImageBase=VA
+
+PE头内部信息大多以RVA形式存在。原因在于，PE文件（主要是DLL）加载到进程虚拟内存的特定位置时，该位置可能已经加载了其他PE文件(DLL)。
+此时必须通过重定位(Relocation)将其加载到其他空白的位置，若PE头信息使用的是VA，则无法正常访问。因此使用RVA来定位信息，即使发生了重定位，只要相对于基准位置的相对地址没有变化，就能正常访问到指定信息，不会出现任何问题。
+
+提示
+- 32位WindowsOS中，各进程分配有4GB的虚拟内存，因此进程中VA值的范围是00000000~FFFFFFFF.
+
 13.3 PE头⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯92
+
 13.3.1 DOS头⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯93
+
+```C++
+// D:\Windows Kits\10\Include\10.0.26100.0\um\winnt.h
+
+typedef struct _IMAGE_DOS_HEADER {      // DOS .EXE header
+    WORD   e_magic;                     // Magic number
+    WORD   e_cblp;                      // Bytes on last page of file
+    WORD   e_cp;                        // Pages in file
+    WORD   e_crlc;                      // Relocations
+    WORD   e_cparhdr;                   // Size of header in paragraphs
+    WORD   e_minalloc;                  // Minimum extra paragraphs needed
+    WORD   e_maxalloc;                  // Maximum extra paragraphs needed
+    WORD   e_ss;                        // Initial (relative) SS value
+    WORD   e_sp;                        // Initial SP value
+    WORD   e_csum;                      // Checksum
+    WORD   e_ip;                        // Initial IP value
+    WORD   e_cs;                        // Initial (relative) CS value
+    WORD   e_lfarlc;                    // File address of relocation table
+    WORD   e_ovno;                      // Overlay number
+    WORD   e_res[4];                    // Reserved words
+    WORD   e_oemid;                     // OEM identifier (for e_oeminfo)
+    WORD   e_oeminfo;                   // OEM information; e_oemid specific
+    WORD   e_res2[10];                  // Reserved words
+    LONG   e_lfanew;                    // File address of new exe header
+  } IMAGE_DOS_HEADER, *PIMAGE_DOS_HEADER;
+```
+
+IMAGE_DOS_HEADER结构体的大小为64个字节。
+
+在该结构体中必须知道2个重要成员：e_magic与e_lfanew.
+- e_magic: DOS签名(signature,4D5A=>ASCII值“MZ”).
+- e_lfanew：指示NT头的偏移（根据不同文件拥有可变值）。
+
 13.3.2 DOS存根⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯94
+
+
+
 13.3.3 NT头⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯94
+
+```C++
+#define IMAGE_SIZEOF_FILE_HEADER             20
+
+typedef struct _IMAGE_NT_HEADERS64 {
+    DWORD Signature;
+    IMAGE_FILE_HEADER FileHeader;
+    IMAGE_OPTIONAL_HEADER64 OptionalHeader;
+} IMAGE_NT_HEADERS64, *PIMAGE_NT_HEADERS64;
+
+typedef struct _IMAGE_NT_HEADERS {
+    DWORD Signature;
+    IMAGE_FILE_HEADER FileHeader;
+    IMAGE_OPTIONAL_HEADER32 OptionalHeader;
+} IMAGE_NT_HEADERS32, *PIMAGE_NT_HEADERS32;
+
+typedef struct _IMAGE_ROM_HEADERS {
+    IMAGE_FILE_HEADER FileHeader;
+    IMAGE_ROM_OPTIONAL_HEADER OptionalHeader;
+} IMAGE_ROM_HEADERS, *PIMAGE_ROM_HEADERS;
+
+#ifdef _WIN64
+typedef IMAGE_NT_HEADERS64                  IMAGE_NT_HEADERS;
+typedef PIMAGE_NT_HEADERS64                 PIMAGE_NT_HEADERS;
+#else
+typedef IMAGE_NT_HEADERS32                  IMAGE_NT_HEADERS;
+typedef PIMAGE_NT_HEADERS32                 PIMAGE_NT_HEADERS;
+#endif
+
+```
+
+IMAGE_NT_HEADERS结构体由3个成员组成:
+- 第一个成员为签名(Signature)结构体，其值为50450000h("PE"00)。
+- 文件头(File Header)
+- 可选头(Optional Header)结构体。
+
+
 13.3.4 NT头：文件头⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯95
+
+
+```C++
+typedef struct _IMAGE_FILE_HEADER {
+    WORD    Machine;
+    WORD    NumberOfSections;
+    DWORD   TimeDateStamp;
+    DWORD   PointerToSymbolTable;
+    DWORD   NumberOfSymbols;
+    WORD    SizeOfOptionalHeader;
+    WORD    Characteristics;
+} IMAGE_FILE_HEADER, *PIMAGE_FILE_HEADER;
+```
+
+IMAGE_FILE_HEADER 20个字节
+
+```
+4C01      Machine
+0500      NumberOfSections
+1413B351  TimeDateStamp
+00000000  PointerToSymbolTable
+00000000  NumberOfSymbols
+E000      SizeOfOptionalHeader
+0201      Characteristics
+```
+
+IMAGE_FILE_HEADER结构体中有如下4种重要成员（若它们设置不正确，将导致文法正常运行）。
+
+#1. Machine
+每个CPU都拥有唯一的Machine码，兼容32位Intel x86芯片的Machine码为14C.以下是定义在winnt. h文件中的Machine码。
+```c++
+
+#define IMAGE_FILE_MACHINE_UNKNOWN           0
+#define IMAGE_FILE_MACHINE_TARGET_HOST       0x0001  // Useful for indicating we want to interact with the host and not a WoW guest.
+#define IMAGE_FILE_MACHINE_I386              0x014c  // Intel 386.
+#define IMAGE_FILE_MACHINE_R3000             0x0162  // MIPS little-endian, 0x160 big-endian
+#define IMAGE_FILE_MACHINE_R4000             0x0166  // MIPS little-endian
+#define IMAGE_FILE_MACHINE_R10000            0x0168  // MIPS little-endian
+#define IMAGE_FILE_MACHINE_WCEMIPSV2         0x0169  // MIPS little-endian WCE v2
+#define IMAGE_FILE_MACHINE_ALPHA             0x0184  // Alpha_AXP
+#define IMAGE_FILE_MACHINE_SH3               0x01a2  // SH3 little-endian
+#define IMAGE_FILE_MACHINE_SH3DSP            0x01a3
+#define IMAGE_FILE_MACHINE_SH3E              0x01a4  // SH3E little-endian
+#define IMAGE_FILE_MACHINE_SH4               0x01a6  // SH4 little-endian
+#define IMAGE_FILE_MACHINE_SH5               0x01a8  // SH5
+#define IMAGE_FILE_MACHINE_ARM               0x01c0  // ARM Little-Endian
+#define IMAGE_FILE_MACHINE_THUMB             0x01c2  // ARM Thumb/Thumb-2 Little-Endian
+#define IMAGE_FILE_MACHINE_ARMNT             0x01c4  // ARM Thumb-2 Little-Endian
+#define IMAGE_FILE_MACHINE_AM33              0x01d3
+#define IMAGE_FILE_MACHINE_POWERPC           0x01F0  // IBM PowerPC Little-Endian
+#define IMAGE_FILE_MACHINE_POWERPCFP         0x01f1
+#define IMAGE_FILE_MACHINE_IA64              0x0200  // Intel 64
+#define IMAGE_FILE_MACHINE_MIPS16            0x0266  // MIPS
+#define IMAGE_FILE_MACHINE_ALPHA64           0x0284  // ALPHA64
+#define IMAGE_FILE_MACHINE_MIPSFPU           0x0366  // MIPS
+#define IMAGE_FILE_MACHINE_MIPSFPU16         0x0466  // MIPS
+#define IMAGE_FILE_MACHINE_AXP64             IMAGE_FILE_MACHINE_ALPHA64
+#define IMAGE_FILE_MACHINE_TRICORE           0x0520  // Infineon
+#define IMAGE_FILE_MACHINE_CEF               0x0CEF
+#define IMAGE_FILE_MACHINE_EBC               0x0EBC  // EFI Byte Code
+#define IMAGE_FILE_MACHINE_AMD64             0x8664  // AMD64 (K8)
+#define IMAGE_FILE_MACHINE_M32R              0x9041  // M32R little-endian
+#define IMAGE_FILE_MACHINE_ARM64             0xAA64  // ARM64 Little-Endian
+#define IMAGE_FILE_MACHINE_CEE               0xC0EE
+```
+
+#2. NumberOfSections
+前面提到过，PE文件把代码、数据、资源等依据属性分类到各节区中存储。
+NumberOfSections用来指出文件中存在的节区数量。该值一定要大于0，且当定义的节区数量与实际节区不同时，将发生运行错误。
+
+#3. SizeOfOptionalHeader
+IMAGE_NT_HEADERS结构体的最后一个成员为IMAGE_OPTIONAL_HEADER32结构体。SizeOfOptionalHeader成员用来指出IMAGE_OPTIONAL_HEADER32结构体的长度。IMAGE_OPTIONAL_HEADER32结构体由C语言编写而成，故其大小已经确定。但是Windows的PE装载器需要查看IMAGE_FILE_HEADER的SizeOfOptionalHeader值，从而识别出IMAGE_OPTIONAL_HEADER32结构体的大小。
+PE32+格式的文件中使用的是IMAGE_OPTIONAL_HEADER64结构体，而不是IMAGE_OPTIONAL_HEADER32结构体。2个结构体的尺寸是不同的，所以需要在SizeOfOptionalHeader成员中明确指出结构体的大小。
+
+#4. Characteristics
+该字段用于标识文件的属性，文件是否是可运行的形态、是否为DLL文件等信息，以bit OR形式组合起来。
+以下是定义在winnt.h文件中的Characteristics值(请记住0002h与2000h这两个值)。
+
+```c++
+#define IMAGE_FILE_RELOCS_STRIPPED           0x0001  // Relocation info stripped from file.
+#define IMAGE_FILE_EXECUTABLE_IMAGE          0x0002  // File is executable  (i.e. no unresolved external references).
+#define IMAGE_FILE_LINE_NUMS_STRIPPED        0x0004  // Line nunbers stripped from file.
+#define IMAGE_FILE_LOCAL_SYMS_STRIPPED       0x0008  // Local symbols stripped from file.
+#define IMAGE_FILE_AGGRESIVE_WS_TRIM         0x0010  // Aggressively trim working set
+#define IMAGE_FILE_LARGE_ADDRESS_AWARE       0x0020  // App can handle >2gb addresses
+#define IMAGE_FILE_BYTES_REVERSED_LO         0x0080  // Bytes of machine word are reversed.
+#define IMAGE_FILE_32BIT_MACHINE             0x0100  // 32 bit word machine.
+#define IMAGE_FILE_DEBUG_STRIPPED            0x0200  // Debugging info stripped from file in .DBG file
+#define IMAGE_FILE_REMOVABLE_RUN_FROM_SWAP   0x0400  // If Image is on removable media, copy and run from the swap file.
+#define IMAGE_FILE_NET_RUN_FROM_SWAP         0x0800  // If Image is on Net, copy and run from the swap file.
+#define IMAGE_FILE_SYSTEM                    0x1000  // System File.
+#define IMAGE_FILE_DLL                       0x2000  // File is a DLL.
+#define IMAGE_FILE_UP_SYSTEM_ONLY            0x4000  // File should only be run on a UP machine
+#define IMAGE_FILE_BYTES_REVERSED_HI         0x8000  // Bytes of machine word are reversed.
+```
+
+```
+4C0105001413B3510000000000000000E0000201
+```
+
 13.3.5 NT头：可选头⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯97
+
+
+32位 224字节  224/16=14
+
+64位 240字节  240/16=15
+
+```
+010B      Magic
+09        MajorLinkerVersion
+00        MinorLinkerVersion
+00180000  SizeOfCode
+00360000  SizeOfInitializedData
+00000000  SizeOfUninitializedData
+53220000  AddressOfEntryPoint
+00100000  BaseOfCode
+00300000  BaseOfData
+00004000  ImageBase
+00100000  SectionAlignment
+00020000  FileAlignment
+0500      MajorOperatingSystemVersion
+0000      MinorOperatingSystemVersion
+0000      MajorImageVersion
+0000      MinorImageVersion
+0500      MajorSubsystemVersion
+0000      MinorSubsystemVersion
+00000000  Win32VersionValue
+00800000  SizeOfImage
+00040000  SizeOfHeaders
+BA1B0100  CheckSum
+0200      Subsystem
+4081      DllCharacteristics
+00001000  SizeOfStackReserve
+00100000  SizeOfStackCommit
+00001000  SizeOfHeapReserve
+00100000  SizeOfHeapCommit
+00000000  LoaderFlags
+10000000  NumberOfRvaAndSizes
+00000000 00000000   DataDirectory0  VirtualAddress  Size
+7C380000 78000000   DataDirectory1  VirtualAddress  Size
+00500000 FC1F0000   DataDirectory2  VirtualAddress  Size
+00000000 00000000   DataDirectory3  VirtualAddress  Size
+00000000 00000000   DataDirectory4  VirtualAddress  Size
+00700000 14030000   DataDirectory5  VirtualAddress  Size
+50310000 1C000000   DataDirectory6  VirtualAddress  Size
+00000000 00000000   DataDirectory7  VirtualAddress  Size
+00000000 00000000   DataDirectory8  VirtualAddress  Size
+00000000 00000000   DataDirectory9  VirtualAddress  Size
+58370000 40000000   DataDirectory10 VirtualAddress  Size
+00000000 00000000   DataDirectory11 VirtualAddress  Size
+00300000 30010000   DataDirectory12 VirtualAddress  Size
+00000000 00000000   DataDirectory13 VirtualAddress  Size
+00000000 00000000   DataDirectory14 VirtualAddress  Size
+00000000 00000000   DataDirectory15 VirtualAddress  Size
+```
+
+```C++
+
+//
+// Directory format.
+//
+
+typedef struct _IMAGE_DATA_DIRECTORY {
+    DWORD   VirtualAddress;
+    DWORD   Size;
+} IMAGE_DATA_DIRECTORY, *PIMAGE_DATA_DIRECTORY;
+
+#define IMAGE_NUMBEROF_DIRECTORY_ENTRIES    16
+
+//
+// Optional header format.
+//
+
+typedef struct _IMAGE_OPTIONAL_HEADER {
+    //
+    // Standard fields.
+    //
+
+    WORD    Magic;
+    BYTE    MajorLinkerVersion;
+    BYTE    MinorLinkerVersion;
+    DWORD   SizeOfCode;
+    DWORD   SizeOfInitializedData;
+    DWORD   SizeOfUninitializedData;
+    DWORD   AddressOfEntryPoint;
+    DWORD   BaseOfCode;
+    DWORD   BaseOfData;
+
+    //
+    // NT additional fields.
+    //
+
+    DWORD   ImageBase;
+    DWORD   SectionAlignment;
+    DWORD   FileAlignment;
+    WORD    MajorOperatingSystemVersion;
+    WORD    MinorOperatingSystemVersion;
+    WORD    MajorImageVersion;
+    WORD    MinorImageVersion;
+    WORD    MajorSubsystemVersion;
+    WORD    MinorSubsystemVersion;
+    DWORD   Win32VersionValue;
+    DWORD   SizeOfImage;
+    DWORD   SizeOfHeaders;
+    DWORD   CheckSum;
+    WORD    Subsystem;
+    WORD    DllCharacteristics;
+    DWORD   SizeOfStackReserve;
+    DWORD   SizeOfStackCommit;
+    DWORD   SizeOfHeapReserve;
+    DWORD   SizeOfHeapCommit;
+    DWORD   LoaderFlags;
+    DWORD   NumberOfRvaAndSizes;
+    IMAGE_DATA_DIRECTORY DataDirectory[IMAGE_NUMBEROF_DIRECTORY_ENTRIES];
+} IMAGE_OPTIONAL_HEADER32, *PIMAGE_OPTIONAL_HEADER32;
+
+typedef struct _IMAGE_ROM_OPTIONAL_HEADER {
+    WORD   Magic;
+    BYTE   MajorLinkerVersion;
+    BYTE   MinorLinkerVersion;
+    DWORD  SizeOfCode;
+    DWORD  SizeOfInitializedData;
+    DWORD  SizeOfUninitializedData;
+    DWORD  AddressOfEntryPoint;
+    DWORD  BaseOfCode;
+    DWORD  BaseOfData;
+    DWORD  BaseOfBss;
+    DWORD  GprMask;
+    DWORD  CprMask[4];
+    DWORD  GpValue;
+} IMAGE_ROM_OPTIONAL_HEADER, *PIMAGE_ROM_OPTIONAL_HEADER;
+
+typedef struct _IMAGE_OPTIONAL_HEADER64 {
+    WORD        Magic;
+    BYTE        MajorLinkerVersion;
+    BYTE        MinorLinkerVersion;
+    DWORD       SizeOfCode;
+    DWORD       SizeOfInitializedData;
+    DWORD       SizeOfUninitializedData;
+    DWORD       AddressOfEntryPoint;
+    DWORD       BaseOfCode;
+    ULONGLONG   ImageBase;
+    DWORD       SectionAlignment;
+    DWORD       FileAlignment;
+    WORD        MajorOperatingSystemVersion;
+    WORD        MinorOperatingSystemVersion;
+    WORD        MajorImageVersion;
+    WORD        MinorImageVersion;
+    WORD        MajorSubsystemVersion;
+    WORD        MinorSubsystemVersion;
+    DWORD       Win32VersionValue;
+    DWORD       SizeOfImage;
+    DWORD       SizeOfHeaders;
+    DWORD       CheckSum;
+    WORD        Subsystem;
+    WORD        DllCharacteristics;
+    ULONGLONG   SizeOfStackReserve;
+    ULONGLONG   SizeOfStackCommit;
+    ULONGLONG   SizeOfHeapReserve;
+    ULONGLONG   SizeOfHeapCommit;
+    DWORD       LoaderFlags;
+    DWORD       NumberOfRvaAndSizes;
+    IMAGE_DATA_DIRECTORY DataDirectory[IMAGE_NUMBEROF_DIRECTORY_ENTRIES];
+} IMAGE_OPTIONAL_HEADER64, *PIMAGE_OPTIONAL_HEADER64;
+
+#define IMAGE_NT_OPTIONAL_HDR32_MAGIC      0x10b
+#define IMAGE_NT_OPTIONAL_HDR64_MAGIC      0x20b
+#define IMAGE_ROM_OPTIONAL_HDR_MAGIC       0x107
+
+#ifdef _WIN64
+typedef IMAGE_OPTIONAL_HEADER64             IMAGE_OPTIONAL_HEADER;
+typedef PIMAGE_OPTIONAL_HEADER64            PIMAGE_OPTIONAL_HEADER;
+#define IMAGE_NT_OPTIONAL_HDR_MAGIC         IMAGE_NT_OPTIONAL_HDR64_MAGIC
+#else
+typedef IMAGE_OPTIONAL_HEADER32             IMAGE_OPTIONAL_HEADER;
+typedef PIMAGE_OPTIONAL_HEADER32            PIMAGE_OPTIONAL_HEADER;
+#define IMAGE_NT_OPTIONAL_HDR_MAGIC         IMAGE_NT_OPTIONAL_HDR32_MAGIC
+#endif
+```
+
+在IMAGE_OPTIONAL_HEADER32结构体中需要关注下列成员。这些值是文件运行必需的，设置错误将导致文件无法正常运行。
+
+#1. Magic
+为IMAGE_OPTIONAL_HEADER32结构体时, Magic码为010B; 
+为IMAGE_OPTIONAL_HEADER64结构体时, Magic码为020B.
+
+#2. AddressOfEntryPoint
+AddressOfEntryPoint持有EP的RVA值。该值指出程序最先执行的代码起始地址，相当重要。
+
+#3. ImageBase
+进程虚拟内存的范围是0~FFFFFFFF（32位系统）。PE文件被加载到如此大的内存中时，ImageBase指出文件的优先装入地址。	 	 
+EXE、DLL文件被装载到用户内存的0~7FFFFFFF中，SYS文件被载入内核内存的80000000~FFFFFFFF中。一般而言，使用开发工具((V B / V C + \rightarrow / D e l p h i)创建好EXE文件后，其ImageBase的值为00400000, DLL文件的ImageBase值为10000000（当然也可以指定为其他值）。执行PE文件时，PE装载器先创建进程，再将文件载入内存，然后把EIP寄存器的值设置为ImageBase+AddressOfEntryPoint.
+
+#4. SectionAlignment, FileAlignment
+PE文件的Body部分划分为若干节区，这些节存储着不同类别的数据。FileAlignment指定了节区在磁盘文件中的最小单位，而SectionAlignment则指定了节区在内存中的最小单位(一个文件中, FileAlignment与SectionAlignment的值可能相同，也可能不同)。磁盘文件或内存的节区大小必定为FileAlignment或SectionAlignment值的整数倍。
+
+#5. SizeOfImage
+加载PE文件到内存时，SizeOfImage指定了PE Image在虚拟内存中所占空间的大小。一般而言，文件的大小与加载到内存中的大小是不同的（节区头中定义了各节装载的位置与占有内存的大小，后面会讲到）。
+
+#6. SizeOfHeader
+SizeOfHeader用来指出整个PE头的大小。该值也必须是FileAlignment的整数倍。第一节区所在位置与SizeOfHeader距文件开始偏移的量相同。
+
+#7. Subsystem
+该Subsystem值用来区分系统驱动文件(*. sys)与普通的可执行文件(*. exe,*. dll).S
+
+#8. NumberOfRvaAndSizes
+NumberOfRvaAndSizes用来指定DataDirectory(IMAGE OPTIONAL HEADER32结构体的最后一个成员)数组的个数。虽然结构体定义中明确指出了数组个数为IMAGE NUMBEROF DIRECTORY ENTRIES(16), 但是PE装载器通过查看NumberOfRvaAndSizes值来识别数组大小，换言之，数组大小也可能不是16.
+
+#9. DataDirectory
+DataDirectory是由IMAGE_DATA_DIRECTORY结构体组成的数组，数组的每项都有被定义的值。代码13-7列出了各数组项。
+
 13.3.6 节区头………………………………………………101
+
+PE文件格式的设计者们决定把具有相似属性的数据统一保存在一个被称为“节区”的地方，然后需要把各节区属性记录在节区头中（节区属性中有文件/内存的起始位置、大小、访问权限等）。
+
+```c++
+//
+// Section header format.
+//
+
+#define IMAGE_SIZEOF_SHORT_NAME              8
+
+typedef struct _IMAGE_SECTION_HEADER {
+    BYTE    Name[IMAGE_SIZEOF_SHORT_NAME];
+    union {
+            DWORD   PhysicalAddress;
+            DWORD   VirtualSize;
+    } Misc;
+    DWORD   VirtualAddress;
+    DWORD   SizeOfRawData;
+    DWORD   PointerToRawData;
+    DWORD   PointerToRelocations;
+    DWORD   PointerToLinenumbers;
+    WORD    NumberOfRelocations;
+    WORD    NumberOfLinenumbers;
+    DWORD   Characteristics;
+} IMAGE_SECTION_HEADER, *PIMAGE_SECTION_HEADER;
+
+#define IMAGE_SIZEOF_SECTION_HEADER          40
+```
+
+
+```C++
+//
+// Section characteristics.
+//
+//      IMAGE_SCN_TYPE_REG                   0x00000000  // Reserved.
+//      IMAGE_SCN_TYPE_DSECT                 0x00000001  // Reserved.
+//      IMAGE_SCN_TYPE_NOLOAD                0x00000002  // Reserved.
+//      IMAGE_SCN_TYPE_GROUP                 0x00000004  // Reserved.
+#define IMAGE_SCN_TYPE_NO_PAD                0x00000008  // Reserved.
+//      IMAGE_SCN_TYPE_COPY                  0x00000010  // Reserved.
+
+#define IMAGE_SCN_CNT_CODE                   0x00000020  // Section contains code.
+#define IMAGE_SCN_CNT_INITIALIZED_DATA       0x00000040  // Section contains initialized data.
+#define IMAGE_SCN_CNT_UNINITIALIZED_DATA     0x00000080  // Section contains uninitialized data.
+
+#define IMAGE_SCN_LNK_OTHER                  0x00000100  // Reserved.
+#define IMAGE_SCN_LNK_INFO                   0x00000200  // Section contains comments or some other type of information.
+//      IMAGE_SCN_TYPE_OVER                  0x00000400  // Reserved.
+#define IMAGE_SCN_LNK_REMOVE                 0x00000800  // Section contents will not become part of image.
+#define IMAGE_SCN_LNK_COMDAT                 0x00001000  // Section contents comdat.
+//                                           0x00002000  // Reserved.
+//      IMAGE_SCN_MEM_PROTECTED - Obsolete   0x00004000
+#define IMAGE_SCN_NO_DEFER_SPEC_EXC          0x00004000  // Reset speculative exceptions handling bits in the TLB entries for this section.
+#define IMAGE_SCN_GPREL                      0x00008000  // Section content can be accessed relative to GP
+#define IMAGE_SCN_MEM_FARDATA                0x00008000
+//      IMAGE_SCN_MEM_SYSHEAP  - Obsolete    0x00010000
+#define IMAGE_SCN_MEM_PURGEABLE              0x00020000
+#define IMAGE_SCN_MEM_16BIT                  0x00020000
+#define IMAGE_SCN_MEM_LOCKED                 0x00040000
+#define IMAGE_SCN_MEM_PRELOAD                0x00080000
+
+#define IMAGE_SCN_ALIGN_1BYTES               0x00100000  //
+#define IMAGE_SCN_ALIGN_2BYTES               0x00200000  //
+#define IMAGE_SCN_ALIGN_4BYTES               0x00300000  //
+#define IMAGE_SCN_ALIGN_8BYTES               0x00400000  //
+#define IMAGE_SCN_ALIGN_16BYTES              0x00500000  // Default alignment if no others are specified.
+#define IMAGE_SCN_ALIGN_32BYTES              0x00600000  //
+#define IMAGE_SCN_ALIGN_64BYTES              0x00700000  //
+#define IMAGE_SCN_ALIGN_128BYTES             0x00800000  //
+#define IMAGE_SCN_ALIGN_256BYTES             0x00900000  //
+#define IMAGE_SCN_ALIGN_512BYTES             0x00A00000  //
+#define IMAGE_SCN_ALIGN_1024BYTES            0x00B00000  //
+#define IMAGE_SCN_ALIGN_2048BYTES            0x00C00000  //
+#define IMAGE_SCN_ALIGN_4096BYTES            0x00D00000  //
+#define IMAGE_SCN_ALIGN_8192BYTES            0x00E00000  //
+// Unused                                    0x00F00000
+#define IMAGE_SCN_ALIGN_MASK                 0x00F00000
+
+#define IMAGE_SCN_LNK_NRELOC_OVFL            0x01000000  // Section contains extended relocations.
+#define IMAGE_SCN_MEM_DISCARDABLE            0x02000000  // Section can be discarded.
+#define IMAGE_SCN_MEM_NOT_CACHED             0x04000000  // Section is not cachable.
+#define IMAGE_SCN_MEM_NOT_PAGED              0x08000000  // Section is not pageable.
+#define IMAGE_SCN_MEM_SHARED                 0x10000000  // Section is shareable.
+#define IMAGE_SCN_MEM_EXECUTE                0x20000000  // Section is executable.
+#define IMAGE_SCN_MEM_READ                   0x40000000  // Section is readable.
+#define IMAGE_SCN_MEM_WRITE                  0x80000000  // Section is writeable.
+
+```
+
+
+IMAGE_SECTION_HEADER结构体中要了解的重要成员（不使用其他成员）。
+IMAGE_SECTION_HEADER结构体的重要成员
+- VirtualSize	内存中节区所占大小
+- VirtualAddress	内存中节区起始地址 (RVA)
+- SizeOfRawData	磁盘文件中节区所占大小
+- PointerToRawData 磁盘文件中节区起始位置
+- Charateristics	节区属性 (bit OR)
+
+VirtualAddress与PointerToRawData不带有任何值，分别由(定义在IMAGE OPTIONAL HEADER32中的) SectionAlignment与FileAlignment确定。
+VirtualSize与SizeOfRawData一般具有不同的值，即磁盘文件中节区的大小与加载到内存中的节区大小是不同的。
+Characterisitics由代码13-10中显示的值组合(bit OR) 而成。
+Name字段，Name成员不像C语言中的字符串一样以NULL结束，并且没有“必须使用ASCII值”的限制。PE规范未明确规定节区的Name，所以可以向其中放入任何值，甚至可以填充NULL值。所以节区的Name仅供参考，不能保证其百分之百地被用作某种信息（数据节区的名称也可叫做. code）.
+
+提示
+- 讲解PE文件时经常出现“映像”(Image)这一术语，希望各位牢记。PE文件加载到内存时，文件不会原封不动地加载，而要根据节区头中定义的节区起始地址、节区大小等加载。因此，磁盘文件中的PE与内存中的PE具有不同形态。将装载到内存中的形态称为“映像”以示区别，使用这一术语能够很好地区分二者。
+
 13.4 RVA to RAW⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯104
+
+PE文件加载到内存时，每个节区都要能准确完成内存地址与文件偏移间的映射。
+这种映射一般称为RVA to RAW,方法如下。
+- (1)查找RVA所在节区。
+- (2)使用简单的公式计算文件偏移 (RAW).
+  
+根据IMAGE SECTION HEADER结构体，换算公式如下：
+- RAW - PointerToRawData = RVA - VirtualAddress
+- RAW = RVA - VirtualAddress + PointerToRawData
+
 13.5 IAT⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯105
+
 13.5.1 DLL…………………………………………………105
+
 13.5.2 IMAGE IMPORT DESCRIPTOR………………………………107
+
 13.5.3 使用notepad. exe练习⋯⋯⋯⋯⋯⋯108
+
 13.6 EAT⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯112
+
 13.6.1 IMAGE EXPORT DIRECTORY………………………………113
 13.6.2 使用kernel32. dll练习………………114
 13.7 高级PE⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯116
@@ -1141,3 +1686,48 @@ link /?
 
 ### **总结**
 通过上述命令，可以在 **Visual Studio** 环境中实现高效的项目构建与管理。掌握 `MSBuild`、`cl.exe` 和 `link.exe` 的核心用法，能够灵活应对从简单编译到复杂项目构建的需求，同时结合 `Developer Command Prompt` 的环境配置，确保编译链接过程无缝衔接。
+
+
+
+
+## windows下 ULONGLONG DWORD WORD BYTE 分别是多少字节？
+
+在 Windows 平台下，以下数据类型的大小如下：
+
+| **数据类型** | **字节数** | **位数** | **说明**                                                                 |
+|--------------|-------------|-----------|--------------------------------------------------------------------------|
+| **BYTE**     | 1 字节      | 8 位      | 无符号字符类型，等同于 `unsigned char`。                                |
+| **WORD**     | 2 字节      | 16 位     | 无符号短整数类型，等同于 `unsigned short`。                             |
+| **DWORD**    | 4 字节      | 32 位     | "双字"（Double Word），等同于 `unsigned long`（注意：在 Windows 中始终为 4 字节）。 |
+| **ULONGLONG**| 8 字节      | 64 位     | 无符号长长整数类型，等同于 `unsigned long long`（C++11 中的 `uint64_t`）。          |
+
+---
+
+### 关键说明：
+1. **固定大小**：  
+   这些类型在 Windows SDK 中明确定义，与编译器和系统架构（32/64位）无关，保证兼容性。
+
+2. **用途**：  
+   - `BYTE`：处理二进制数据（如文件、网络流）。  
+   - `WORD`/`DWORD`：与 Windows API 交互（如 `GetLastError()` 返回 `DWORD`）。  
+   - `ULONGLONG`：表示大范围数值（如文件大小、时间戳）。
+
+3. **跨平台注意**：  
+   非 Windows 系统（如 Linux）需使用 `<stdint.h>` 的类型（如 `uint32_t`），但 Windows 下优先使用上述类型以保证与 API 兼容。
+
+---
+
+### 验证方式：
+可通过 `sizeof` 运算符直接验证（示例代码）：
+```cpp
+#include <Windows.h>
+#include <stdio.h>
+
+int main() {
+    printf("BYTE: %zu\n", sizeof(BYTE));      // 输出 1
+    printf("WORD: %zu\n", sizeof(WORD));      // 输出 2
+    printf("DWORD: %zu\n", sizeof(DWORD));    // 输出 4
+    printf("ULONGLONG: %zu\n", sizeof(ULONGLONG)); // 输出 8
+    return 0;
+}
+```
