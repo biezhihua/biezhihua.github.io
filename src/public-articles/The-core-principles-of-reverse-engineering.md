@@ -1010,6 +1010,21 @@ DataDirectory是由IMAGE_DATA_DIRECTORY结构体组成的数组，数组的每�
 
 PE文件格式的设计者们决定把具有相似属性的数据统一保存在一个被称为“节区”的地方，然后需要把各节区属性记录在节区头中（节区属性中有文件/内存的起始位置、大小、访问权限等）。
 
+IMAGE_SECTION_HEADER 40个字节
+
+```
+2E 74 65 78 74 00 00 00    Name
+9E170000    Misc
+00100000    VirtualAddress
+00180000    SizeOfRawData
+00040000    PointerToRawData
+00000000    PointerToRelocations
+00000000    PointerToLinenumbers
+0000        NumberOfRelocations
+0000        NumberOfLinenumbers
+20000060    Characteristics
+```
+
 ```c++
 //
 // Section header format.
