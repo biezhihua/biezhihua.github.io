@@ -1006,6 +1006,25 @@ NumberOfRvaAndSizes用来指定DataDirectory(IMAGE OPTIONAL HEADER32结构体的
 #9. DataDirectory
 DataDirectory是由IMAGE_DATA_DIRECTORY结构体组成的数组，数组的每项都有被定义的值。代码13-7列出了各数组项。
 
+```c++
+DataDirectory[θ] = EXPORT Directory
+DataDirectory[1] = IMPORT Directory
+DataDirectory[2] = RESOURCE Directory
+DataDirectory[3] = EXCEPTION Directory
+DataDirectory[4] = SECURITY Directory
+DataDirectory[5] = BASERELOC Directory
+DataDirectory[6] = DEBUG Directory
+DataDirectory[7] = COPYRIGHT Directory
+DataDirectory[8] = GLOBALPTR Directory
+DataDirectory[9] = TLS Directory
+DataDirectory[A] = LOAD CONFIG Directory
+DataDirectory[B] = BOUND IMPORT Directory
+DataDirectory[C] = IAT Directory
+DataDirectory[D] = DELAY IMPORT Directory
+DataDirectory[E] = COM DESCRIPTOR Directory
+DataDirectory[F] = Reserved Directory
+```
+
 13.3.6 节区头………………………………………………101
 
 PE文件格式的设计者们决定把具有相似属性的数据统一保存在一个被称为“节区”的地方，然后需要把各节区属性记录在节区头中（节区属性中有文件/内存的起始位置、大小、访问权限等）。
@@ -1139,21 +1158,140 @@ PE文件加载到内存时，每个节区都要能准确完成内存地址与文
 - RAW - PointerToRawData = RVA - VirtualAddress
 - RAW = RVA - VirtualAddress + PointerToRawData
 
+接下来将继续学习PE头的核心内容:
+- IAT(Import Address Table, 导入地址表)
+- EAT (Export Address Table, 导出地址表)
+
 13.5 IAT⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯105
+
+IAT (Import Address Table, 导入地址表)。
 
 13.5.1 DLL…………………………………………………105
 
-13.5.2 IMAGE IMPORT DESCRIPTOR………………………………107
+Windows OS设计者们根据需要引入了DLL这一概念，描述如下。
+- 不要把库包含到程序中，单独组成DLL文件，需要时调用即可。
+- 内存映射技术使加载后的DLL代码、资源在多个进程中实现共享。
+- 更新库时只要替换相关DLL文件即可，简便易行。
+
+13.5.2 IMAGE_IMPORT_DESCRIPTOR………………………………107
+
+```C++
+typedef struct _IMAGE_IMPORT_DESCRIPTOR {
+    union {
+        DWORD   Characteristics;            // 0 for terminating null import descriptor
+        DWORD   OriginalFirstThunk;         // RVA to original unbound IAT (PIMAGE_THUNK_DATA)
+    } DUMMYUNIONNAME;
+    DWORD   TimeDateStamp;                  // 0 if not bound,
+                                            // -1 if bound, and real date\time stamp
+                                            //     in IMAGE_DIRECTORY_ENTRY_BOUND_IMPORT (new BIND)
+                                            // O.W. date/time stamp of DLL bound to (Old BIND)
+
+    DWORD   ForwarderChain;                 // -1 if no forwarders
+    DWORD   Name;
+    DWORD   FirstThunk;                     // RVA to IAT (if bound this IAT has actual addresses)
+} IMAGE_IMPORT_DESCRIPTOR;
+typedef IMAGE_IMPORT_DESCRIPTOR UNALIGNED *PIMAGE_IMPORT_DESCRIPTOR;
+
+typedef struct _IMAGE_IMPORT_BY_NAME {
+    WORD    Hint;
+    CHAR   Name[1];
+} IMAGE_IMPORT_BY_NAME, *PIMAGE_IMPORT_BY_NAME;
+
+typedef struct _IMAGE_THUNK_DATA64 {
+    union {
+        ULONGLONG ForwarderString;  // PBYTE 
+        ULONGLONG Function;         // PDWORD
+        ULONGLONG Ordinal;
+        ULONGLONG AddressOfData;    // PIMAGE_IMPORT_BY_NAME
+    } u1;
+} IMAGE_THUNK_DATA64;
+typedef IMAGE_THUNK_DATA64 * PIMAGE_THUNK_DATA64;
+
+typedef struct _IMAGE_THUNK_DATA32 {
+    union {
+        DWORD ForwarderString;      // PBYTE 
+        DWORD Function;             // PDWORD
+        DWORD Ordinal;
+        DWORD AddressOfData;        // PIMAGE_IMPORT_BY_NAME
+    } u1;
+} IMAGE_THUNK_DATA32;
+typedef IMAGE_THUNK_DATA32 * PIMAGE_THUNK_DATA32;
+```
+
+执行一个普通程序时往往需要导入多个库，导入多少库就存在多少个IMAGE_IMPORT_DESCRIPTOR结构体，这些结构体形成了数组，且结构体数组最后以NULL结构体结束。
+
+IMAGE_IMPORT_DESCRIPTOR中的重要成员如表所示（拥有全部RVA值）。
+- OriginalFirstThunk	INT的地址(RVA)
+- Name	库名称字符串的地址 (RVA)
+- FirstThunk	IAT的地址(RVA)
+  
+下面了解一下PE装载器把导入函数输入至IAT的顺序。IAT输入顺序:
+1. 读取IID(IMAGE_IMPORT_DESCRIPTOR)的Name成员，获取库名称字符串 ("kernel32. dll").
+2. 装载相应库。
+   → LoadLibrary("kernel32. dll")
+3. 读取IID的OriginalFirstThunk成员，获取INT地址。
+4. 逐一读取INT中数组的值，获取相应IMAGE_IMPORT_BY_NAME地址 (RVA).
+5. 使用IMAGE_IMPORT_BY_NAME的Hint (ordinal) 或Name项，获取相应函数的起始地址。
+    → GetProcAddress("GetCurrentThreadld")
+6. 读取IID的FirstThunk (IAT) 成员，获得IAT地址。
+7. 将上面获得的函数地址输入相应IAT数组值。
+8. 重复以上步骤4~7, 直到INT结束 (遇到NULL时)。
 
 13.5.3 使用notepad. exe练习⋯⋯⋯⋯⋯⋯108
 
 13.6 EAT⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯112
 
-13.6.1 IMAGE EXPORT DIRECTORY………………………………113
+Windows操作系统中，“库”是为了方便其他程序调用而集中包含相关函数的文件(DLL/SYS)。
+
+Win32API是最具代表性的库，其中的kernel32. dll文件被称为最核心的库文件。
+
+
+EAT是一种核心机制，它使不同的应用程序可以调用库文件中提供的函数。
+也就是说，只有通过EAT才能准确求得从相应库中导出函数的起始地址。
+
+与前面讲解的IAT一样，PE文件内的特定结构体(IMAGE_EXPORT_DIRECTORY)保存着导出信息，且PE文件中仅有一个用来说明库EAT的IMAGE EXPORT DIRECTORY结构体。
+
+13.6.1 IMAGE_EXPORT_DIRECTORY ………………………………113
+
+```c++
+//@[comment("MVI_tracked")]
+typedef struct _IMAGE_EXPORT_DIRECTORY {
+    DWORD   Characteristics;
+    DWORD   TimeDateStamp;
+    WORD    MajorVersion;
+    WORD    MinorVersion;
+    DWORD   Name;
+    DWORD   Base;
+    DWORD   NumberOfFunctions;
+    DWORD   NumberOfNames;
+    DWORD   AddressOfFunctions;     // RVA from base of image
+    DWORD   AddressOfNames;         // RVA from base of image
+    DWORD   AddressOfNameOrdinals;  // RVA from base of image
+} IMAGE_EXPORT_DIRECTORY, *PIMAGE_EXPORT_DIRECTORY;
+```
+
+- NumberOfFunctions	实际Export函数的个数
+- NumberOfNames	Export函数中具名的函数个数
+- AddressOfFunctions	Export函数地址数组 (数组元素个数=NumberOfFunctions)
+- AddressOfNames	函数名称地址数组 (数组元素个数=NumberOfNames)
+- AddressOfNameOrdinals	Ordinal地址数组 (数组元素个数=NumberOfNames)
+
+GetProcAddress()操作原理:
+- (1)利用AddressOfNames成员转到“函数名称数组”。
+- (2)“函数名称数组”中存储着字符串地址。通过比较(strcmp)字符串，查找指定的函数名称（此时数组的索引称为name index）.
+- (3)利用AddressOfNameOrdinals成员，转到orinal数组。
+- (4)在ordinal数组中通过name index查找相应ordinal值。
+- (5)利用AddressOfFunctions成员转到“函数地址数组”(EAT).
+- (6)在“函数地址数组”中将刚刚求得的ordinal用作数组索引，获得指定函数的起始地址。
+
 13.6.2 使用kernel32. dll练习………………114
+
 13.7 高级PE⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯116
+
 13.7.1 PEView.exe⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯ 116
+
 13.7.2 Patched PE⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯117
+
 13.8 小结⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯118
 
 ### 第14章	运行时压缩⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯121
@@ -1216,7 +1354,7 @@ PE文件加载到内存时，每个节区都要能准确完成内存地址与文
 18.5.4 IMAGE SECTION HEADER⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯153
 18.5.5 重叠节区⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯155
 18.5.6 RVA to RAW⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯156
-18.5.7 导入表 (IMAGE IMPORT DESCRIPTOR array)…………………158
+18.5.7 导入表 (IMAGE_IMPORT_DESCRIPTOR array)…………………158
 18.5.8 导入地址表⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯160
 18.6 小结⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯⋯161
 
