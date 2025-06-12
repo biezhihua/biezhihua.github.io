@@ -43,7 +43,7 @@ export default hopeTheme({
       blog: {
         filter: page => {
           //  || page?.filePathRelative?.startsWith("learn-blogs") || page?.filePathRelative?.startsWith("public-articles") || false
-          return page?.filePathRelative?.startsWith("public-articles");
+          return page?.filePathRelative?.startsWith("public-articles") ||  page?.filePathRelative?.startsWith("learn-android");
         },
         excerptLength: 0,
       }
